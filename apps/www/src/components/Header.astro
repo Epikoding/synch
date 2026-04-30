@@ -9,8 +9,6 @@ const locale = Astro.props.locale ?? getLocale(Astro.currentLocale);
 const t = ui[locale].nav;
 const apiUrl = import.meta.env.PUBLIC_API_URL || "";
 const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
-const signInUrl = new URL("/signin", apiUrl || Astro.url.origin);
-signInUrl.searchParams.set("return_to", vaultsUrl);
 const authButtonClass =
   "inline-flex h-8 min-w-16 items-center justify-center rounded bg-zinc-200 px-3 text-xs font-medium text-[#0a0a0a] transition-colors hover:bg-white";
 ---
@@ -30,16 +28,17 @@ const authButtonClass =
       class="hover:text-zinc-200 transition-colors">{t.github}</a
     >
     <div class="w-px h-3 bg-zinc-800"></div>
-    <a
+    <button
       id="auth-link"
-      href={signInUrl.toString()}
-      class={authButtonClass}>{t.signIn}</a
+      type="button"
+      data-waitlist-open
+      class={authButtonClass}>{t.joinWaitlist}</button
     >
   </nav>
 </header>
 
 <script
-  define:vars={{ apiUrl, authButtonClass, signInLabel: t.signIn, signInUrl: signInUrl.toString(), vaultsLabel: t.vaults, vaultsUrl }}
+  define:vars={{ apiUrl, authButtonClass, vaultsLabel: t.vaults, vaultsUrl }}
 >
   async function checkAuth() {
     const authLink = document.getElementById("auth-link");
@@ -54,12 +53,13 @@ const authButtonClass =
 
       if (session?.user) {
         authLink.textContent = vaultsLabel;
-        authLink.setAttribute("href", vaultsUrl);
+        authLink.removeAttribute("data-waitlist-open");
+        authLink.addEventListener("click", () => {
+          window.location.href = vaultsUrl;
+        });
         authLink.className = authButtonClass;
       }
     } catch (error) {
-      authLink.textContent = signInLabel;
-      authLink.setAttribute("href", signInUrl);
       authLink.className = authButtonClass;
     }
   }

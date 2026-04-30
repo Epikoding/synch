@@ -1,0 +1,131 @@
+---
+import { getLocale, ui, type Locale } from "../i18n";
+
+interface Props {
+  locale?: Locale;
+}
+
+const locale = Astro.props.locale ?? getLocale(Astro.currentLocale);
+const t = ui[locale].waitlist;
+---
+
+<dialog
+  id="waitlist-dialog"
+  class="fixed inset-0 m-auto max-h-[calc(100vh-2rem)] w-[min(calc(100%-2rem),26rem)] rounded border border-zinc-800 bg-[#0f0f0f] p-0 text-zinc-400 shadow-2xl backdrop:bg-black/70"
+>
+  <form method="dialog" class="flex justify-end border-b border-zinc-800 px-4 py-3">
+    <button
+      type="submit"
+      class="text-xs text-zinc-500 transition-colors hover:text-zinc-200"
+    >
+      {t.close}
+    </button>
+  </form>
+  <form id="waitlist-form" class="space-y-5 p-6">
+    <input type="hidden" name="locale" value={locale} />
+    <input
+      type="text"
+      name="website"
+      tabindex="-1"
+      autocomplete="off"
+      class="hidden"
+      aria-hidden="true"
+    />
+    <div class="space-y-2">
+      <h2 class="text-lg font-normal text-zinc-200">{t.title}</h2>
+      <p class="leading-relaxed text-zinc-500">{t.body}</p>
+    </div>
+    <label class="block space-y-2">
+      <span class="text-xs text-zinc-400">{t.emailLabel}</span>
+      <input
+        required
+        type="email"
+        name="email"
+        autocomplete="email"
+        placeholder={t.emailPlaceholder}
+        class="h-10 w-full rounded border border-zinc-800 bg-[#0a0a0a] px-3 text-sm text-zinc-200 outline-none transition-colors placeholder:text-zinc-700 focus:border-zinc-600"
+      />
+    </label>
+    <button
+      type="submit"
+      class="inline-flex h-10 w-full items-center justify-center rounded bg-zinc-200 px-4 text-sm font-medium text-[#0a0a0a] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {t.submit}
+    </button>
+    <p id="waitlist-message" class="min-h-5 text-sm text-zinc-500" aria-live="polite"></p>
+  </form>
+</dialog>
+
+<script
+  define:vars={{
+    duplicateMessage: t.duplicate,
+    errorMessage: t.error,
+    submitLabel: t.submit,
+    submittingLabel: t.submitting,
+    successMessage: t.success,
+  }}
+>
+  const dialog = document.getElementById("waitlist-dialog");
+  const form = document.getElementById("waitlist-form");
+  const message = document.getElementById("waitlist-message");
+  const submitButton = form?.querySelector("button[type='submit']");
+
+  dialog?.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+
+    const trigger = event.target.closest("[data-waitlist-open]");
+    if (!trigger || !(dialog instanceof HTMLDialogElement)) return;
+
+    event.preventDefault();
+    message.textContent = "";
+    if (submitButton instanceof HTMLButtonElement) {
+      submitButton.disabled = false;
+      submitButton.textContent = submitLabel;
+    }
+    dialog.showModal();
+    dialog.querySelector("input[name='email']")?.focus();
+  });
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!(form instanceof HTMLFormElement) || !(submitButton instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const body = Object.fromEntries(new FormData(form));
+    submitButton.disabled = true;
+    submitButton.textContent = submittingLabel;
+    message.textContent = "";
+
+    try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        message.textContent = result.status === "existing" ? duplicateMessage : successMessage;
+        form.reset();
+        submitButton.textContent = submitLabel;
+        return;
+      }
+
+      message.textContent = errorMessage;
+      submitButton.disabled = false;
+      submitButton.textContent = submitLabel;
+    } catch {
+      message.textContent = errorMessage;
+      submitButton.disabled = false;
+      submitButton.textContent = submitLabel;
+    }
+  });
+</script>

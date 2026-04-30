@@ -1,10 +1,19 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "synch-www",
-  "compatibility_date": "2026-04-30",
-  "assets": {
-    "directory": "./dist",
-    "html_handling": "drop-trailing-slash",
-    "not_found_handling": "none"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "synch-www",
+	"compatibility_date": "2026-04-17",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": "./dist",
+		"html_handling": "drop-trailing-slash",
+		"not_found_handling": "none"
+	},
+	"d1_databases": [
+		{
+			"binding": "WAITLIST_DB",
+			"database_name": "synch-www-waitlist",
+      "database_id": "03cc9276-9e98-4b8c-b671-732bbc3a8bfc",
+			"migrations_dir": "migrations"
+		}
+	]
 }

@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { getLocale, ui, type Locale } from '../i18n';
+import WaitlistDialog from '../components/WaitlistDialog.astro';
 
 interface Props {
 	title?: string;
@@ -21,5 +22,6 @@ const { title = ui[locale].meta.defaultTitle } = Astro.props;
 	</head>
 	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased selection:bg-zinc-800 selection:text-zinc-200 min-h-screen flex flex-col text-sm">
 		<slot />
+		<WaitlistDialog locale={locale} />
 	</body>
 </html>
