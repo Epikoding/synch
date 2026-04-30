@@ -1,0 +1,119 @@
+---
+import Footer from "./Footer.astro";
+import Header from "./Header.astro";
+import Layout from "../layouts/Layout.astro";
+import { ui, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = ui[locale];
+const apiUrl = import.meta.env.PUBLIC_API_URL || "";
+const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
+const signUpUrl = new URL("/signup", apiUrl || Astro.url.origin);
+signUpUrl.searchParams.set("return_to", vaultsUrl);
+const freeFeatures = [
+  t.pricing.features.oneVault,
+  t.pricing.features.freeStorage,
+  t.pricing.features.freeFileSize,
+  t.pricing.features.history,
+];
+const starterFeatures = [
+  t.pricing.features.oneVault,
+  t.pricing.features.starterStorage,
+  t.pricing.features.starterFileSize,
+  t.pricing.features.history,
+];
+---
+
+<Layout title={t.meta.pricingTitle} locale={locale}>
+  <div class="max-w-2xl mx-auto px-6 w-full flex-1 flex flex-col">
+    <Header locale={locale} />
+
+    <main class="flex-1 flex flex-col py-24">
+      <div class="space-y-4 mb-20 text-center">
+        <h1
+          class="text-2xl sm:text-3xl text-zinc-200 tracking-tight"
+        >
+          {t.pricing.heading}
+        </h1>
+        <p class="text-zinc-500 max-w-md leading-relaxed mx-auto">
+          {t.pricing.subheading}
+        </p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto w-full">
+        <div
+          class="p-6 rounded-lg border border-zinc-800/50 bg-zinc-900/20 flex flex-col"
+        >
+          <div class="mb-8">
+            <h3 class="text-zinc-200 font-normal mb-2">{t.pricing.freePlan}</h3>
+            <div class="flex items-baseline gap-1">
+              <span class="text-2xl text-zinc-200">$0</span>
+              <span class="text-xs text-zinc-500">{t.pricing.forever}</span>
+            </div>
+          </div>
+
+          <ul class="space-y-4 mb-8 text-xs flex-1 text-zinc-400">
+            {
+              freeFeatures.map((feature) => (
+                <li class="flex items-center gap-3">
+                  <div class="w-1 h-1 rounded-full bg-zinc-600" />
+                  {feature}
+                </li>
+              ))
+            }
+          </ul>
+
+          <a
+            href={signUpUrl.toString()}
+            class="w-full py-2 px-4 text-center text-xs bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
+          >
+            {t.home.getStarted}
+          </a>
+        </div>
+
+        <div
+          class="p-6 rounded-lg border border-zinc-800/50 bg-zinc-900/10 flex flex-col relative opacity-80"
+        >
+          <div
+            class="absolute -top-3 right-6 px-2 py-1 bg-zinc-800 text-zinc-300 text-[10px] font-medium uppercase tracking-wider rounded-sm"
+          >
+            {t.pricing.comingSoon}
+          </div>
+          <div class="mb-8">
+            <h3 class="text-zinc-400 font-normal mb-2">
+              {t.pricing.starterPlan}
+            </h3>
+            <div class="flex items-baseline gap-1">
+              <span class="text-2xl text-zinc-400">$1</span>
+              <span class="text-xs text-zinc-600">{t.pricing.month}</span>
+            </div>
+          </div>
+
+          <ul class="space-y-4 mb-8 text-xs flex-1 text-zinc-500">
+            {
+              starterFeatures.map((feature) => (
+                <li class="flex items-center gap-3">
+                  <div class="w-1 h-1 rounded-full bg-zinc-700" />
+                  {feature}
+                </li>
+              ))
+            }
+          </ul>
+
+          <button
+            disabled
+            class="w-full py-2 px-4 text-center text-xs bg-zinc-800/50 text-zinc-500 rounded cursor-not-allowed"
+          >
+            {t.pricing.comingSoon}
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <Footer locale={locale} />
+  </div>
+</Layout>

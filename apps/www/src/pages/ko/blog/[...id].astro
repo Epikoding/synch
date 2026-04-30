@@ -1,16 +1,16 @@
 ---
 import { getCollection, render } from "astro:content";
-import BlogPostPage from "../../components/BlogPostPage.astro";
-import { blogSlug, isLocaleEntry } from "../../i18n";
+import BlogPostPage from "../../../components/BlogPostPage.astro";
+import { blogSlug, isLocaleEntry } from "../../../i18n";
 
 export async function getStaticPaths() {
   const posts = await getCollection("blog", ({ id, data }) => {
     const visible = import.meta.env.PROD ? data.draft !== true : true;
-    return visible && isLocaleEntry(id, "en");
+    return visible && isLocaleEntry(id, "ko");
   });
 
   return posts.map((post) => ({
-    params: { id: blogSlug(post.id, "en") },
+    params: { id: blogSlug(post.id, "ko") },
     props: { post },
   }));
 }
@@ -19,4 +19,4 @@ const { post } = Astro.props;
 const { Content } = await render(post);
 ---
 
-<BlogPostPage Content={Content} locale="en" post={post} />
+<BlogPostPage Content={Content} locale="ko" post={post} />

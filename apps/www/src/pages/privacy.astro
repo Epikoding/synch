@@ -17,14 +17,14 @@ const Content = rendered?.Content;
 			{
 				entry && Content ? (
 					<article class="legal-content">
-						<h1 class="text-2xl sm:text-3xl font-light text-zinc-200 tracking-tight mb-4">{entry.data.title}</h1>
+						<h1 class="text-2xl sm:text-3xl text-zinc-200 tracking-tight mb-4">{entry.data.title}</h1>
 						{entry.data.description && <p class="text-zinc-500 mb-12 text-base">{entry.data.description}</p>}
 						<div class="h-px bg-zinc-800/50 w-full mb-12"></div>
 						<Content />
 					</article>
 				) : (
 					<section>
-						<h1 class="text-2xl sm:text-3xl font-light text-zinc-200 tracking-tight mb-8">Privacy Policy</h1>
+						<h1 class="text-2xl sm:text-3xl text-zinc-200 tracking-tight mb-8">Privacy Policy</h1>
 						<p class="text-zinc-500">Privacy policy content has not been added yet.</p>
 					</section>
 				)

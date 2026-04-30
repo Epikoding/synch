@@ -1,4 +1,12 @@
 ---
+import { getLocale, localizedPath, ui, type Locale } from "../i18n";
+
+interface Props {
+  locale?: Locale;
+}
+
+const locale = Astro.props.locale ?? getLocale(Astro.currentLocale);
+const t = ui[locale].nav;
 const apiUrl = import.meta.env.PUBLIC_API_URL || "";
 const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
 const signInUrl = new URL("/signin", apiUrl || Astro.url.origin);
@@ -9,29 +17,29 @@ const authButtonClass =
 
 <header class="py-12 flex items-center justify-between">
   <a
-    href="/"
+    href={localizedPath(locale)}
     class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity"
     >Synch</a
   >
   <nav class="flex items-center gap-6 text-xs">
-    <a href="/pricing" class="hover:text-zinc-200 transition-colors">Pricing</a>
+    <a href={localizedPath(locale, "/pricing")} class="hover:text-zinc-200 transition-colors">{t.pricing}</a>
     <a
       href="https://github.com/hjinco/synch"
       target="_blank"
       rel="noopener noreferrer"
-      class="hover:text-zinc-200 transition-colors">GitHub</a
+      class="hover:text-zinc-200 transition-colors">{t.github}</a
     >
     <div class="w-px h-3 bg-zinc-800"></div>
     <a
       id="auth-link"
       href={signInUrl.toString()}
-      class={authButtonClass}>Sign In</a
+      class={authButtonClass}>{t.signIn}</a
     >
   </nav>
 </header>
 
 <script
-  define:vars={{ apiUrl, authButtonClass, signInUrl: signInUrl.toString(), vaultsUrl }}
+  define:vars={{ apiUrl, authButtonClass, signInLabel: t.signIn, signInUrl: signInUrl.toString(), vaultsLabel: t.vaults, vaultsUrl }}
 >
   async function checkAuth() {
     const authLink = document.getElementById("auth-link");
@@ -45,12 +53,12 @@ const authButtonClass =
       const session = response.ok ? await response.json() : null;
 
       if (session?.user) {
-        authLink.textContent = "Vaults";
+        authLink.textContent = vaultsLabel;
         authLink.setAttribute("href", vaultsUrl);
         authLink.className = authButtonClass;
       }
     } catch (error) {
-      authLink.textContent = "Sign In";
+      authLink.textContent = signInLabel;
       authLink.setAttribute("href", signInUrl);
       authLink.className = authButtonClass;
     }

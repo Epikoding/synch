@@ -1,0 +1,61 @@
+---
+import type { CollectionEntry } from "astro:content";
+import Footer from "./Footer.astro";
+import Header from "./Header.astro";
+import Layout from "../layouts/Layout.astro";
+import { ui, type Locale } from "../i18n";
+
+interface Props {
+  Content: unknown;
+  locale: Locale;
+  post: CollectionEntry<"blog">;
+}
+
+const { Content, locale, post } = Astro.props;
+const t = ui[locale];
+---
+
+<Layout title={`${post.data.title} - Synch`} locale={locale}>
+  <div class="max-w-3xl mx-auto px-6 w-full flex-1 flex flex-col">
+    <Header locale={locale} />
+
+    <main class="flex-1 py-16">
+      <article class="blog-content max-w-none">
+        <h1>{post.data.title}</h1>
+        <p class="lead">{post.data.description}</p>
+        <time datetime={post.data.pubDate.toISOString()}>
+          {post.data.pubDate.toLocaleDateString(t.blog.dateLocale, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </time>
+        <Content />
+      </article>
+    </main>
+
+    <Footer locale={locale} />
+  </div>
+</Layout>
+
+<style is:global>
+  @reference "../styles/global.css";
+  .blog-content h1 {
+    @apply text-3xl font-semibold text-zinc-200 mb-4;
+  }
+  .blog-content .lead {
+    @apply text-zinc-500 mb-3;
+  }
+  .blog-content time {
+    @apply block text-sm text-zinc-600 mb-10;
+  }
+  .blog-content h2 {
+    @apply text-xl font-medium text-zinc-200 mt-10 mb-4;
+  }
+  .blog-content p {
+    @apply text-zinc-400 mb-6 leading-relaxed;
+  }
+  .blog-content a {
+    @apply text-zinc-300 border-b border-zinc-700 hover:text-zinc-100 hover:border-zinc-500 transition-colors;
+  }
+</style>
