@@ -12,11 +12,9 @@ signInUrl.searchParams.set("return_to", vaultsUrl);
     >Synch</a
   >
   <nav class="flex items-center gap-6 text-xs">
-    <a href="/pricing" class="hover:text-zinc-200 transition-colors"
-      >Pricing</a
-    >
+    <a href="/pricing" class="hover:text-zinc-200 transition-colors">Pricing</a>
     <a
-      href="https://github.com/hyeongjin/synch"
+      href="https://github.com/hjinco/synch"
       target="_blank"
       rel="noopener noreferrer"
       class="hover:text-zinc-200 transition-colors">GitHub</a
@@ -31,7 +29,6 @@ signInUrl.searchParams.set("return_to", vaultsUrl);
 </header>
 
 <script define:vars={{ apiUrl, signInUrl: signInUrl.toString(), vaultsUrl }}>
-
   async function checkAuth() {
     const authLink = document.getElementById("auth-link");
     if (!authLink) return;
