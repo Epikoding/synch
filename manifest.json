@@ -3,7 +3,7 @@
   "name": "Synch",
   "version": "0.0.1",
   "minAppVersion": "1.11.4",
-  "description": "End-to-end encrypted sync for Obsidian vaults.",
+  "description": "Sync your vault across devices with end-to-end encryption.",
   "author": "Synch",
   "authorUrl": "https://github.com/hjinco/synch",
   "isDesktopOnly": false
