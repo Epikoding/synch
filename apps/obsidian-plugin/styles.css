@@ -79,11 +79,6 @@
   color: var(--text-on-accent);
 }
 
-.synch-vault-option-id {
-  font-size: var(--font-ui-smaller);
-  opacity: 0.8;
-}
-
 .synch-history-view {
   display: flex;
   flex-direction: column;

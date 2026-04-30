@@ -384,10 +384,6 @@ class BootstrapRemoteVaultModal extends Modal {
         this.renderVaultButtons(containerEl, selectedLabel);
       });
 
-      button.createEl("span", {
-        cls: "synch-vault-option-id",
-        text: vault.id,
-      });
     }
   }
 
@@ -397,6 +393,6 @@ class BootstrapRemoteVaultModal extends Modal {
       return "None";
     }
 
-    return `${selectedVault.name} (${selectedVault.id})`;
+    return selectedVault.name;
   }
 }
