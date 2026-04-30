@@ -26,6 +26,13 @@ export type SubscriptionPlanPolicy = {
 	};
 };
 
+export type SubscriptionPlanLimitOverrides = {
+	syncedVaults?: number | null;
+	storageLimitBytes?: number | null;
+	maxFileSizeBytes?: number | null;
+	versionHistoryRetentionDays?: number | null;
+};
+
 export const SUBSCRIPTION_PLAN_POLICIES = {
 	free: {
 		id: "free",
@@ -91,6 +98,26 @@ export function getSubscriptionPlanPolicy(
 	planId: SubscriptionPlanId,
 ): SubscriptionPlanPolicy {
 	return SUBSCRIPTION_PLAN_POLICIES[planId];
+}
+
+export function applySubscriptionPlanLimitOverrides(
+	policy: SubscriptionPlanPolicy,
+	overrides: SubscriptionPlanLimitOverrides,
+): SubscriptionPlanPolicy {
+	return {
+		...policy,
+		limits: {
+			syncedVaults:
+				overrides.syncedVaults ?? policy.limits.syncedVaults,
+			storageLimitBytes:
+				overrides.storageLimitBytes ?? policy.limits.storageLimitBytes,
+			maxFileSizeBytes:
+				overrides.maxFileSizeBytes ?? policy.limits.maxFileSizeBytes,
+			versionHistoryRetentionDays:
+				overrides.versionHistoryRetentionDays ??
+				policy.limits.versionHistoryRetentionDays,
+		},
+	};
 }
 
 export function formatPolicyBytes(bytes: number): string {

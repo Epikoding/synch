@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import type { D1Db } from "../db/client";
 import * as schema from "../db/d1";
 import {
+	applySubscriptionPlanLimitOverrides,
 	getSubscriptionPlanPolicy,
 	type SubscriptionPlanPolicy,
 } from "./policy";
@@ -39,11 +40,34 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 			.orderBy(desc(schema.polarSubscription.periodEnd))
 			.limit(10);
 
-		if (subscriptions.some(subscriptionGrantsAccess)) {
-			return getSubscriptionPlanPolicy("starter");
+		const basePolicy = subscriptions.some(subscriptionGrantsAccess)
+			? getSubscriptionPlanPolicy("starter")
+			: getSubscriptionPlanPolicy("free");
+
+		const organizations = await this.db
+			.select({
+				syncedVaultsOverride: schema.organization.syncedVaultsOverride,
+				storageLimitBytesOverride: schema.organization.storageLimitBytesOverride,
+				maxFileSizeBytesOverride: schema.organization.maxFileSizeBytesOverride,
+				versionHistoryRetentionDaysOverride:
+					schema.organization.versionHistoryRetentionDaysOverride,
+			})
+			.from(schema.organization)
+			.where(eq(schema.organization.id, organizationId))
+			.limit(1);
+
+		const organization = organizations[0];
+		if (!organization) {
+			return basePolicy;
 		}
 
-		return getSubscriptionPlanPolicy("free");
+		return applySubscriptionPlanLimitOverrides(basePolicy, {
+			syncedVaults: organization.syncedVaultsOverride,
+			storageLimitBytes: organization.storageLimitBytesOverride,
+			maxFileSizeBytes: organization.maxFileSizeBytesOverride,
+			versionHistoryRetentionDays:
+				organization.versionHistoryRetentionDaysOverride,
+		});
 	}
 
 	async readVaultPolicy(vaultId: string): Promise<SubscriptionPlanPolicy> {
