@@ -3,6 +3,8 @@ const apiUrl = import.meta.env.PUBLIC_API_URL || "";
 const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
 const signInUrl = new URL("/signin", apiUrl || Astro.url.origin);
 signInUrl.searchParams.set("return_to", vaultsUrl);
+const authButtonClass =
+  "inline-flex h-8 min-w-16 items-center justify-center rounded bg-zinc-200 px-3 text-xs font-medium text-[#0a0a0a] transition-colors hover:bg-white";
 ---
 
 <header class="py-12 flex items-center justify-between">
@@ -23,12 +25,14 @@ signInUrl.searchParams.set("return_to", vaultsUrl);
     <a
       id="auth-link"
       href={signInUrl.toString()}
-      class="hover:text-zinc-200 transition-colors">Sign In</a
+      class={authButtonClass}>Sign In</a
     >
   </nav>
 </header>
 
-<script define:vars={{ apiUrl, signInUrl: signInUrl.toString(), vaultsUrl }}>
+<script
+  define:vars={{ apiUrl, authButtonClass, signInUrl: signInUrl.toString(), vaultsUrl }}
+>
   async function checkAuth() {
     const authLink = document.getElementById("auth-link");
     if (!authLink) return;
@@ -43,13 +47,12 @@ signInUrl.searchParams.set("return_to", vaultsUrl);
       if (session?.user) {
         authLink.textContent = "Vaults";
         authLink.setAttribute("href", vaultsUrl);
-        authLink.className =
-          "px-3 py-1.5 bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium";
+        authLink.className = authButtonClass;
       }
     } catch (error) {
       authLink.textContent = "Sign In";
       authLink.setAttribute("href", signInUrl);
-      authLink.className = "hover:text-zinc-200 transition-colors";
+      authLink.className = authButtonClass;
     }
   }
 
