@@ -1,0 +1,362 @@
+import type { Plugin } from "obsidian";
+
+import { SyncAutoLoop } from "../engine/auto-sync";
+import type { SyncTokenResponse } from "../remote/client";
+import { SyncEventGate } from "../engine/event-gate";
+import { SyncEventRecorder } from "../engine/event-recorder";
+import type { SyncFileRules } from "../core/file-rules";
+import {
+  type ReconcileOnceResult,
+  SyncLocalReconcileService,
+} from "../engine/local-reconcile-service";
+import { ObsidianSyncVaultAdapter } from "../vault/obsidian-vault-adapter";
+import { SyncPullService } from "../engine/pull-service";
+import { SyncPushService } from "../engine/push-service";
+import { SyncAuthorizedRequestClient } from "../remote/request-client";
+import { SyncBlobClient } from "../remote/blob-client";
+import { SyncPullClient } from "../remote/pull-client";
+import {
+  type EntryVersion,
+  type EntryVersionPageCursor,
+  type SyncRealtimeSession,
+  type SyncStorageStatus,
+} from "../remote/realtime-client";
+import type { DeletedSyncEntryRow, SyncStore } from "../store/store";
+import {
+  getOrCreateStoredLocalVaultId,
+  readStoredSyncConnection,
+} from "../store/connection";
+import type { UserVisibleSyncState } from "./user-visible-status";
+import type { UserVisibleSyncProgress } from "./user-visible-status";
+import { SyncVaultEventHandler } from "./vault-event-handler";
+import {
+  SyncVersionHistoryService,
+  type SyncEntryVersionsPage,
+} from "./version-history-service";
+
+type SyncActivityKind = "push" | "pull" | "local";
+
+interface ActiveSyncActivity {
+  id: number;
+  kind: SyncActivityKind;
+}
+
+export interface SyncEngineDeps {
+  plugin: Plugin;
+  getApiBaseUrl: () => string;
+  getSyncToken: () => Promise<SyncTokenResponse>;
+  invalidateSyncToken: () => void;
+  getRemoteVaultKey: () => Uint8Array;
+  getSyncFileRules: () => SyncFileRules;
+  hasActiveRemoteVaultSession: () => boolean;
+  notify: (message: string, timeout?: number) => void;
+  notifyError: (error: unknown, prefix: string) => void;
+  notifySyncConflict: (event: {
+    op: "upsert" | "delete";
+    reason?: "local_pending_mutation" | "remote_path_collision";
+    originalPath: string;
+    conflictPath: string | null;
+  }) => void;
+  setSyncProgress: (progress: UserVisibleSyncProgress | null) => void;
+  setSyncStatus: (status: UserVisibleSyncState) => void;
+  setStorageStatus: (status: SyncStorageStatus | null) => void;
+}
+
+export class SyncEngine {
+  private syncStore: SyncStore | null = null;
+  private localMutationQueue: Promise<void> = Promise.resolve();
+  private activeSyncActivities: ActiveSyncActivity[] = [];
+  private nextSyncActivityId = 1;
+  private readonly syncEventGate = new SyncEventGate();
+  private readonly vaultAdapter = new ObsidianSyncVaultAdapter(
+    this.deps.plugin,
+    () => this.deps.getSyncFileRules(),
+  );
+  private readonly syncEventRecorder = new SyncEventRecorder({
+    getSyncStore: () => this.syncStore,
+    getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+    eventGate: this.syncEventGate,
+  });
+  private readonly syncRequestClient = new SyncAuthorizedRequestClient({
+    getApiBaseUrl: () => this.deps.getApiBaseUrl(),
+    getSyncToken: async () => await this.deps.getSyncToken(),
+    invalidateSyncToken: () => this.deps.invalidateSyncToken(),
+  });
+  private readonly syncPushService = new SyncPushService({
+    getApiBaseUrl: () => this.deps.getApiBaseUrl(),
+    getSyncToken: async () => await this.deps.getSyncToken(),
+    getSyncStore: () => this.syncStore,
+    getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+    fileReader: this.vaultAdapter,
+    conflictFileWriter: this.vaultAdapter,
+    blobClient: new SyncBlobClient(this.syncRequestClient),
+    onProgress: async (progress) => {
+      this.reportActivityProgress(progress);
+    },
+    onConflict: (event) => this.deps.notifySyncConflict(event),
+  });
+  private readonly syncLocalReconcileService = new SyncLocalReconcileService({
+    getSyncStore: () => this.syncStore,
+    getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+    shouldSyncPath: (path) => this.vaultAdapter.isSyncablePath(path),
+    scanner: this.vaultAdapter,
+  });
+  private readonly syncAutoLoop = new SyncAutoLoop({
+    getApiBaseUrl: () => this.deps.getApiBaseUrl(),
+    getSyncToken: async () => await this.deps.getSyncToken(),
+    getSyncStore: () => this.syncStore,
+    pushPendingMutations: async (session) =>
+      await this.withSyncActivity("push", async () => {
+        return await this.syncPushService.pushPendingMutations(session);
+      }),
+    pullOnce: async (session) =>
+      await this.withSyncActivity("pull", async () => {
+        return await this.syncPullService.pullOnce(session);
+      }),
+    onConnectionStateChange: (state) => {
+      if (state === "reconnecting") {
+        this.deps.setSyncStatus("reconnecting");
+        return;
+      }
+
+      if (state === "connecting") {
+        this.deps.setSyncStatus("syncing");
+      }
+    },
+    onStorageStatusChange: (status) => {
+      this.deps.setStorageStatus(status);
+    },
+    onSyncScheduled: () => {
+      this.deps.setSyncStatus("syncing");
+    },
+    onIdle: () => {
+      this.deps.setSyncStatus("up_to_date");
+    },
+    onError: (error) => {
+      this.deps.setSyncStatus("attention_needed");
+      this.deps.notifyError(error, "Auto sync failed");
+    },
+  });
+  private readonly syncVaultEventHandler = new SyncVaultEventHandler({
+    plugin: this.deps.plugin,
+    vaultAdapter: this.vaultAdapter,
+    eventRecorder: this.syncEventRecorder,
+    autoLoop: this.syncAutoLoop,
+    runLocalMutationWork: async (work) => await this.runLocalMutationWork(work),
+    hasActiveRemoteVaultSession: () => this.deps.hasActiveRemoteVaultSession(),
+    onError: (error) => {
+      this.deps.setSyncStatus("attention_needed");
+      this.deps.notifyError(error, "Sync event handling failed");
+    },
+  });
+  private readonly syncPullService = new SyncPullService({
+    getApiBaseUrl: () => this.deps.getApiBaseUrl(),
+    getSyncToken: async () => await this.deps.getSyncToken(),
+    getSyncStore: () => this.syncStore,
+    getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+    eventGate: this.syncEventGate,
+    vaultAdapter: this.vaultAdapter,
+    pullClient: new SyncPullClient(this.syncRequestClient),
+    onProgress: async (progress) => {
+      this.reportActivityProgress(progress);
+    },
+    onConflict: (event) => this.deps.notifySyncConflict(event),
+  });
+  private readonly syncVersionHistoryService = new SyncVersionHistoryService({
+    getStore: () => this.requireStore(),
+    getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+    withRealtimeSession: async (work) => await this.withRealtimeSession(work),
+    runLocalMutationWork: async (work) => await this.runLocalMutationWork(work),
+    pullOnce: async (session) => {
+      await this.withSyncActivity("pull", async () => {
+        await this.syncPullService.pullOnce(session);
+      });
+    },
+  });
+  constructor(private readonly deps: SyncEngineDeps) {}
+
+  setStore(store: SyncStore): void {
+    this.syncStore = store;
+  }
+
+  hasStore(): boolean {
+    return this.syncStore !== null;
+  }
+
+  detachStore(): SyncStore | null {
+    const store = this.syncStore;
+    this.syncStore = null;
+    return store;
+  }
+
+  async closeStore(): Promise<void> {
+    const store = this.detachStore();
+    await store?.close();
+  }
+
+  async readLocalVaultId(): Promise<string> {
+    return (await readStoredSyncConnection(this.requireStore()))?.localVaultId ?? "";
+  }
+
+  async getOrCreateLocalVaultId(remoteVaultId: string): Promise<string> {
+    return await getOrCreateStoredLocalVaultId(this.requireStore(), remoteVaultId);
+  }
+
+  startAutoSync(): Promise<boolean> {
+    return this.syncAutoLoop.start();
+  }
+
+  stopAutoSync(): void {
+    this.syncAutoLoop.stop();
+  }
+
+  reconnectAutoSync(): void {
+    this.syncAutoLoop.reconnectNow();
+  }
+
+  async resumeAutoSyncConnection(): Promise<void> {
+    await this.syncAutoLoop.resumeConnection();
+  }
+
+  registerVaultEvents(): void {
+    this.syncVaultEventHandler.register();
+  }
+
+  notifyLocalChange(): void {
+    this.syncAutoLoop.notifyLocalChange();
+  }
+
+  setStorageStatusWatching(enabled: boolean): void {
+    this.syncAutoLoop.setStorageStatusWatching(enabled);
+  }
+
+  async reconcileOnce(): Promise<ReconcileOnceResult> {
+    return await this.runLocalMutationWork(async () => {
+      return await this.syncLocalReconcileService.reconcileOnce();
+    });
+  }
+
+  async refreshSyncProgress(): Promise<void> {
+    const store = this.syncStore;
+    if (!store) {
+      this.reportBaselineProgress({
+        completedEntries: 0,
+        totalEntries: 0,
+      });
+      return;
+    }
+
+    this.reportBaselineProgress(await store.countSyncProgress());
+  }
+
+  async hasPendingMutations(): Promise<boolean> {
+    const pending = await this.syncStore?.listDirtyEntries(1);
+    return (pending?.length ?? 0) > 0;
+  }
+
+  async listEntryVersionsForPath(
+    path: string,
+    before: EntryVersionPageCursor | null,
+    limit: number,
+  ): Promise<SyncEngineEntryVersionsPage | null> {
+    return await this.syncVersionHistoryService.listEntryVersionsForPath(
+      path,
+      before,
+      limit,
+    );
+  }
+
+  async restoreEntryVersionForPath(
+    path: string,
+    version: EntryVersion,
+  ): Promise<void> {
+    await this.syncVersionHistoryService.restoreEntryVersionForPath(path, version);
+  }
+
+  async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
+    return await this.syncVersionHistoryService.listDeletedEntries();
+  }
+
+  async restoreDeletedEntry(entryId: string): Promise<void> {
+    await this.syncVersionHistoryService.restoreDeletedEntry(entryId);
+  }
+
+  async waitForLocalMutationWork(): Promise<void> {
+    await this.localMutationQueue;
+  }
+
+  private async withRealtimeSession<T>(
+    work: (session: SyncRealtimeSession) => Promise<T>,
+  ): Promise<T> {
+    return await this.syncAutoLoop.withRealtimeSession(work);
+  }
+
+  private runLocalMutationWork<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.localMutationQueue.then(
+      () => this.withSyncActivity("local", work),
+      () => this.withSyncActivity("local", work),
+    );
+    this.localMutationQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async withSyncActivity<T>(
+    kind: SyncActivityKind,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const activity = this.beginSyncActivity(kind);
+    try {
+      return await work();
+    } finally {
+      await this.finishSyncActivity(activity);
+    }
+  }
+
+  private beginSyncActivity(kind: SyncActivityKind): ActiveSyncActivity {
+    const activity = {
+      id: this.nextSyncActivityId,
+      kind,
+    };
+    this.nextSyncActivityId += 1;
+    this.activeSyncActivities.push(activity);
+    return activity;
+  }
+
+  private async finishSyncActivity(activity: ActiveSyncActivity): Promise<void> {
+    this.activeSyncActivities = this.activeSyncActivities.filter(
+      (activeActivity) => activeActivity.id !== activity.id,
+    );
+    await this.refreshSyncProgress();
+  }
+
+  private reportActivityProgress(progress: UserVisibleSyncProgress): void {
+    if (!this.hasActiveRemoteActivity()) {
+      return;
+    }
+
+    this.deps.setSyncProgress(progress);
+  }
+
+  private reportBaselineProgress(progress: UserVisibleSyncProgress): void {
+    if (this.activeSyncActivities.length === 0) {
+      this.deps.setSyncProgress(progress);
+    }
+  }
+
+  private hasActiveRemoteActivity(): boolean {
+    return this.activeSyncActivities.some((activity) => activity.kind !== "local");
+  }
+
+  private requireStore(): SyncStore {
+    if (!this.syncStore) {
+      throw new Error("Local sync store is not initialized.");
+    }
+
+    return this.syncStore;
+  }
+}
+
+export type SyncEngineEntryVersionsPage = SyncEntryVersionsPage;

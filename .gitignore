@@ -1,0 +1,12 @@
+.DS_Store
+node_modules
+dist
+.turbo
+.pnpm-store
+target
+Cargo.lock
+*.tsbuildinfo
+apps/obsidian-plugin/main.js
+
+.omx
+.env

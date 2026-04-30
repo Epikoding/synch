@@ -1,0 +1,51 @@
+declare const __SYNCH_API_BASE_URL__: string;
+
+const FALLBACK_API_BASE_URL = "http://127.0.0.1:8787";
+const API_BASE_URL = normalizeApiBaseUrl(
+  typeof __SYNCH_API_BASE_URL__ === "string"
+    ? __SYNCH_API_BASE_URL__
+    : FALLBACK_API_BASE_URL,
+  FALLBACK_API_BASE_URL,
+);
+
+export function getDefaultApiBaseUrl(): string {
+  return API_BASE_URL;
+}
+
+export function normalizeApiBaseUrl(value: unknown, fallback: string): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return fallback;
+    }
+    if (parsed.search || parsed.hash) {
+      return fallback;
+    }
+  } catch {
+    return fallback;
+  }
+
+  return trimmed;
+}
+
+export function parseApiBaseUrlInput(value: string, fallback: string): string {
+  if (!value.trim()) {
+    return fallback;
+  }
+
+  const normalized = normalizeApiBaseUrl(value, "");
+  if (!normalized) {
+    throw new Error("API base URL must be a valid http:// or https:// URL.");
+  }
+
+  return normalized;
+}

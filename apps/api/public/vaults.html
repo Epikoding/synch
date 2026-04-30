@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en" class="dark">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>Synch vaults</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<style>
+			::selection {
+				background-color: #27272a;
+				color: #e4e4e7;
+			}
+			dialog::backdrop {
+				background: rgba(0, 0, 0, 0.6);
+				backdrop-filter: blur(4px);
+			}
+		</style>
+	</head>
+	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col font-light text-sm">
+		<div class="max-w-4xl mx-auto px-6 w-full flex-1 flex flex-col py-12">
+			<div class="flex items-center mb-8">
+				<a href="/" class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity">Synch</a>
+			</div>
+			
+			<header class="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-8">
+				<div>
+					<h1 class="text-2xl font-light text-zinc-200 tracking-tight mb-2">Remote vaults</h1>
+					<p class="text-zinc-500 text-sm max-w-2xl leading-relaxed">
+						Manage the encrypted vaults attached to this Synch account. Deleting a remote
+						vault does not delete local Obsidian files.
+					</p>
+				</div>
+				<div id="user" class="text-zinc-500 text-xs bg-zinc-900/50 border border-zinc-800 rounded-full px-3 py-1.5 whitespace-nowrap hidden sm:inline-block"></div>
+			</header>
+
+			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+				<div id="status" class="text-zinc-400 text-sm" aria-live="polite">Loading vaults...</div>
+				<button id="refresh" type="button" class="w-full sm:w-auto py-1.5 px-4 text-xs bg-transparent border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+					Refresh
+				</button>
+			</div>
+
+			<section id="vault-list" class="grid gap-3" aria-live="polite"></section>
+		</div>
+
+		<dialog id="delete-dialog" class="w-[calc(100%-2rem)] sm:w-[480px] bg-[#0a0a0a] text-zinc-200 border border-zinc-800 rounded-xl p-0 shadow-2xl">
+			<form method="dialog">
+				<div class="p-6">
+					<h2 class="text-lg font-medium mb-3">Delete remote vault</h2>
+					<p id="delete-copy" class="text-zinc-400 text-sm mb-6 leading-relaxed"></p>
+					
+					<div class="space-y-2">
+						<label for="confirm-name" class="block text-xs text-zinc-500">Type the vault name to confirm</label>
+						<input id="confirm-name" autocomplete="off" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" />
+					</div>
+				</div>
+				<div class="flex justify-end gap-3 px-6 py-4 border-t border-zinc-800/50 bg-white/[0.01]">
+					<button id="cancel-delete" value="cancel" type="submit" class="py-2 px-4 text-xs bg-transparent border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded transition-colors font-medium">
+						Cancel
+					</button>
+					<button id="confirm-delete" value="delete" type="button" disabled class="py-2 px-4 text-xs bg-transparent border border-red-900/50 text-red-400 hover:bg-red-900/20 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+						Delete permanently
+					</button>
+				</div>
+			</form>
+		</dialog>
+
+		<script>
+			const statusEl = document.querySelector("#status");
+			const userEl = document.querySelector("#user");
+			const listEl = document.querySelector("#vault-list");
+			const refreshButton = document.querySelector("#refresh");
+			const deleteDialog = document.querySelector("#delete-dialog");
+			const deleteCopy = document.querySelector("#delete-copy");
+			const confirmInput = document.querySelector("#confirm-name");
+			const confirmDeleteButton = document.querySelector("#confirm-delete");
+			let selectedVault = null;
+
+			refreshButton.addEventListener("click", () => {
+				void loadVaults();
+			});
+
+			confirmInput.addEventListener("input", () => {
+				confirmDeleteButton.disabled =
+					!selectedVault || confirmInput.value !== selectedVault.name;
+			});
+
+			confirmDeleteButton.addEventListener("click", () => {
+				void deleteSelectedVault();
+			});
+
+			void initialize();
+
+			async function initialize() {
+				const session = await loadSession();
+				if (!session?.user) {
+					redirectToLogin();
+					return;
+				}
+
+				userEl.textContent = session.user.email || session.user.name || "Signed in";
+				userEl.classList.remove("hidden");
+				await loadVaults();
+			}
+
+			async function loadSession() {
+				try {
+					const response = await fetch("/api/auth/get-session", { credentials: "include" });
+					if (!response.ok) {
+						return null;
+					}
+					return await response.json();
+				} catch {
+					return null;
+				}
+			}
+
+			function redirectToLogin() {
+				const loginUrl = new URL("/signin", window.location.origin);
+				loginUrl.searchParams.set("return_to", window.location.href);
+				window.location.assign(loginUrl.toString());
+			}
+
+			async function loadVaults() {
+				setStatus("Loading vaults...");
+				refreshButton.disabled = true;
+				try {
+					const response = await fetch("/v1/vaults?includeDeleting=true", {
+						credentials: "include",
+					});
+					if (response.status === 401) {
+						redirectToLogin();
+						return;
+					}
+					if (!response.ok) {
+						setStatus(await readErrorMessage(response, "Unable to load vaults."));
+						return;
+					}
+					const json = await response.json();
+					renderVaults(Array.isArray(json.vaults) ? json.vaults : []);
+				} catch {
+					setStatus("Unable to reach the API.");
+				} finally {
+					refreshButton.disabled = false;
+				}
+			}
+
+			function renderVaults(vaults) {
+				listEl.replaceChildren();
+				setStatus(`${vaults.length} remote vault${vaults.length === 1 ? "" : "s"}`);
+
+				if (vaults.length === 0) {
+					const empty = document.createElement("div");
+					empty.className = "py-12 px-8 border border-dashed border-zinc-800 rounded-xl text-center text-zinc-500 text-sm";
+					empty.textContent = "No remote vaults are attached to this account.";
+					listEl.append(empty);
+					return;
+				}
+
+				for (const vault of vaults) {
+					const row = document.createElement("article");
+					row.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 border border-zinc-800 rounded-xl bg-zinc-900/30 hover:border-zinc-700 transition-colors";
+
+					const details = document.createElement("div");
+					const name = document.createElement("h2");
+					name.className = "text-base font-medium text-zinc-200 mb-1";
+					name.textContent = vault.name;
+					const meta = document.createElement("p");
+					meta.className = "text-zinc-500 text-xs leading-relaxed break-all";
+					meta.textContent = formatVaultMeta(vault);
+					details.append(name, meta);
+
+					const isDeleting =
+						vault.deletionStatus === "queued" || vault.deletionStatus === "running";
+					const button = document.createElement("button");
+					button.className = "w-full sm:w-auto py-2 px-4 text-xs bg-transparent border border-red-900/50 text-red-400 hover:bg-red-900/20 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed";
+					button.type = "button";
+					button.textContent = isDeleting ? "Deleting" : "Delete";
+					button.disabled = isDeleting;
+					button.addEventListener("click", () => {
+						openDeleteDialog(vault);
+					});
+
+					row.append(details, button);
+					listEl.append(row);
+				}
+
+				if (
+					vaults.some(
+						(vault) =>
+							vault.deletionStatus === "queued" || vault.deletionStatus === "running",
+					)
+				) {
+					window.setTimeout(() => {
+						void loadVaults();
+					}, 2500);
+				}
+			}
+
+			function openDeleteDialog(vault) {
+				selectedVault = vault;
+				deleteCopy.textContent =
+					`This permanently removes remote vault "${vault.name}" from this account. ` +
+					"Local Obsidian files are not deleted.";
+				confirmInput.value = "";
+				confirmDeleteButton.disabled = true;
+				deleteDialog.showModal();
+				confirmInput.focus();
+			}
+
+			async function deleteSelectedVault() {
+				if (!selectedVault || confirmInput.value !== selectedVault.name) {
+					return;
+				}
+
+				confirmDeleteButton.disabled = true;
+				setStatus(`Deleting ${selectedVault.name}...`);
+				try {
+					const response = await fetch(`/v1/vaults/${encodeURIComponent(selectedVault.id)}`, {
+						method: "DELETE",
+						credentials: "include",
+					});
+					if (!response.ok) {
+						setStatus(await readErrorMessage(response, "Unable to delete vault."));
+						return;
+					}
+					deleteDialog.close();
+					setStatus(`${selectedVault.name} queued for deletion.`);
+					selectedVault = null;
+					await loadVaults();
+				} catch {
+					setStatus("Unable to reach the API.");
+				} finally {
+					confirmDeleteButton.disabled = false;
+				}
+			}
+
+			function formatDate(value) {
+				const date = new Date(value);
+				if (Number.isNaN(date.getTime())) {
+					return "unknown";
+				}
+				return date.toLocaleDateString(undefined, {
+					year: "numeric",
+					month: "short",
+					day: "numeric",
+				});
+			}
+
+			function formatVaultMeta(vault) {
+				const parts = [vault.id, `Created ${formatDate(vault.createdAt)}`];
+				if (vault.deletionStatus) {
+					parts.push(`Deletion ${vault.deletionStatus}`);
+				}
+				if (vault.deletionError) {
+					parts.push(vault.deletionError);
+				}
+				return parts.join(" - ");
+			}
+
+			function setStatus(message) {
+				statusEl.textContent = message;
+			}
+
+			async function readErrorMessage(response, fallback) {
+				try {
+					const json = await response.json();
+					return json?.message || fallback;
+				} catch {
+					return fallback;
+				}
+			}
+		</script>
+	</body>
+</html>

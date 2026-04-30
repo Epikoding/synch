@@ -1,0 +1,224 @@
+import { drizzle } from "drizzle-orm/durable-sqlite";
+import { migrate } from "drizzle-orm/durable-sqlite/migrator";
+
+import type {
+	BlobRow,
+	CommitMutationMessage,
+	CommitMutationResult,
+	CommitMutationsMessage,
+	CommitMutationsResult,
+	CurrentEntryRow,
+	EntryStatePageCursor,
+	EntryStateRow,
+	EntryVersionListRow,
+	EntryVersionPageCursor,
+	EntryVersionReason,
+	EntryVersionRow,
+	SocketSession,
+	StorageStatusSnapshot,
+} from "./types";
+import * as doSchema from "../../db/do";
+import type { VaultSyncStatusSummary } from "../health/types";
+import doMigrations from "../../../drizzle-do/migrations";
+import { CoordinatorBlobStore } from "./store/blob-store";
+import { CoordinatorCursorStore } from "./store/cursor-store";
+import { CoordinatorEntryStore } from "./store/entry-store";
+import { CoordinatorHealthStore } from "./store/health-store";
+import { CoordinatorHistoryStore } from "./store/history-store";
+import { CoordinatorMutationStore } from "./store/mutation-store";
+
+export class CoordinatorStateRepository {
+	private readonly blobStore: CoordinatorBlobStore;
+	private readonly cursorStore: CoordinatorCursorStore;
+	private readonly entryStore: CoordinatorEntryStore;
+	private readonly healthStore: CoordinatorHealthStore;
+	private readonly historyStore: CoordinatorHistoryStore;
+	private readonly mutationStore: CoordinatorMutationStore;
+
+	constructor(private readonly ctx: DurableObjectState) {
+		this.blobStore = new CoordinatorBlobStore(ctx.storage);
+		this.cursorStore = new CoordinatorCursorStore(ctx.storage);
+		this.entryStore = new CoordinatorEntryStore(ctx.storage);
+		this.healthStore = new CoordinatorHealthStore(ctx);
+		this.historyStore = new CoordinatorHistoryStore(ctx.storage);
+		this.mutationStore = new CoordinatorMutationStore(ctx.storage);
+	}
+
+	async migrate(): Promise<void> {
+		const db = drizzle(this.ctx.storage, { schema: doSchema });
+		await migrate(db, doMigrations);
+	}
+
+	currentCursor(): number {
+		return this.cursorStore.currentCursor();
+	}
+
+	rememberVaultId(vaultId: string): void {
+		this.cursorStore.rememberVaultId(vaultId);
+	}
+
+	readVaultId(): string | null {
+		return this.cursorStore.readVaultId();
+	}
+
+	async purgeVaultState(): Promise<void> {
+		await this.ctx.storage.deleteAll();
+	}
+
+	recordLocalVaultCursor(userId: string, localVaultId: string, cursor: number): void {
+		this.cursorStore.recordLocalVaultCursor(userId, localVaultId, cursor);
+	}
+
+	markHealthSummaryDirty(now = Date.now()): void {
+		this.healthStore.markHealthSummaryDirty(now);
+	}
+
+	recordGcCompleted(now = Date.now()): void {
+		this.healthStore.recordGcCompleted(now);
+	}
+
+	isHealthSummaryDirty(): boolean {
+		return this.healthStore.isHealthSummaryDirty();
+	}
+
+	recordHealthSummaryFlushed(now = Date.now()): void {
+		this.healthStore.recordHealthSummaryFlushed(now);
+	}
+
+	recordHealthSummaryFlushFailed(error: unknown, now = Date.now()): number {
+		return this.healthStore.recordHealthSummaryFlushFailed(error, now);
+	}
+
+	readHealthSummary(
+		now: number,
+		activeCursorTtlMs: number,
+	): VaultSyncStatusSummary | null {
+		return this.healthStore.readHealthSummary(now, activeCursorTtlMs);
+	}
+
+	readStorageStatus(): StorageStatusSnapshot {
+		return this.healthStore.readStorageStatus();
+	}
+
+	compactSyncedCommits(now: number, activeCursorTtlMs: number, limit: number): number {
+		return this.cursorStore.compactSyncedCommits(now, activeCursorTtlMs, limit);
+	}
+
+	listEntryStates(
+		sinceCursor: number,
+		targetCursor: number,
+		after: EntryStatePageCursor | null,
+		limit: number,
+	): EntryStateRow[] {
+		return this.entryStore.listEntryStates(sinceCursor, targetCursor, after, limit);
+	}
+
+	countEntryStates(sinceCursor: number, targetCursor: number): number {
+		return this.entryStore.countEntryStates(sinceCursor, targetCursor);
+	}
+
+	async stageBlob(
+		blobId: string,
+		sizeBytes: number,
+		storageLimitBytes: number,
+		now: number,
+		deleteAfter: number,
+	): Promise<void> {
+		await this.blobStore.stageBlob(
+			blobId,
+			sizeBytes,
+			storageLimitBytes,
+			now,
+			deleteAfter,
+		);
+	}
+
+	readBlob(blobId: string): BlobRow | null {
+		return this.blobStore.readBlob(blobId);
+	}
+
+	deleteBlobRecord(blobId: string): void {
+		this.blobStore.deleteBlobRecord(blobId);
+	}
+
+	abortStagedBlob(blobId: string, now = Date.now()): void {
+		this.blobStore.abortStagedBlob(blobId, now);
+	}
+
+	isBlobPinned(blobId: string, includeStaging = true, now = Date.now()): boolean {
+		return this.blobStore.isBlobPinned(blobId, includeStaging, now);
+	}
+
+	readEntry(entryId: string): CurrentEntryRow | null {
+		return this.entryStore.readEntry(entryId);
+	}
+
+	listEntryVersions(
+		entryId: string,
+		before: EntryVersionPageCursor | null,
+		retentionStart: number,
+		limit: number,
+	): EntryVersionListRow[] {
+		return this.historyStore.listEntryVersions(
+			entryId,
+			before,
+			retentionStart,
+			limit,
+		);
+	}
+
+	readEntryVersion(
+		entryId: string,
+		versionId: string,
+		retentionStart: number,
+	): EntryVersionRow | null {
+		return this.historyStore.readEntryVersion(entryId, versionId, retentionStart);
+	}
+
+	async commitMutation(
+		session: SocketSession,
+		message: CommitMutationMessage,
+		stageGracePeriodMs: number,
+		versionHistoryRetentionMs: number,
+		options: { forcedHistoryBefore?: EntryVersionReason | null } = {},
+	): Promise<CommitMutationResult> {
+		return await this.mutationStore.commitMutation(
+			session,
+			message,
+			stageGracePeriodMs,
+			versionHistoryRetentionMs,
+			options,
+		);
+	}
+
+	async commitMutations(
+		session: SocketSession,
+		message: CommitMutationsMessage,
+		stageGracePeriodMs: number,
+		versionHistoryRetentionMs: number,
+		options: {
+			forcedHistoryBefore?: EntryVersionReason | null;
+			unavailableBlobIds?: ReadonlySet<string>;
+		} = {},
+	): Promise<CommitMutationsResult> {
+		return await this.mutationStore.commitMutations(
+			session,
+			message,
+			stageGracePeriodMs,
+			versionHistoryRetentionMs,
+			options,
+		);
+	}
+
+	listBlobsReadyForDeletion(now: number, limit: number): BlobRow[] {
+		return this.blobStore.listBlobsReadyForDeletion(now, limit);
+	}
+
+	deleteBlobIfCollectible(blobId: string, now = Date.now()): void {
+		this.blobStore.deleteBlobIfCollectible(blobId, now);
+	}
+
+	nextBlobGcAt(): number | null {
+		return this.blobStore.nextBlobGcAt();
+	}
+}

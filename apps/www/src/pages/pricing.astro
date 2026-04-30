@@ -1,0 +1,119 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+const apiUrl = import.meta.env.PUBLIC_API_URL || "";
+const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
+const signUpUrl = new URL("/signup", apiUrl || Astro.url.origin);
+signUpUrl.searchParams.set("return_to", vaultsUrl);
+---
+
+<Layout title="Pricing - Synch">
+  <div class="max-w-2xl mx-auto px-6 w-full flex-1 flex flex-col">
+    <Header />
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col py-24">
+      <div class="space-y-4 mb-20 text-center">
+        <h1
+          class="text-2xl sm:text-3xl font-light text-zinc-200 tracking-tight"
+        >
+          Simple, transparent pricing.
+        </h1>
+        <p class="text-zinc-500 max-w-md leading-relaxed mx-auto">
+          Start syncing your vaults for free.
+        </p>
+      </div>
+
+      <!-- Pricing Cards -->
+      <div class="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto w-full">
+        <!-- Free Plan -->
+        <div
+          class="p-6 rounded-lg border border-zinc-800/50 bg-zinc-900/20 flex flex-col"
+        >
+          <div class="mb-8">
+            <h3 class="text-zinc-200 font-normal mb-2">Sync Free</h3>
+            <div class="flex items-baseline gap-1">
+              <span class="text-2xl font-light text-zinc-200">$0</span>
+              <span class="text-xs text-zinc-500">/ forever</span>
+            </div>
+          </div>
+
+          <ul class="space-y-4 mb-8 text-xs flex-1 text-zinc-400">
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-600"></div>
+              1 synced vault
+            </li>
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-600"></div>
+              50 MB storage
+            </li>
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-600"></div>
+              3 MB max file size
+            </li>
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-600"></div>
+              1 day version history
+            </li>
+          </ul>
+
+          <a
+            href={signUpUrl.toString()}
+            class="w-full py-2 px-4 text-center text-xs bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
+          >
+            Get Started
+          </a>
+        </div>
+
+        <!-- Starter Plan (Coming Soon) -->
+        <div
+          class="p-6 rounded-lg border border-zinc-800/50 bg-zinc-900/10 flex flex-col relative opacity-80"
+        >
+          <div
+            class="absolute -top-3 right-6 px-2 py-1 bg-zinc-800 text-zinc-300 text-[10px] font-medium uppercase tracking-wider rounded-sm"
+          >
+            Coming Soon
+          </div>
+          <div class="mb-8">
+            <h3 class="text-zinc-400 font-normal mb-2">Sync Starter</h3>
+            <div class="flex items-baseline gap-1">
+              <span class="text-2xl font-light text-zinc-400">$1</span>
+              <span class="text-xs text-zinc-600">/ month</span>
+            </div>
+          </div>
+
+          <ul class="space-y-4 mb-8 text-xs flex-1 text-zinc-500">
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-700"></div>
+              1 synced vault
+            </li>
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-700"></div>
+              1 GB storage
+            </li>
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-700"></div>
+              5 MB max file size
+            </li>
+            <li class="flex items-center gap-3">
+              <div class="w-1 h-1 rounded-full bg-zinc-700"></div>
+              1 day version history
+            </li>
+          </ul>
+
+          <button
+            disabled
+            class="w-full py-2 px-4 text-center text-xs bg-zinc-800/50 text-zinc-500 rounded cursor-not-allowed"
+          >
+            Coming Soon
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <Footer />
+  </div>
+</Layout>

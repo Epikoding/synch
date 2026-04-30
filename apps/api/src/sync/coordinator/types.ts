@@ -1,0 +1,283 @@
+export type {
+	AckCursorMessage,
+	ClientControlMessage,
+	CommitMutationMessage,
+	CommitMutationPayload,
+	CommitMutationsMessage,
+	HeartbeatMessage,
+	HelloMessage,
+	ListEntryStatesMessage,
+	ListEntryVersionsMessage,
+	RestoreEntryVersionMessage,
+	UnwatchStorageStatusMessage,
+	WatchStorageStatusMessage,
+} from "./protocol";
+
+export type HelloAckMessage = {
+	type: "hello_ack";
+	requestId: string;
+	cursor: number;
+	policy: {
+		storageLimitBytes: number;
+		maxFileSizeBytes: number;
+	};
+	storageStatus: StorageStatusSnapshot;
+};
+
+export type CursorAdvancedMessage = {
+	type: "cursor_advanced";
+	cursor: number;
+};
+
+export type StorageStatusSnapshot = {
+	storageUsedBytes: number;
+	storageLimitBytes: number;
+};
+
+export type StorageStatusUpdatedMessage = {
+	type: "storage_status_updated";
+	storageStatus: StorageStatusSnapshot;
+};
+
+export type CommitAcceptedMessage = {
+	type: "commit_accepted";
+	requestId: string;
+	cursor: number;
+	entryId: string;
+	revision: number;
+};
+
+export type CursorAckedMessage = {
+	type: "cursor_acked";
+	requestId: string;
+	cursor: number;
+};
+
+export type HeartbeatAckMessage = {
+	type: "heartbeat_ack";
+	requestId: string;
+};
+
+export type CommitRejectedMessage = {
+	type: "commit_rejected";
+	requestId: string;
+	code: string;
+	message: string;
+	expectedBaseRevision?: number;
+	receivedBaseRevision?: number;
+};
+
+export type CommitMutationAcceptedBatchResult = {
+	status: "accepted";
+	mutationId: string;
+	cursor: number;
+	entryId: string;
+	revision: number;
+};
+
+export type CommitMutationRejectedBatchResult = {
+	status: "rejected";
+	mutationId: string;
+	entryId: string;
+	code: "blob_not_found" | "blob_not_staged" | "stale_revision" | "commit_failed";
+	message: string;
+	expectedBaseRevision?: number;
+	receivedBaseRevision?: number;
+};
+
+export type CommitMutationBatchResult =
+	| CommitMutationAcceptedBatchResult
+	| CommitMutationRejectedBatchResult;
+
+export type CommitMutationsCommittedMessage = {
+	type: "commit_mutations_committed";
+	requestId: string;
+	cursor: number;
+	results: CommitMutationBatchResult[];
+};
+
+export type CommitMutationsFailedMessage = {
+	type: "commit_mutations_failed";
+	requestId: string;
+	code: string;
+	message: string;
+};
+
+export type EntryStatePageCursor = {
+	updatedSeq: number;
+	entryId: string;
+};
+
+export type EntryStatesListedMessage = {
+	type: "entry_states_listed";
+	requestId: string;
+	targetCursor: number;
+	totalEntries: number;
+	hasMore: boolean;
+	nextAfter: EntryStatePageCursor | null;
+	entries: Array<{
+		entryId: string;
+		revision: number;
+		blobId: string | null;
+		encryptedMetadata: string;
+		deleted: boolean;
+		updatedSeq: number;
+		updatedAt: number;
+	}>;
+};
+
+export type EntryStatesListFailedMessage = {
+	type: "entry_states_list_failed";
+	requestId: string;
+	code: string;
+	message: string;
+};
+
+export type EntryVersionPageCursor = {
+	capturedAt: number;
+	versionId: string;
+};
+
+export type EntryVersionsListedMessage = {
+	type: "entry_versions_listed";
+	requestId: string;
+	entryId: string;
+	versions: Array<{
+		versionId: string;
+		sourceRevision: number;
+		op: "upsert" | "delete";
+		blobId: string | null;
+		encryptedMetadata: string;
+		reason: EntryVersionReason;
+		capturedAt: number;
+	}>;
+	hasMore: boolean;
+	nextBefore: EntryVersionPageCursor | null;
+};
+
+export type EntryVersionsListFailedMessage = {
+	type: "entry_versions_list_failed";
+	requestId: string;
+	code: string;
+	message: string;
+};
+
+export type EntryVersionRestoredMessage = {
+	type: "entry_version_restored";
+	requestId: string;
+	entryId: string;
+	restoredFromVersionId: string;
+	restoredFromRevision: number;
+	cursor: number;
+	revision: number;
+};
+
+export type EntryRestoreFailedMessage = {
+	type: "entry_restore_failed";
+	requestId: string;
+	code: string;
+	message: string;
+};
+
+export type SessionErrorMessage = {
+	type: "session_error";
+	code: string;
+	message: string;
+};
+
+export type ServerControlMessage =
+	| HelloAckMessage
+	| CursorAdvancedMessage
+	| StorageStatusUpdatedMessage
+	| CommitAcceptedMessage
+	| CursorAckedMessage
+	| HeartbeatAckMessage
+	| CommitRejectedMessage
+	| CommitMutationsCommittedMessage
+	| CommitMutationsFailedMessage
+	| EntryStatesListedMessage
+	| EntryStatesListFailedMessage
+	| EntryVersionsListedMessage
+	| EntryVersionsListFailedMessage
+	| EntryVersionRestoredMessage
+	| EntryRestoreFailedMessage
+	| SessionErrorMessage;
+
+export type CurrentEntryRow = {
+	entry_id: string;
+	revision: number;
+	blob_id: string | null;
+	encrypted_metadata: string;
+	deleted: number;
+};
+
+export type EntryVersionReason = "auto" | "before_delete" | "before_restore" | "manual";
+
+export type EntryVersionRow = {
+	version_id: string;
+	entry_id: string;
+	source_revision: number;
+	op_type: "upsert" | "delete";
+	blob_id: string | null;
+	encrypted_metadata: string;
+	reason: EntryVersionReason;
+	bucket_start_ms: number | null;
+	captured_at: number;
+	created_by_user_id: string;
+	created_by_local_vault_id: string;
+};
+
+export type EntryVersionListRow = Pick<
+	EntryVersionRow,
+	| "version_id"
+	| "entry_id"
+	| "source_revision"
+	| "op_type"
+	| "blob_id"
+	| "encrypted_metadata"
+	| "reason"
+	| "captured_at"
+>;
+
+export type EntryStateRow = {
+	entry_id: string;
+	revision: number;
+	blob_id: string | null;
+	encrypted_metadata: string;
+	deleted: boolean;
+	updated_seq: number;
+	updated_at: number;
+};
+
+export type BlobState = "staged" | "live" | "pending_delete";
+
+export type BlobRow = {
+	blob_id: string;
+	state: BlobState;
+	size_bytes: number;
+	created_at: number;
+	last_uploaded_at: number;
+	delete_after: number | null;
+};
+
+export type SocketSession = {
+	userId: string;
+	localVaultId: string;
+	vaultId: string;
+	wantsStorageStatus: boolean;
+};
+
+export type CommitMutationResult = {
+	message: ServerControlMessage;
+	broadcastCursor: number | null;
+};
+
+export type CommitMutationsResult = {
+	message: CommitMutationsCommittedMessage;
+	broadcastCursor: number | null;
+};
+
+export type RestoreEntryVersionResult = {
+	message: EntryVersionRestoredMessage;
+	broadcastCursor: number | null;
+};

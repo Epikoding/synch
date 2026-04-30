@@ -1,0 +1,326 @@
+import type {
+	CommitMutationsMessage,
+	CommitMutationsResult,
+	EntryStatesListedMessage,
+	EntryVersionsListedMessage,
+	ListEntryStatesMessage,
+	ListEntryVersionsMessage,
+	RestoreEntryVersionMessage,
+	RestoreEntryVersionResult,
+	SocketSession,
+} from "../types";
+import type { SubscriptionPlanPolicy } from "../../../subscription/policy";
+import type { SubscriptionPolicyReader } from "../../../subscription/policy-service";
+import {
+	formatClientControlMessageError,
+	parseClientControlMessage,
+} from "../protocol";
+import type { CoordinatorSocketService } from "./service";
+import type { CoordinatorStateRepository } from "../state-repository";
+
+export type CoordinatorControlMessageUseCases = {
+	ackCursor(session: SocketSession, cursor: number): Promise<{ cursor: number }>;
+	commitMutations(
+		session: SocketSession,
+		message: CommitMutationsMessage,
+	): Promise<CommitMutationsResult>;
+	listEntryStates(
+		session: SocketSession,
+		message: ListEntryStatesMessage,
+	): EntryStatesListedMessage;
+	listEntryVersions(
+		session: SocketSession,
+		message: ListEntryVersionsMessage,
+	): Promise<EntryVersionsListedMessage>;
+	restoreEntryVersion(
+		session: SocketSession,
+		message: RestoreEntryVersionMessage,
+	): Promise<RestoreEntryVersionResult>;
+};
+
+export class CoordinatorControlMessageHandler {
+	constructor(
+		private readonly socketService: CoordinatorSocketService,
+		private readonly stateRepository: CoordinatorStateRepository,
+		private readonly subscriptionPolicyService: SubscriptionPolicyReader,
+		private readonly useCases: CoordinatorControlMessageUseCases,
+		private readonly markHealthSummaryDirty: () => Promise<void>,
+	) {}
+
+	async handle(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+		if (typeof message !== "string") {
+			this.socketService.sendSocketMessage(ws, {
+				type: "session_error",
+				code: "invalid_message",
+				message: "binary websocket messages are not supported",
+			});
+			return;
+		}
+
+		const session = this.socketService.readSocketSession(ws);
+		if (!session) {
+			this.socketService.sendSocketMessage(ws, {
+				type: "session_error",
+				code: "unauthorized",
+				message: "socket session is missing",
+			});
+			ws.close(4401, "missing socket session");
+			return;
+		}
+
+		let parsed;
+		try {
+			const decoded = JSON.parse(message) as unknown;
+			const result = parseClientControlMessage(decoded);
+			if (!result.success) {
+				this.socketService.sendSocketMessage(ws, {
+					type: "session_error",
+					code: "invalid_message",
+					message: formatClientControlMessageError(result.error),
+				});
+				return;
+			}
+
+			parsed = result.data;
+		} catch {
+			this.socketService.sendSocketMessage(ws, {
+				type: "session_error",
+				code: "invalid_json",
+				message: "websocket message must be valid json",
+			});
+			return;
+		}
+
+		if (parsed.type === "hello") {
+			try {
+				this.stateRepository.recordLocalVaultCursor(
+					session.userId,
+					session.localVaultId,
+					parsed.lastKnownCursor,
+				);
+				const policy = await this.subscriptionPolicyService.readVaultPolicy(
+					session.vaultId,
+				);
+				await this.markHealthSummaryDirty();
+				this.socketService.sendSocketMessage(ws, {
+					type: "hello_ack",
+					requestId: parsed.requestId,
+					cursor: this.stateRepository.currentCursor(),
+					policy: {
+						storageLimitBytes: policy.limits.storageLimitBytes,
+						maxFileSizeBytes: policy.limits.maxFileSizeBytes,
+					},
+					storageStatus: storageStatusWithPolicy(
+						this.stateRepository.readStorageStatus(),
+						policy,
+					),
+				});
+			} catch (error) {
+				this.socketService.sendSocketMessage(ws, {
+					type: "session_error",
+					code: "hello_failed",
+					message: error instanceof Error ? error.message : "hello failed",
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "commit_mutations") {
+			try {
+				const result = await this.useCases.commitMutations(session, parsed);
+				this.socketService.sendSocketMessage(ws, result.message);
+				if (result.broadcastCursor !== null) {
+					this.socketService.broadcastExcept(ws, {
+						type: "cursor_advanced",
+						cursor: result.broadcastCursor,
+					});
+				}
+			} catch (error) {
+				this.socketService.sendSocketMessage(ws, {
+					type: "commit_mutations_failed",
+					requestId: parsed.requestId,
+					code: "commit_failed",
+					message: error instanceof Error ? error.message : "commit failed",
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "list_entry_states") {
+			try {
+				this.socketService.sendSocketMessage(
+					ws,
+					this.useCases.listEntryStates(session, parsed),
+				);
+			} catch (error) {
+				const details = websocketRequestError(
+					error,
+					"entry_states_list_failed",
+					"entry states list failed",
+				);
+				this.socketService.sendSocketMessage(ws, {
+					type: "entry_states_list_failed",
+					requestId: parsed.requestId,
+					code: details.code,
+					message: details.message,
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "list_entry_versions") {
+			try {
+				this.socketService.sendSocketMessage(
+					ws,
+					await this.useCases.listEntryVersions(session, parsed),
+				);
+			} catch (error) {
+				const details = websocketRequestError(
+					error,
+					"entry_versions_list_failed",
+					"entry history failed",
+				);
+				this.socketService.sendSocketMessage(ws, {
+					type: "entry_versions_list_failed",
+					requestId: parsed.requestId,
+					code: details.code,
+					message: details.message,
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "restore_entry_version") {
+			try {
+				const result = await this.useCases.restoreEntryVersion(session, parsed);
+				this.socketService.sendSocketMessage(ws, result.message);
+				if (result.broadcastCursor !== null) {
+					this.socketService.broadcastExcept(ws, {
+						type: "cursor_advanced",
+						cursor: result.broadcastCursor,
+					});
+				}
+			} catch (error) {
+				const details = websocketRequestError(
+					error,
+					"entry_restore_failed",
+					"entry restore failed",
+				);
+				this.socketService.sendSocketMessage(ws, {
+					type: "entry_restore_failed",
+					requestId: parsed.requestId,
+					code: details.code,
+					message: details.message,
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "ack_cursor") {
+			try {
+				await this.useCases.ackCursor(session, parsed.cursor);
+				this.socketService.sendSocketMessage(ws, {
+					type: "cursor_acked",
+					requestId: parsed.requestId,
+					cursor: parsed.cursor,
+				});
+			} catch (error) {
+				this.socketService.sendSocketMessage(ws, {
+					type: "session_error",
+					code: "ack_failed",
+					message: error instanceof Error ? error.message : "ack failed",
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "heartbeat") {
+			this.socketService.sendSocketMessage(ws, {
+				type: "heartbeat_ack",
+				requestId: parsed.requestId,
+			});
+			return;
+		}
+
+		if (parsed.type === "watch_storage_status") {
+			const policy = await this.subscriptionPolicyService.readVaultPolicy(
+				session.vaultId,
+			);
+			const nextSession = {
+				...session,
+				wantsStorageStatus: true,
+			};
+			this.socketService.attachSocketSession(ws, nextSession);
+			this.socketService.sendSocketMessage(ws, {
+				type: "storage_status_updated",
+				storageStatus: storageStatusWithPolicy(
+					this.stateRepository.readStorageStatus(),
+					policy,
+				),
+			});
+			return;
+		}
+
+		if (parsed.type === "unwatch_storage_status") {
+			this.socketService.attachSocketSession(ws, {
+				...session,
+				wantsStorageStatus: false,
+			});
+			return;
+		}
+
+		this.socketService.sendSocketMessage(ws, {
+			type: "session_error",
+			code: "unsupported_message",
+			message: "unsupported websocket message type",
+		});
+	}
+}
+
+function storageStatusWithPolicy(
+	status: { storageUsedBytes: number; storageLimitBytes: number },
+	policy: SubscriptionPlanPolicy,
+) {
+	return {
+		...status,
+		storageLimitBytes: policy.limits.storageLimitBytes,
+	};
+}
+
+function websocketRequestError(
+	error: unknown,
+	fallbackCode: string,
+	fallbackMessage: string,
+): { code: string; message: string } {
+	const code = extractErrorCode(error) ?? fallbackCode;
+	const message =
+		error instanceof Error && error.message.trim()
+			? error.message
+			: fallbackMessage;
+	return { code, message };
+}
+
+function extractErrorCode(error: unknown): string | null {
+	if (!error || typeof error !== "object") {
+		return null;
+	}
+
+	if ("code" in error && typeof error.code === "string" && error.code.trim()) {
+		return error.code;
+	}
+
+	if ("cause" in error) {
+		const cause = error.cause;
+		if (
+			cause &&
+			typeof cause === "object" &&
+			"code" in cause &&
+			typeof cause.code === "string" &&
+			cause.code.trim()
+		) {
+			return cause.code;
+		}
+	}
+
+	return null;
+}

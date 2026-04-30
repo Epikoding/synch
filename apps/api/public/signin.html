@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en" class="dark">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>Sign In - Synch</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<style>
+			/* Mimic the selection colors from Layout.astro */
+			::selection {
+				background-color: #27272a;
+				color: #e4e4e7;
+			}
+		</style>
+	</head>
+	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col font-light text-sm">
+		<div class="max-w-md mx-auto px-6 w-full flex-1 flex flex-col justify-center py-24">
+			<div class="mb-8 text-center">
+				<a href="/" class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity inline-block mb-8">Synch</a>
+				<h1 class="text-2xl font-light text-zinc-200 tracking-tight mb-2">Welcome back</h1>
+				<p class="text-zinc-500 text-xs">Sign in to your account to continue</p>
+			</div>
+
+			<form id="sign-in-form" class="space-y-4">
+				<div class="space-y-2">
+					<label for="email" class="block text-xs text-zinc-400">Email</label>
+					<input type="email" id="email" name="email" required autocomplete="email" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="you@example.com" />
+				</div>
+				
+				<div class="space-y-2">
+					<div class="flex items-center justify-between">
+						<label for="password" class="block text-xs text-zinc-400">Password</label>
+					</div>
+					<input type="password" id="password" name="password" required autocomplete="current-password" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="••••••••" />
+				</div>
+
+				<div id="status" class="text-zinc-400 text-xs text-center min-h-6" aria-live="polite"></div>
+
+				<button type="submit" class="w-full py-2 px-4 mt-4 text-center text-xs bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+					Sign In
+				</button>
+
+				<div id="resend-container" class="hidden mt-4 text-center flex-col items-center">
+					<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline disabled:opacity-50 disabled:no-underline transition-colors hidden">
+						Resend verification email
+					</button>
+					<div id="resend-message" class="text-xs mt-2 text-zinc-400 hidden"></div>
+				</div>
+			</form>
+
+			<div class="mt-8 text-center text-xs text-zinc-500">
+				Don't have an account? <a id="signup-link" href="/signup" class="text-zinc-300 hover:text-zinc-100 transition-colors">Sign up</a>
+			</div>
+		</div>
+
+		<script>
+			const form = document.querySelector("#sign-in-form");
+			const status = document.querySelector("#status");
+			const signupLink = document.querySelector("#signup-link");
+			const resendContainer = document.querySelector("#resend-container");
+			const resendButton = document.querySelector("#resend-button");
+			const resendMessage = document.querySelector("#resend-message");
+			let returnTo = "";
+
+			let resendCooldown = 0;
+			let resendInterval;
+			let currentEmail = "";
+
+			void initializePage();
+
+			function startResendCooldown() {
+				if (!resendButton) return;
+				resendButton.classList.remove("hidden");
+				resendCooldown = 30;
+				resendButton.disabled = true;
+				
+				if (resendInterval) clearInterval(resendInterval);
+				
+				resendInterval = setInterval(() => {
+					resendCooldown -= 1;
+					if (resendCooldown <= 0) {
+						clearInterval(resendInterval);
+						resendButton.disabled = false;
+						resendButton.textContent = "Resend verification email";
+					} else {
+						resendButton.textContent = `Resend available in ${resendCooldown}s`;
+					}
+				}, 1000);
+			}
+
+			resendButton?.addEventListener("click", async () => {
+				if (resendCooldown > 0 || !currentEmail) return;
+				
+				resendButton.disabled = true;
+				if (resendMessage) {
+					resendMessage.textContent = "Sending...";
+					resendMessage.classList.remove("hidden", "text-red-400");
+					resendMessage.classList.add("text-zinc-400");
+				}
+
+				try {
+					const response = await fetch("/api/auth/send-verification-email", {
+						method: "POST",
+						credentials: "include",
+						headers: {
+							"content-type": "application/json",
+						},
+						body: JSON.stringify({ 
+							email: currentEmail,
+							callbackURL: returnTo || "/",
+						}),
+					});
+
+					if (!response.ok) {
+						if (resendMessage) {
+							resendMessage.textContent = await readErrorMessage(response, "Failed to resend");
+							resendMessage.classList.remove("text-zinc-400");
+							resendMessage.classList.add("text-red-400");
+						}
+						resendButton.disabled = false;
+						return;
+					}
+
+					if (resendMessage) {
+						resendMessage.textContent = "Verification email resent.";
+						resendMessage.classList.remove("text-red-400");
+						resendMessage.classList.add("text-zinc-400");
+					}
+					startResendCooldown();
+				} catch {
+					if (resendMessage) {
+						resendMessage.textContent = "Unable to reach the API.";
+						resendMessage.classList.remove("text-zinc-400");
+						resendMessage.classList.add("text-red-400");
+					}
+					resendButton.disabled = false;
+				}
+			});
+
+			form?.addEventListener("submit", (event) => {
+				event.preventDefault();
+				void submitAuth();
+			});
+
+			async function initializePage() {
+				returnTo = loadReturnTo();
+				if (signupLink && returnTo) {
+					const signupUrl = new URL("/signup", window.location.origin);
+					signupUrl.searchParams.set("return_to", returnTo);
+					signupLink.href = signupUrl.toString();
+				}
+
+				try {
+					const response = await fetch("/api/auth/get-session", { credentials: "include" });
+					const session = response.ok ? await response.json() : null;
+					if (session?.user && returnTo) {
+						window.location.assign(returnTo);
+					}
+				} catch {
+					// Ignore session checks; explicit form submission will surface errors.
+				}
+			}
+
+			function loadReturnTo() {
+				const params = new URLSearchParams(window.location.search);
+				const requested = params.get("return_to") || params.get("callbackURL") || "";
+				const fallback = new URL("/vaults", window.location.origin).toString();
+				if (!requested.trim()) {
+					return fallback;
+				}
+
+				try {
+					const parsed = new URL(requested, window.location.href);
+					return parsed.origin === window.location.origin ? parsed.toString() : fallback;
+				} catch {
+					return fallback;
+				}
+			}
+
+			async function submitAuth() {
+				const body = Object.fromEntries(new FormData(form).entries());
+				body.callbackURL = returnTo || "/";
+				setSubmitting(true);
+				setStatus("Logging in...");
+				try {
+					const response = await fetch("/api/auth/sign-in/email", {
+						method: "POST",
+						credentials: "include",
+						headers: {
+							"content-type": "application/json",
+						},
+						body: JSON.stringify(body),
+					});
+
+					if (!response.ok) {
+						const msg = await readErrorMessage(response, "Authentication failed.");
+						setStatus(msg);
+						if (msg.toLowerCase().includes("verify") || msg.toLowerCase().includes("verified")) {
+							currentEmail = body.email;
+							if (resendContainer) {
+								resendContainer.classList.remove("hidden");
+								resendContainer.classList.add("flex");
+								startResendCooldown();
+							}
+						}
+						return;
+					}
+
+					setStatus("Logged in. Redirecting...");
+					window.location.assign(returnTo || "/");
+				} catch {
+					setStatus("Unable to reach the API. Check the server URL and try again.");
+				} finally {
+					setSubmitting(false);
+				}
+			}
+
+			function setStatus(message) {
+				if (status.classList.contains("text-red-400")) {
+					status.classList.remove("text-red-400");
+					status.classList.add("text-zinc-400");
+				}
+				status.textContent = message;
+				if (message.includes("failed") || message.includes("Unable")) {
+					status.classList.remove("text-zinc-400");
+					status.classList.add("text-red-400");
+				}
+			}
+
+			function setSubmitting(submitting) {
+				for (const element of form.elements) {
+					if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
+						element.disabled = submitting;
+					}
+				}
+			}
+
+			async function readErrorMessage(response, fallback = "Request failed.") {
+				try {
+					const json = await response.json();
+					return json.message || json.error_description || json.error || fallback;
+				} catch {
+					return fallback;
+				}
+			}
+		</script>
+	</body>
+</html>

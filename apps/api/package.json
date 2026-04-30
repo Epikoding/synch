@@ -1,0 +1,56 @@
+{
+	"name": "@synch/api",
+	"version": "0.0.0",
+	"private": true,
+	"packageManager": "pnpm@10.33.0",
+	"scripts": {
+		"db:generate": "drizzle-kit generate",
+		"db:generate:do": "drizzle-kit generate --config=./drizzle-do.config.ts",
+		"db:migrate:local": "wrangler d1 migrations apply DB --local --env managed",
+		"db:migrate:self-hosted": "wrangler d1 migrations apply DB --remote --env self-hosted",
+		"db:migrate:managed": "wrangler d1 migrations apply DB --remote --env managed",
+		"db:studio": "drizzle-kit studio",
+		"dev": "wrangler dev --env managed",
+		"deploy": "wrangler d1 migrations apply DB --remote --env self-hosted && wrangler deploy --env self-hosted",
+		"deploy:self-hosted": "wrangler d1 migrations apply DB --remote --env self-hosted && wrangler deploy --env self-hosted",
+		"deploy:managed": "wrangler d1 migrations apply DB --remote --env managed && wrangler deploy --env managed",
+		"e2e:smoke": "node ./scripts/e2e-smoke.mjs",
+		"test:integration": "vitest run --config ./vitest.config.mts",
+		"test:integration:watch": "vitest --config ./vitest.config.mts",
+		"test:unit": "vitest run --config ./vitest.unit.config.mts",
+		"test:smoke": "node ./scripts/e2e-smoke.mjs",
+		"cf-typegen": "wrangler types",
+		"typecheck": "tsgo --noEmit"
+	},
+	"cloudflare": {
+		"bindings": {
+			"BETTER_AUTH_SECRET": {
+				"description": "Generate a random secret for Better Auth session signing, for example `openssl rand -hex 32`."
+			},
+			"SYNC_TOKEN_SECRET": {
+				"description": "Generate a separate random secret for sync websocket token signing, for example `openssl rand -hex 32`."
+			}
+		}
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.14.6",
+		"@types/node": "^25.6.0",
+		"@typescript/native-preview": "^7.0.0-dev.20260423.1",
+		"dotenv": "^17.4.2",
+		"drizzle-kit": "^0.31.10",
+		"vitest": "^4.1.4",
+		"wrangler": "^4.82.2",
+		"ws": "^8.20.0"
+	},
+	"dependencies": {
+		"@better-auth/drizzle-adapter": "^1.6.2",
+		"@hono/zod-validator": "^0.7.6",
+		"@polar-sh/better-auth": "^1.8.3",
+		"@polar-sh/sdk": "^0.46.7",
+		"better-auth": "^1.6.2",
+		"drizzle-orm": "^0.45.2",
+		"hono": "^4.12.14",
+		"jose": "^6.2.2",
+		"zod": "^4.3.6"
+	}
+}

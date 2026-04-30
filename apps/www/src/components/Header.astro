@@ -1,0 +1,66 @@
+---
+const apiUrl = import.meta.env.PUBLIC_API_URL || "";
+const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
+const signInUrl = new URL("/signin", apiUrl || Astro.url.origin);
+signInUrl.searchParams.set("return_to", vaultsUrl);
+---
+
+<header class="py-12 flex items-center justify-between">
+  <a
+    href="/"
+    class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity"
+    >Synch</a
+  >
+  <nav class="flex items-center gap-6 text-xs">
+    <a href="/pricing" class="hover:text-zinc-200 transition-colors"
+      >Pricing</a
+    >
+    <a
+      href="https://github.com/hyeongjin/synch"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="hover:text-zinc-200 transition-colors">GitHub</a
+    >
+    <div class="w-px h-3 bg-zinc-800"></div>
+    <a
+      id="auth-link"
+      href={signInUrl.toString()}
+      class="hover:text-zinc-200 transition-colors hidden">Sign In</a
+    >
+  </nav>
+</header>
+
+<script define:vars={{ apiUrl, signInUrl: signInUrl.toString(), vaultsUrl }}>
+
+  async function checkAuth() {
+    const authLink = document.getElementById("auth-link");
+    if (!authLink) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/api/auth/get-session`, {
+        credentials: "include",
+        headers: { accept: "application/json" },
+      });
+      const session = response.ok ? await response.json() : null;
+
+      authLink.classList.remove("hidden");
+      if (session?.user) {
+        authLink.textContent = "Vaults";
+        authLink.setAttribute("href", vaultsUrl);
+        authLink.className =
+          "px-3 py-1.5 bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium";
+      } else {
+        authLink.textContent = "Sign In";
+        authLink.setAttribute("href", signInUrl);
+        authLink.className = "hover:text-zinc-200 transition-colors";
+      }
+    } catch (error) {
+      authLink.classList.remove("hidden");
+      authLink.textContent = "Sign In";
+      authLink.setAttribute("href", signInUrl);
+      authLink.className = "hover:text-zinc-200 transition-colors";
+    }
+  }
+
+  checkAuth();
+</script>

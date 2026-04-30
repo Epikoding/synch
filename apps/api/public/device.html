@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en" class="dark">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>Authorize device | Synch</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<style>
+			::selection {
+				background-color: #27272a;
+				color: #e4e4e7;
+			}
+			[hidden] {
+				display: none !important;
+			}
+		</style>
+	</head>
+	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col font-light text-sm">
+		<div class="max-w-3xl mx-auto px-6 w-full flex-1 flex flex-col justify-center py-12 sm:py-24">
+			<div class="mb-8 text-center">
+				<a href="/" class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity inline-block mb-8">Synch</a>
+				<h1 class="text-2xl font-light text-zinc-200 tracking-tight mb-2">Authorize Obsidian Device</h1>
+				<p class="text-zinc-500 text-xs">Sign in to approve this Obsidian device.</p>
+			</div>
+
+			<div id="status" class="text-zinc-400 text-xs text-center min-h-[1.5rem] mb-2" aria-live="polite"></div>
+			<p id="identity" class="text-green-400/90 text-xs text-center mb-6 font-medium" hidden></p>
+
+			<div id="approval-panel" class="flex flex-col sm:flex-row justify-center gap-3 mb-8 max-w-xs mx-auto w-full" hidden>
+				<button id="approve-button" type="button" class="w-full py-2 px-4 text-xs bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+					Approve device
+				</button>
+				<button id="deny-button" type="button" class="w-full py-2 px-4 text-xs bg-transparent border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+					Deny device
+				</button>
+			</div>
+		</div>
+
+		<script>
+			const params = new URLSearchParams(window.location.search);
+			let activeUserCode = normalizeUserCode(params.get("user_code") ?? "");
+
+			const approvalPanel = document.querySelector("#approval-panel");
+			const approveButton = document.querySelector("#approve-button");
+			const denyButton = document.querySelector("#deny-button");
+			const identity = document.querySelector("#identity");
+			const status = document.querySelector("#status");
+
+			approveButton?.addEventListener("click", () => {
+				void submitDeviceDecision("approve");
+			});
+
+			denyButton?.addEventListener("click", () => {
+				void submitDeviceDecision("deny");
+			});
+
+			void refreshDevice();
+
+			async function refreshDevice() {
+				setVisible(approvalPanel, false);
+				setVisible(identity, false);
+
+				setStatus("Checking session...");
+				try {
+					const session = await getSession();
+					const accountLabel = session?.user?.email || session?.user?.name || "";
+
+					if (!accountLabel) {
+						redirectToSignIn();
+						return;
+					}
+
+					identity.textContent = `Logged in as ${accountLabel}`;
+					setVisible(identity, true);
+
+					if (!activeUserCode) {
+						setStatus("Open this page from Obsidian to approve a device.");
+						return;
+					}
+
+					setStatus("Checking device request...");
+					const deviceStatus = await getDeviceStatus();
+
+					if (deviceStatus === "approved") {
+						setStatus("The device has been approved. Return to Obsidian to finish sign-in.");
+						return;
+					}
+					if (deviceStatus === "denied") {
+						setStatus("The device request has been denied.");
+						return;
+					}
+					if (deviceStatus !== "pending") {
+						setStatus("This device code is invalid or has already been consumed.");
+						return;
+					}
+
+					setVisible(approvalPanel, true);
+					setStatus("Approve this Obsidian device to finish sign-in.");
+				} catch (error) {
+					setStatus(error instanceof Error ? error.message : "Unable to load device request.");
+				}
+			}
+
+			async function getSession() {
+				const response = await fetchApi("/api/auth/get-session");
+				if (response.status === 401 || response.status === 403) {
+					return null;
+				}
+				if (!response.ok) {
+					throw new Error(await readErrorMessage(response, "Unable to check your session."));
+				}
+				return await response.json();
+			}
+
+			async function getDeviceStatus() {
+				const response = await fetchApi(
+					`/api/auth/device?user_code=${encodeURIComponent(activeUserCode)}`,
+				);
+				if (!response.ok) {
+					throw new Error(await readErrorMessage(response, "This device code is invalid."));
+				}
+				const json = await response.json();
+				return json.status;
+			}
+
+			async function submitDeviceDecision(decision) {
+				if (!activeUserCode) {
+					return;
+				}
+
+				setActionButtonsDisabled(true);
+				setStatus(decision === "approve" ? "Approving device..." : "Denying device...");
+				try {
+					const response = await fetchApi(`/api/auth/device/${decision}`, {
+						method: "POST",
+						headers: {
+							"content-type": "application/json",
+						},
+						body: JSON.stringify({ userCode: activeUserCode }),
+					});
+
+					if (!response.ok) {
+						setStatus(await readErrorMessage(response, "Unable to update device request."), "error");
+						return;
+					}
+
+					setVisible(approvalPanel, false);
+					setStatus(
+						decision === "approve"
+							? "The device has been approved. Return to Obsidian to finish sign-in."
+							: "The device request has been denied.",
+						decision === "approve" ? "success" : "error",
+					);
+				} catch {
+					setStatus("Unable to reach the API. Check the server URL and try again.", "error");
+				} finally {
+					setActionButtonsDisabled(false);
+				}
+			}
+
+			function fetchApi(path, init = {}) {
+				return fetch(path, {
+					credentials: "include",
+					...init,
+					headers: {
+						...(init.headers ?? {}),
+					},
+				});
+			}
+
+			function redirectToSignIn() {
+				const signInUrl = new URL("/signin", window.location.origin);
+				signInUrl.searchParams.set("return_to", window.location.href);
+				window.location.assign(signInUrl.toString());
+			}
+
+			function setStatus(message, tone = inferTone(message)) {
+				status.classList.remove("text-red-400", "text-green-400", "text-zinc-400");
+				status.classList.add(statusClassForTone(tone));
+				status.textContent = message;
+			}
+
+			function inferTone(message) {
+				const lower = message.toLowerCase();
+				if (
+					lower.includes("failed") ||
+					lower.includes("unable") ||
+					lower.includes("invalid") ||
+					lower.includes("denied") ||
+					lower.includes("error")
+				) {
+					return "error";
+				}
+				if (
+					lower.includes("sent") ||
+					lower.includes("authenticated") ||
+					lower.includes("approved") ||
+					lower.includes("logged in")
+				) {
+					return "success";
+				}
+				return "neutral";
+			}
+
+			function statusClassForTone(tone) {
+				if (tone === "error") {
+					return "text-red-400";
+				}
+				if (tone === "success") {
+					return "text-green-400";
+				}
+				return "text-zinc-400";
+			}
+
+			function setVisible(element, visible) {
+				element.hidden = !visible;
+			}
+
+			function setActionButtonsDisabled(disabled) {
+				approveButton.disabled = disabled;
+				denyButton.disabled = disabled;
+			}
+
+			async function readErrorMessage(response, fallback = "Request failed.") {
+				try {
+					const json = await response.json();
+					return json.message || json.error_description || json.error || fallback;
+				} catch {
+					return fallback;
+				}
+			}
+
+			function normalizeUserCode(value) {
+				return value.trim().replaceAll("-", "").toUpperCase();
+			}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "synch",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "check:api": "pnpm -C apps/api check",
+    "dev:api": "pnpm --filter @synch/api dev",
+    "dev:www": "pnpm --filter www dev",
+    "dev:plugin": "pnpm --filter @synch/obsidian-plugin dev",
+    "dev:desktop": "pnpm --filter desktop tauri dev",
+    "dev:desktop:web": "pnpm --filter desktop dev",
+    "dev": "pnpm -r --parallel --filter @synch/api --filter @synch/obsidian-plugin run dev",
+    "build": "pnpm -r --if-present build",
+    "build:www": "pnpm -C apps/www build",
+    "deploy:www": "pnpm -C apps/www deploy",
+    "build:plugin": "pnpm -C apps/obsidian-plugin build",
+    "release:plugin": "pnpm -C apps/obsidian-plugin release:prepare",
+    "test:api": "pnpm -C apps/api test:integration",
+    "test:rust": "cargo test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260423.1",
+    "typescript": "^5.9.3"
+  }
+}

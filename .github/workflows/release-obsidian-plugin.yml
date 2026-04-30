@@ -1,0 +1,86 @@
+name: Release Obsidian plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: "Version bump to apply before releasing."
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: "Mark the GitHub release as a prerelease."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      API_BASE_URL: ${{ vars.OBSIDIAN_PLUGIN_API_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate release configuration
+        run: |
+          test -n "$API_BASE_URL" || {
+            echo "Set repository variable OBSIDIAN_PLUGIN_API_BASE_URL before releasing."
+            exit 1
+          }
+
+      - name: Bump version
+        id: version
+        run: |
+          VERSION="$(pnpm -C apps/obsidian-plugin bump:version ${{ inputs.version_bump }} | tail -n 1)"
+          pnpm -C apps/obsidian-plugin sync:metadata
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - run: pnpm -C apps/obsidian-plugin test
+      - run: pnpm -C apps/obsidian-plugin build
+
+      - name: Commit release metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/obsidian-plugin/package.json apps/obsidian-plugin/manifest.json apps/obsidian-plugin/versions.json manifest.json versions.json
+          git commit -m "chore: release obsidian plugin ${{ steps.version.outputs.version }}"
+
+      - name: Create tag
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            apps/obsidian-plugin/dist/main.js
+            apps/obsidian-plugin/dist/manifest.json
+            apps/obsidian-plugin/dist/styles.css
+            apps/obsidian-plugin/dist/versions.json

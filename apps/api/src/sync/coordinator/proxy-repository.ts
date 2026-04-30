@@ -1,0 +1,70 @@
+type CoordinatorNamespace = {
+	getByName(name: string): DurableObjectStub;
+};
+
+export class CoordinatorProxyRepository {
+	constructor(private readonly namespace: CoordinatorNamespace) {}
+
+	async fetch(vaultId: string, request: Request): Promise<Response> {
+		const stub = this.namespace.getByName(vaultId);
+		return await stub.fetch(request);
+	}
+
+	async stageBlob(
+		vaultId: string,
+		blobId: string,
+		sizeBytes: number,
+		authorizationHeader?: string | null,
+	): Promise<Response> {
+		const stub = this.namespace.getByName(vaultId);
+		const headers = new Headers();
+		if (authorizationHeader) {
+			headers.set("authorization", authorizationHeader);
+		}
+		headers.set("x-blob-size", String(sizeBytes));
+
+		return await stub.fetch(
+			new Request(
+				`https://internal/internal/v1/vaults/${encodeURIComponent(vaultId)}/blobs/${encodeURIComponent(blobId)}/stage`,
+				{
+					method: "PUT",
+					headers,
+				},
+			),
+		);
+	}
+
+	async abortStagedBlob(
+		vaultId: string,
+		blobId: string,
+		authorizationHeader?: string | null,
+	): Promise<Response> {
+		const stub = this.namespace.getByName(vaultId);
+		const headers = new Headers();
+		if (authorizationHeader) {
+			headers.set("authorization", authorizationHeader);
+		}
+
+		return await stub.fetch(
+			new Request(
+				`https://internal/internal/v1/vaults/${encodeURIComponent(vaultId)}/blobs/${encodeURIComponent(blobId)}/stage`,
+				{
+					method: "DELETE",
+					headers,
+				},
+			),
+		);
+	}
+
+	async purgeVault(vaultId: string): Promise<Response> {
+		const stub = this.namespace.getByName(vaultId);
+		return await stub.fetch(
+			new Request(
+				`https://internal/internal/v1/vaults/${encodeURIComponent(vaultId)}/purge`,
+				{
+					method: "POST",
+				},
+			),
+		);
+	}
+}

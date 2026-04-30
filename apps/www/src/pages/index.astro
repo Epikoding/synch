@@ -1,0 +1,68 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Layout>
+  <div class="max-w-2xl mx-auto px-6 w-full flex-1 flex flex-col">
+    <Header />
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col justify-center py-24">
+      <div class="space-y-6">
+        <h1
+          class="text-2xl sm:text-3xl font-light text-zinc-200 tracking-tight"
+        >
+          End-to-end encrypted sync<br />for Obsidian.
+        </h1>
+
+        <p class="max-w-md leading-relaxed text-zinc-500">
+          An open-source alternative to Obsidian Sync. Your notes are encrypted
+          locally before leaving your device, ensuring complete privacy and
+          control over your data.
+        </p>
+
+        <div class="flex items-center gap-4 pt-4 text-xs">
+          <a
+            href="#"
+            class="px-4 py-2 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
+          >
+            Get Started
+          </a>
+          <a
+            href="https://github.com/hyeongjin/synch"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-4 py-2 bg-transparent text-zinc-400 border border-zinc-800 hover:border-zinc-700 hover:text-zinc-300 rounded transition-all"
+          >
+            View Source
+          </a>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="grid sm:grid-cols-2 gap-12 mt-32">
+        <div class="space-y-3">
+          <div class="w-8 h-px bg-zinc-800"></div>
+          <h3 class="text-zinc-300 font-normal">Zero Knowledge</h3>
+          <p class="text-zinc-500 leading-relaxed">
+            Everything is encrypted with AES-256-GCM on your device. The server
+            never sees your raw notes.
+          </p>
+        </div>
+        <div class="space-y-3">
+          <div class="w-8 h-px bg-zinc-800"></div>
+          <h3 class="text-zinc-300 font-normal">Open Source</h3>
+          <p class="text-zinc-500 leading-relaxed">
+            Built in the open. You can inspect the code, host it yourself, or
+            contribute to the project on GitHub.
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <Footer />
+  </div>
+</Layout>

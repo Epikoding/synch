@@ -1,0 +1,116 @@
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/durable-sqlite";
+
+import * as doSchema from "../../../db/do";
+import type {
+	CurrentEntryRow,
+	EntryStatePageCursor,
+	EntryStateRow,
+} from "../types";
+
+export class CoordinatorEntryStore {
+	constructor(private readonly storage: DurableObjectStorage) {}
+
+	listEntryStates(
+		sinceCursor: number,
+		targetCursor: number,
+		after: EntryStatePageCursor | null,
+		limit: number,
+	): EntryStateRow[] {
+		const rows = this.storage.sql
+			.exec<{
+				entry_id: string;
+				revision: number;
+				blob_id: string | null;
+				encrypted_metadata: string;
+				deleted: number;
+				updated_seq: number;
+				updated_at: number;
+			}>(
+				`
+				SELECT
+					entry_id,
+					revision,
+					blob_id,
+					encrypted_metadata,
+					deleted,
+					updated_seq,
+					updated_at
+				FROM entries
+				WHERE updated_seq > ?
+					AND updated_seq <= ?
+					AND (
+						? IS NULL
+						OR updated_seq > ?
+						OR (updated_seq = ? AND entry_id > ?)
+					)
+				ORDER BY updated_seq ASC, entry_id ASC
+				LIMIT ?
+				`,
+				sinceCursor,
+				targetCursor,
+				after?.updatedSeq ?? null,
+				after?.updatedSeq ?? null,
+				after?.updatedSeq ?? null,
+				after?.entryId ?? null,
+				limit,
+			)
+			.toArray();
+
+		return rows.map((row) => ({
+			entry_id: row.entry_id,
+			revision: Number(row.revision),
+			blob_id: row.blob_id,
+			encrypted_metadata: row.encrypted_metadata,
+			deleted: Number(row.deleted) !== 0,
+			updated_seq: Number(row.updated_seq),
+			updated_at: Number(row.updated_at),
+		}));
+	}
+
+	countEntryStates(sinceCursor: number, targetCursor: number): number {
+		const row = this.storage.sql
+			.exec<{ total: number }>(
+				`
+				SELECT COUNT(*) AS total
+				FROM entries
+				WHERE updated_seq > ?
+					AND updated_seq <= ?
+				`,
+				sinceCursor,
+				targetCursor,
+			)
+			.one();
+
+		return Number(row.total);
+	}
+
+	readEntry(entryId: string): CurrentEntryRow | null {
+		const row = this.getDb()
+			.select({
+				entry_id: doSchema.entries.entryId,
+				revision: doSchema.entries.revision,
+				blob_id: doSchema.entries.blobId,
+				encrypted_metadata: doSchema.entries.encryptedMetadata,
+				deleted: doSchema.entries.deleted,
+			})
+			.from(doSchema.entries)
+			.where(eq(doSchema.entries.entryId, entryId))
+			.limit(1)
+			.get();
+
+		return row
+			? {
+					entry_id: row.entry_id,
+					revision: Number(row.revision),
+					blob_id: row.blob_id,
+					encrypted_metadata: row.encrypted_metadata,
+					deleted: Number(row.deleted),
+				}
+			: null;
+	}
+
+	private getDb() {
+		return drizzle(this.storage, { schema: doSchema });
+	}
+}

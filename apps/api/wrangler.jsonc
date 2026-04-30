@@ -1,0 +1,137 @@
+/**
+ * Shared Wrangler config for Synch API deployments.
+ *
+ * Resource bindings live in named environments. The self-hosted environment
+ * omits generated resource IDs so Cloudflare can provision resources for
+ * Deploy to Cloudflare and first-time setup flows.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "synch-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-04-14",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"migrations": [
+		{
+			"new_sqlite_classes": [
+				"SyncCoordinator"
+			],
+			"tag": "v1"
+		}
+	],
+	"assets": {
+		"directory": "./public",
+		"html_handling": "drop-trailing-slash",
+		"not_found_handling": "none"
+	},
+	"upload_source_maps": true,
+	"rules": [
+		{
+			"type": "Text",
+			"globs": [
+				"**/*.sql"
+			],
+			"fallthrough": true
+		}
+	],
+	"env": {
+		"self-hosted": {
+			"durable_objects": {
+				"bindings": [
+					{
+						"class_name": "SyncCoordinator",
+						"name": "SYNC_COORDINATOR"
+					}
+				]
+			},
+			"r2_buckets": [
+				{
+					"binding": "SYNC_BLOBS",
+					"bucket_name": "synch-blobs"
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "synch-db",
+					"migrations_dir": "drizzle"
+				}
+			],
+			"queues": {
+				"producers": [
+					{
+						"binding": "VAULT_PURGE_QUEUE",
+						"queue": "synch-vault-purge"
+					}
+				],
+				"consumers": [
+					{
+						"queue": "synch-vault-purge",
+						"max_batch_size": 5,
+						"max_batch_timeout": 30,
+						"max_retries": 3
+					}
+				]
+			},
+			"vars": {
+				"SYNC_TOKEN_TTL_SECONDS": 120,
+				"SELF_HOSTED": true
+			}
+		},
+		"managed": {
+			"durable_objects": {
+				"bindings": [
+					{
+						"class_name": "SyncCoordinator",
+						"name": "SYNC_COORDINATOR"
+					}
+				]
+			},
+			"r2_buckets": [
+				{
+					"binding": "SYNC_BLOBS",
+					"bucket_name": "synch-blobs"
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "synch-db",
+					"database_id": "89af0147-d14f-4884-92f1-4eb7bd5e4bb5",
+					"migrations_dir": "drizzle"
+				}
+			],
+			"queues": {
+				"producers": [
+					{
+						"binding": "VAULT_PURGE_QUEUE",
+						"queue": "synch-vault-purge"
+					}
+				],
+				"consumers": [
+					{
+						"queue": "synch-vault-purge",
+						"max_batch_size": 5,
+						"max_batch_timeout": 30,
+						"max_retries": 3
+					}
+				]
+			},
+			"send_email": [
+				{
+					"name": "EMAIL"
+				}
+			],
+			"vars": {
+				"SYNC_TOKEN_TTL_SECONDS": 120,
+				"SELF_HOSTED": false,
+				"WWW_BASE_URL": "https://synch.run"
+			},
+			"observability": {
+				"enabled": true,
+			}
+		}
+	}
+}

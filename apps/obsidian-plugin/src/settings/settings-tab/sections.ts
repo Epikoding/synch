@@ -1,0 +1,292 @@
+import { App, Notice, Setting } from "obsidian";
+
+import { getDefaultApiBaseUrl } from "../../config";
+import type { SynchFileRules } from "../../plugin/view-models";
+import type { SynchSettingsController } from "../controller";
+import { formatSyncDescription, shouldShowSyncSpinner } from "./format";
+import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
+
+type RefreshSettings = () => void;
+
+export function renderApiBaseUrlSetting(
+  containerEl: HTMLElement,
+  controller: SynchSettingsController,
+  options: {
+    canChangeApiBaseUrl: boolean;
+    hasConnectedRemoteVault: boolean;
+    isDeviceLoginInProgress: boolean;
+  },
+): void {
+  const apiBaseUrl = controller.getApiBaseUrl();
+  const visibleApiBaseUrl = apiBaseUrl === getDefaultApiBaseUrl() ? "" : apiBaseUrl;
+  let apiBaseUrlInput = visibleApiBaseUrl;
+  new Setting(containerEl)
+    .setName("API base URL")
+    .setDesc(
+      options.isDeviceLoginInProgress
+        ? "Finish or cancel sign-in before changing the API server."
+        : options.hasConnectedRemoteVault
+          ? "Disconnect the current vault before changing the API server."
+          : "Server URL used for authentication, vaults, and sync.",
+    )
+    .addText((text) =>
+      text
+        .setPlaceholder("Default server")
+        .setValue(visibleApiBaseUrl)
+        .setDisabled(!options.canChangeApiBaseUrl)
+        .onChange((value) => {
+          apiBaseUrlInput = value;
+        }),
+    )
+    .addButton((button) =>
+      button
+        .setButtonText("Save")
+        .setDisabled(!options.canChangeApiBaseUrl)
+        .onClick(async () => {
+          try {
+            await controller.updateApiBaseUrl(apiBaseUrlInput);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            new Notice(message);
+          }
+        }),
+    );
+}
+
+export function renderSyncStatusSetting(
+  containerEl: HTMLElement,
+  controller: SynchSettingsController,
+): void {
+  const syncProgress = controller.getSyncProgress();
+  const syncSetting = new Setting(containerEl)
+    .setName("Sync")
+    .setDesc(formatSyncDescription(
+      controller.getSyncStatusLabel(),
+      syncProgress,
+      controller.getStorageStatus(),
+    ));
+  if (shouldShowSyncSpinner(controller.getSyncState())) {
+    syncSetting.addExtraButton((button) => {
+      button
+        .setIcon("loader-circle")
+        .setTooltip("Sync in progress")
+        .setDisabled(true);
+      button.extraSettingsEl.addClass("synch-sync-spinner");
+    });
+  }
+  syncSetting.addProgressBar((progressBar) => {
+    progressBar.setValue(controller.getSyncPercent());
+  });
+}
+
+export function renderAuthenticationSetting(
+  containerEl: HTMLElement,
+  controller: SynchSettingsController,
+  isDeviceLoginInProgress: boolean,
+  refresh: RefreshSettings,
+): void {
+  const authSetting = new Setting(containerEl)
+    .setName("Authentication")
+    .setDesc(controller.getAuthStatusLabel());
+
+  if (!controller.hasAuthenticatedSession()) {
+    authSetting.addButton((button) =>
+      button
+        .setButtonText(
+          isDeviceLoginInProgress
+            ? "Open sign-in page again"
+            : "Sign in on this device",
+        )
+        .onClick(async () => {
+          await controller.beginDeviceLogin();
+          refresh();
+        }),
+    );
+  } else {
+    authSetting.addButton((button) =>
+      button
+        .setButtonText("Sign out")
+        .onClick(async () => {
+          await controller.signOutDevice();
+          refresh();
+        }),
+    );
+  }
+}
+
+export function renderRemoteVaultSettings(
+  app: App,
+  containerEl: HTMLElement,
+  controller: SynchSettingsController,
+  hasConnectedRemoteVault: boolean,
+  refresh: RefreshSettings,
+): void {
+  new Setting(containerEl)
+    .setName("Vault management")
+    .setDesc("Manage remote vaults for your account.")
+    .addButton((button) =>
+      button.setButtonText("Manage remote vaults").onClick(() => {
+        controller.openRemoteVaultManagementPage();
+      }),
+    );
+
+  const vaultSetting = new Setting(containerEl)
+    .setName("Vault")
+    .setDesc(controller.getRemoteVaultStatusLabel());
+
+  if (hasConnectedRemoteVault) {
+    vaultSetting.addButton((button) =>
+      button.setButtonText("Disconnect vault").onClick(async () => {
+        await controller.disconnectRemoteVault();
+        refresh();
+      }),
+    );
+
+    new Setting(containerEl)
+      .setName("Deleted files")
+      .setDesc("Review synced files that were deleted from this vault.")
+      .addButton((button) =>
+        button.setButtonText("View deleted files").onClick(() => {
+          new DeletedFilesModal(app, {
+            listDeletedFiles: async () => await controller.listDeletedFiles(),
+            restoreDeletedFiles: async (entryIds) => {
+              await controller.restoreDeletedFiles(entryIds);
+              refresh();
+            },
+          }).open();
+        }),
+      );
+    return;
+  }
+
+  vaultSetting
+    .addButton((button) =>
+      button.setButtonText("Create vault").onClick(async () => {
+        await controller.createRemoteVaultFromPrompt();
+        refresh();
+      }),
+    )
+    .addButton((button) =>
+      button.setButtonText("Connect vault").onClick(async () => {
+        await controller.connectRemoteVaultFromPrompt();
+        refresh();
+      }),
+    );
+}
+
+export function renderFileSyncSettings(
+  app: App,
+  containerEl: HTMLElement,
+  controller: SynchSettingsController,
+  refresh: RefreshSettings,
+): void {
+  const fileRules = controller.getSyncFileRules();
+
+  new Setting(containerEl).setName("File sync").setHeading();
+
+  addFileRuleToggle(
+    containerEl,
+    "Images",
+    "Sync image attachments on this device.",
+    fileRules,
+    "includeImages",
+    controller,
+    refresh,
+  );
+  addFileRuleToggle(
+    containerEl,
+    "Audio",
+    "Sync audio attachments on this device.",
+    fileRules,
+    "includeAudio",
+    controller,
+    refresh,
+  );
+  addFileRuleToggle(
+    containerEl,
+    "Videos",
+    "Sync video attachments on this device.",
+    fileRules,
+    "includeVideos",
+    controller,
+    refresh,
+  );
+  addFileRuleToggle(
+    containerEl,
+    "PDF",
+    "Sync PDF attachments on this device.",
+    fileRules,
+    "includePdf",
+    controller,
+    refresh,
+  );
+  addFileRuleToggle(
+    containerEl,
+    "Other file types",
+    "Sync additional non-markdown file types on this device.",
+    fileRules,
+    "includeOtherFiles",
+    controller,
+    refresh,
+  );
+
+  new Setting(containerEl)
+    .setName("Excluded folders")
+    .setDesc(
+      fileRules.excludedFolders.length > 0
+        ? `${fileRules.excludedFolders.length} folder${fileRules.excludedFolders.length === 1 ? "" : "s"} excluded on this device.`
+        : "No excluded folders on this device.",
+    )
+    .addButton((button) =>
+      button.setButtonText("Manage").onClick(() => {
+        new ExcludedFoldersModal(app, {
+          availableFolders: controller.listSelectableExcludedFolderPaths(),
+          initialSelection: fileRules.excludedFolders,
+          onSubmit: async (paths) => {
+            await controller.updateExcludedFolders(paths);
+            refresh();
+          },
+        }).open();
+      }),
+    );
+
+  for (const folder of fileRules.excludedFolders) {
+    new Setting(containerEl)
+      .setName(folder)
+      .setDesc("Excluded from sync on this device.")
+      .addButton((button) =>
+        button.setButtonText("Remove").onClick(async () => {
+          await controller.updateExcludedFolders(
+            fileRules.excludedFolders.filter((value) => value !== folder),
+          );
+          refresh();
+        }),
+      );
+  }
+
+  containerEl.createEl("p", {
+    cls: "synch-setting-hint",
+    text:
+      "File sync rules apply only to this device. Files already uploaded to the server are not removed automatically when you exclude them here.",
+  });
+}
+
+function addFileRuleToggle<K extends keyof SynchFileRules>(
+  containerEl: HTMLElement,
+  name: string,
+  description: string,
+  fileRules: SynchFileRules,
+  key: K,
+  controller: SynchSettingsController,
+  refresh: RefreshSettings,
+): void {
+  new Setting(containerEl)
+    .setName(name)
+    .setDesc(description)
+    .addToggle((toggle) =>
+      toggle.setValue(fileRules[key] as boolean).onChange(async (value) => {
+        await controller.updateSyncFileRule(key, value as SynchFileRules[K]);
+        refresh();
+      }),
+    );
+}

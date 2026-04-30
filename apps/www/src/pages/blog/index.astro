@@ -1,0 +1,37 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+
+const posts = (await getCollection('blog', ({ data }) => {
+	return import.meta.env.PROD ? data.draft !== true : true;
+})).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Layout>
+	<main class="mx-auto max-w-3xl px-6 py-16">
+		<h1 class="text-3xl font-semibold">Blog</h1>
+		{
+			posts.length > 0 ? (
+				<ul class="mt-8 space-y-6">
+					{posts.map((post) => (
+						<li>
+							<a class="text-xl font-medium hover:underline" href={`/blog/${post.id}`}>
+								{post.data.title}
+							</a>
+							<p class="mt-2 text-neutral-600">{post.data.description}</p>
+							<time class="mt-2 block text-sm text-neutral-500" datetime={post.data.pubDate.toISOString()}>
+								{post.data.pubDate.toLocaleDateString('en', {
+									year: 'numeric',
+									month: 'long',
+									day: 'numeric',
+								})}
+							</time>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p class="mt-4 text-neutral-600">No blog posts have been added yet.</p>
+			)
+		}
+	</main>
+</Layout>
