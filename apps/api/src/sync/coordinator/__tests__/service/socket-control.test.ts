@@ -174,12 +174,12 @@ describe("coordinator websocket control messages", () => {
 			requestId: "request-hello",
 			cursor: 11,
 			policy: {
-				storageLimitBytes: 50_000_000,
+				storageLimitBytes: 100_000_000,
 				maxFileSizeBytes: 3_000_000,
 			},
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
-				storageLimitBytes: 50_000_000,
+				storageLimitBytes: 100_000_000,
 			},
 		});
 	});
@@ -226,7 +226,7 @@ describe("coordinator websocket control messages", () => {
 			type: "storage_status_updated",
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
-				storageLimitBytes: 50_000_000,
+				storageLimitBytes: 100_000_000,
 			},
 		});
 	});
@@ -282,7 +282,7 @@ describe("coordinator websocket control messages", () => {
 			type: "storage_status_updated",
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
-				storageLimitBytes: 50_000_000,
+				storageLimitBytes: 100_000_000,
 			},
 		});
 	});
@@ -371,7 +371,7 @@ describe("coordinator websocket control messages", () => {
 			type: "storage_status_updated",
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
-				storageLimitBytes: 50_000_000,
+				storageLimitBytes: 100_000_000,
 			},
 		});
 	});

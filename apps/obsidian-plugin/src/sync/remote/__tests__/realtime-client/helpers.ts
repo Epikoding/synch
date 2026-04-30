@@ -73,12 +73,12 @@ export async function openRealtimeSession(input: {
     requestId: hello.requestId,
     cursor: 0,
     policy: input.helloPolicy ?? {
-      storageLimitBytes: 50_000_000,
+      storageLimitBytes: 100_000_000,
       maxFileSizeBytes: 3_000_000,
     },
     storageStatus: input.helloStorageStatus ?? {
       storageUsedBytes: 24_300_000,
-      storageLimitBytes: 50_000_000,
+      storageLimitBytes: 100_000_000,
     },
   });
 

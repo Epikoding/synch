@@ -12,7 +12,7 @@ describe("SyncRealtimeClient connection health", () => {
 
     expect(session.maxFileSizeBytes).toBe(3_000_000);
     expect(session.storageUsedBytes).toBe(24_300_000);
-    expect(session.storageLimitBytes).toBe(50_000_000);
+    expect(session.storageLimitBytes).toBe(100_000_000);
     session.close();
   });
 

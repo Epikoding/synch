@@ -79,7 +79,7 @@ export function socketStateRepository(_session = testSocketSession()) {
 		markHealthSummaryDirty: vi.fn(),
 		readStorageStatus: vi.fn(() => ({
 			storageUsedBytes: 24_300_000,
-			storageLimitBytes: 50_000_000,
+			storageLimitBytes: 100_000_000,
 		})),
 	});
 }

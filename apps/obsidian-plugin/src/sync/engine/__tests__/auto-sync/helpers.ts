@@ -70,7 +70,7 @@ export function createRealtimeClient(
       const session: SyncRealtimeSession = {
         serverCursor,
         storageUsedBytes: 0,
-        storageLimitBytes: 50_000_000,
+        storageLimitBytes: 100_000_000,
         maxFileSizeBytes: 3_000_000,
         watchStorageStatus() {},
         unwatchStorageStatus() {},
