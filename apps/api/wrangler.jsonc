@@ -49,7 +49,7 @@
 			"r2_buckets": [
 				{
 					"binding": "SYNC_BLOBS",
-					"bucket_name": "synch-blobs"
+					"bucket_name": "synch-bucket"
 				}
 			],
 			"d1_databases": [
@@ -92,7 +92,7 @@
 			"r2_buckets": [
 				{
 					"binding": "SYNC_BLOBS",
-					"bucket_name": "synch-blobs"
+					"bucket_name": "synch-bucket"
 				}
 			],
 			"d1_databases": [
