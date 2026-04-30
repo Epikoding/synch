@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultApiBaseUrl } from "../config";
 import {
   getButtonComponents,
+  getCreatedElementTexts,
   getProgressBarComponents,
   getSettingDescriptions,
   getSettingNames,
@@ -23,7 +24,7 @@ describe("SynchSettingTab", () => {
 
     tab.display();
 
-    const signInButton = getButtonComponents()[1];
+    const signInButton = getButtonComponents()[0];
     expect(signInButton?.text).toBe("Open sign-in page again");
     expect(signInButton?.disabled).toBe(false);
   });
@@ -35,12 +36,12 @@ describe("SynchSettingTab", () => {
 
     tab.display();
 
-    const signInButton = getButtonComponents()[1];
+    const signInButton = getButtonComponents()[0];
     expect(signInButton?.text).toBe("Sign in on this device");
     expect(signInButton?.disabled).toBe(false);
   });
 
-  it("hides settings below authentication before sign-in", () => {
+  it("shows account before self-hosted server settings before sign-in", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => false,
     });
@@ -48,11 +49,13 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     const buttonTexts = getButtonComponents().map((button) => button.text);
-    expect(buttonTexts).toEqual(["Save", "Sign in on this device"]);
+    expect(getCreatedElementTexts()).toEqual(["Synch", "Account", "Self-hosted server"]);
+    expect(getSettingNames().slice(0, 2)).toEqual(["Authentication", "Server URL"]);
+    expect(buttonTexts).toEqual(["Sign in on this device", "Save"]);
     expect(getProgressBarComponents()).toEqual([]);
   });
 
-  it("shows an editable API base URL before sign-in", async () => {
+  it("shows an editable self-hosted server URL before sign-in", async () => {
     const updateApiBaseUrl = vi.fn(async () => {});
     const tab = createSettingsTab({
       getApiBaseUrl: () => "https://api.synch.test",
@@ -65,7 +68,7 @@ describe("SynchSettingTab", () => {
     expect(apiBaseUrlInput?.value).toBe("https://api.synch.test");
     expect(apiBaseUrlInput?.disabled).toBe(false);
 
-    const saveButton = getButtonComponents()[0];
+    const saveButton = getButtonComponents()[1];
     expect(saveButton?.text).toBe("Save");
     expect(saveButton?.disabled).toBe(false);
 
@@ -87,13 +90,13 @@ describe("SynchSettingTab", () => {
 
     const apiBaseUrlInput = getTextComponents()[0];
     expect(apiBaseUrlInput?.value).toBe("");
-    expect(apiBaseUrlInput?.placeholder).toBe("Default server");
+    expect(apiBaseUrlInput?.placeholder).toBe("Synch Cloud");
 
-    await getButtonComponents()[0]?.click();
+    await getButtonComponents()[1]?.click();
     expect(updateApiBaseUrl).toHaveBeenCalledWith("");
   });
 
-  it("hides the API base URL after sign-in", () => {
+  it("hides the self-hosted server URL after sign-in", () => {
     const updateApiBaseUrl = vi.fn(async () => {});
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
@@ -103,13 +106,13 @@ describe("SynchSettingTab", () => {
 
     tab.display();
 
-    expect(getSettingNames()).not.toContain("API base URL");
+    expect(getSettingNames()).not.toContain("Server URL");
     expect(getTextComponents()).toEqual([]);
     expect(getButtonComponents().map((button) => button.text)).not.toContain("Save");
     expect(updateApiBaseUrl).not.toHaveBeenCalled();
   });
 
-  it("disables the API base URL during device sign-in", async () => {
+  it("disables the self-hosted server URL during device sign-in", async () => {
     const updateApiBaseUrl = vi.fn(async () => {});
     const tab = createSettingsTab({
       isDeviceLoginInProgress: () => true,
@@ -120,7 +123,7 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     const apiBaseUrlInput = getTextComponents()[0];
-    const saveButton = getButtonComponents()[0];
+    const saveButton = getButtonComponents()[1];
     expect(apiBaseUrlInput?.disabled).toBe(true);
     expect(saveButton?.disabled).toBe(true);
 
@@ -130,7 +133,7 @@ describe("SynchSettingTab", () => {
     expect(updateApiBaseUrl).not.toHaveBeenCalled();
   });
 
-  it("disables the API base URL while a vault is connected", async () => {
+  it("disables the self-hosted server URL while a vault is connected", async () => {
     const updateApiBaseUrl = vi.fn(async () => {});
     const tab = createSettingsTab({
       hasConnectedRemoteVault: () => true,
@@ -141,11 +144,11 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     const apiBaseUrlInput = getTextComponents()[0];
-    const saveButton = getButtonComponents()[0];
+    const saveButton = getButtonComponents()[1];
     expect(apiBaseUrlInput?.disabled).toBe(true);
     expect(saveButton?.disabled).toBe(true);
-    expect(getSettingDescriptions()[0]).toBe(
-      "Disconnect the current vault before changing the API server.",
+    expect(getSettingDescriptions()[1]).toBe(
+      "Disconnect the current vault before changing servers.",
     );
 
     await apiBaseUrlInput?.change("https://custom.synch.test");

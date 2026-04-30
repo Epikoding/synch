@@ -21,17 +21,17 @@ export function renderApiBaseUrlSetting(
   const visibleApiBaseUrl = apiBaseUrl === getDefaultApiBaseUrl() ? "" : apiBaseUrl;
   let apiBaseUrlInput = visibleApiBaseUrl;
   new Setting(containerEl)
-    .setName("API base URL")
+    .setName("Server URL")
     .setDesc(
       options.isDeviceLoginInProgress
-        ? "Finish or cancel sign-in before changing the API server."
+        ? "Finish or cancel sign-in before changing servers."
         : options.hasConnectedRemoteVault
-          ? "Disconnect the current vault before changing the API server."
-          : "Server URL used for authentication, vaults, and sync.",
+          ? "Disconnect the current vault before changing servers."
+          : "Synch Cloud is used by default. Change this only for a self-hosted server.",
     )
     .addText((text) =>
       text
-        .setPlaceholder("Default server")
+        .setPlaceholder("Synch Cloud")
         .setValue(visibleApiBaseUrl)
         .setDisabled(!options.canChangeApiBaseUrl)
         .onChange((value) => {

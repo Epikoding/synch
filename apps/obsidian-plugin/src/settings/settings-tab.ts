@@ -54,16 +54,10 @@ export class SynchSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "Synch" });
 
-    if (!hasAuthenticatedSession) {
-      renderApiBaseUrlSetting(containerEl, this.controller, {
-        canChangeApiBaseUrl,
-        hasConnectedRemoteVault,
-        isDeviceLoginInProgress,
-      });
-    }
-
     if (hasAuthenticatedSession) {
       renderSyncStatusSetting(containerEl, this.controller);
+    } else {
+      containerEl.createEl("h3", { text: "Account" });
     }
 
     renderAuthenticationSetting(
@@ -74,6 +68,12 @@ export class SynchSettingTab extends PluginSettingTab {
     );
 
     if (!hasAuthenticatedSession) {
+      containerEl.createEl("h3", { text: "Self-hosted server" });
+      renderApiBaseUrlSetting(containerEl, this.controller, {
+        canChangeApiBaseUrl,
+        hasConnectedRemoteVault,
+        isDeviceLoginInProgress,
+      });
       return;
     }
 
