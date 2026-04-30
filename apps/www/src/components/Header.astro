@@ -23,7 +23,7 @@ signInUrl.searchParams.set("return_to", vaultsUrl);
     <a
       id="auth-link"
       href={signInUrl.toString()}
-      class="hover:text-zinc-200 transition-colors hidden">Sign In</a
+      class="hover:text-zinc-200 transition-colors">Sign In</a
     >
   </nav>
 </header>
@@ -40,19 +40,13 @@ signInUrl.searchParams.set("return_to", vaultsUrl);
       });
       const session = response.ok ? await response.json() : null;
 
-      authLink.classList.remove("hidden");
       if (session?.user) {
         authLink.textContent = "Vaults";
         authLink.setAttribute("href", vaultsUrl);
         authLink.className =
           "px-3 py-1.5 bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium";
-      } else {
-        authLink.textContent = "Sign In";
-        authLink.setAttribute("href", signInUrl);
-        authLink.className = "hover:text-zinc-200 transition-colors";
       }
     } catch (error) {
-      authLink.classList.remove("hidden");
       authLink.textContent = "Sign In";
       authLink.setAttribute("href", signInUrl);
       authLink.className = "hover:text-zinc-200 transition-colors";
