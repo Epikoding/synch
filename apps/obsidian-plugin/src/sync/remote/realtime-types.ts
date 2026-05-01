@@ -127,6 +127,16 @@ export class SyncRealtimeError extends Error {
   }
 }
 
+export class SyncRealtimeConnectionError extends Error {
+  readonly cause?: unknown;
+
+  constructor(message: string, options: { cause?: unknown } = {}) {
+    super(message);
+    this.name = "SyncRealtimeConnectionError";
+    this.cause = options.cause;
+  }
+}
+
 export interface WebSocketFactory {
   create(url: string, protocols: string[]): WebSocket;
 }

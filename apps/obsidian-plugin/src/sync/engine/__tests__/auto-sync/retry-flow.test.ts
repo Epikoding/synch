@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createInitializedTestSyncStore, createTestPlugin } from "../../../../test-support/test-plugin";
-import type { SyncRealtimeCallbacks } from "../../../remote/realtime-client";
+import {
+  SyncRealtimeConnectionError,
+  type SyncRealtimeCallbacks,
+} from "../../../remote/realtime-client";
 import { SyncAutoLoop } from "../../auto-sync";
 import {
   createFailingRealtimeClient,
@@ -137,6 +140,87 @@ describe("SyncAutoLoop retry flow", () => {
     expect(callbacks).toHaveLength(2);
     expect(states.at(-1)).toBe("live");
 
+    autoLoop.stop();
+    await store.close();
+  });
+
+  it("reconnects without reporting a realtime connection error", async () => {
+    vi.useFakeTimers();
+
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const callbacks: SyncRealtimeCallbacks[] = [];
+    const onError = vi.fn();
+    const states: string[] = [];
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations: vi.fn(async () => createPushResult()),
+      pullOnce: vi.fn(async () => {}),
+      realtimeClient: createRealtimeClient((nextCallbacks) => {
+        callbacks.push(nextCallbacks);
+      }),
+      reconnectDelayMs: 1_000,
+      onError,
+      onConnectionStateChange(state) {
+        states.push(state);
+      },
+    });
+
+    await autoLoop.start();
+
+    callbacks[0]?.onError(
+      new SyncRealtimeConnectionError("sync websocket connection failed"),
+    );
+    callbacks[0]?.onClose();
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(states).toContain("reconnecting");
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(callbacks).toHaveLength(2);
+    autoLoop.stop();
+    await store.close();
+  });
+
+  it("keeps realtime request closures out of user-visible error reporting", async () => {
+    vi.useFakeTimers();
+
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const pushPendingMutations = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new SyncRealtimeConnectionError(
+          "sync websocket closed before the request completed",
+        ),
+      )
+      .mockResolvedValue(createPushResult());
+    const onError = vi.fn();
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations,
+      pullOnce: vi.fn(async () => {}),
+      realtimeClient: createRealtimeClient(),
+      pushDebounceMs: 100,
+      syncRetryBaseDelayMs: 1_000,
+      syncRetryMaxDelayMs: 1_000,
+      onError,
+    });
+
+    await autoLoop.start();
+    autoLoop.notifyLocalChange();
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(pushPendingMutations).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(pushPendingMutations).toHaveBeenCalledTimes(2);
     autoLoop.stop();
     await store.close();
   });

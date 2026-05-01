@@ -6,7 +6,7 @@ import type {
   SyncRealtimeCallbacks,
   SyncRealtimeClientOptions,
 } from "./realtime-types";
-import { SyncRealtimeError } from "./realtime-types";
+import { SyncRealtimeConnectionError, SyncRealtimeError } from "./realtime-types";
 
 type ClientMessage =
   | {
@@ -126,7 +126,7 @@ export class SyncRealtimeSocketSession {
   ): Promise<ServerMessage> {
     return await new Promise<ServerMessage>((resolve, reject) => {
       if (this.closed) {
-        reject(new Error("sync websocket is not connected"));
+        reject(new SyncRealtimeConnectionError("sync websocket is not connected"));
         return;
       }
 
@@ -138,7 +138,7 @@ export class SyncRealtimeSocketSession {
               }
 
               this.failConnection(
-                new Error("sync websocket request timed out"),
+                new SyncRealtimeConnectionError("sync websocket request timed out"),
                 reportConnectionError,
               );
             }, timeoutMs)
@@ -148,7 +148,9 @@ export class SyncRealtimeSocketSession {
         this.socket.send(JSON.stringify(message));
       } catch (error) {
         this.failConnection(
-          error instanceof Error ? error : new Error(String(error)),
+          new SyncRealtimeConnectionError(toErrorMessage(error), {
+            cause: error,
+          }),
           reportConnectionError,
         );
       }
@@ -157,14 +159,17 @@ export class SyncRealtimeSocketSession {
 
   send(message: ClientMessage): void {
     if (this.closed) {
-      throw new Error("sync websocket is not connected");
+      throw new SyncRealtimeConnectionError("sync websocket is not connected");
     }
 
     try {
       this.socket.send(JSON.stringify(message));
     } catch (error) {
-      this.failConnection(error instanceof Error ? error : new Error(String(error)), false);
-      throw error;
+      const connectionError = new SyncRealtimeConnectionError(toErrorMessage(error), {
+        cause: error,
+      });
+      this.failConnection(connectionError, false);
+      throw connectionError;
     }
   }
 
@@ -178,7 +183,11 @@ export class SyncRealtimeSocketSession {
     this.socket.removeEventListener("message", this.handleMessage as EventListener);
     this.socket.removeEventListener("error", this.handleError);
     this.socket.removeEventListener("close", this.handleClose);
-    this.rejectPending(new Error("sync websocket closed before the request completed"));
+    this.rejectPending(
+      new SyncRealtimeConnectionError(
+        "sync websocket closed before the request completed",
+      ),
+    );
     try {
       this.socket.close();
     } catch {
@@ -241,7 +250,9 @@ export class SyncRealtimeSocketSession {
   };
 
   private readonly handleError = (): void => {
-    this.failConnection(new Error("sync websocket connection failed"));
+    this.failConnection(
+      new SyncRealtimeConnectionError("sync websocket connection failed"),
+    );
   };
 
   private readonly handleClose = (): void => {
@@ -251,7 +262,11 @@ export class SyncRealtimeSocketSession {
 
     this.closed = true;
     this.stopHeartbeat();
-    this.rejectPending(new Error("sync websocket closed before the request completed"));
+    this.rejectPending(
+      new SyncRealtimeConnectionError(
+        "sync websocket closed before the request completed",
+      ),
+    );
     this.callbacks.onClose();
   };
 
@@ -269,7 +284,7 @@ export class SyncRealtimeSocketSession {
       }
     } catch (error) {
       if (!this.closed) {
-        this.failConnection(error instanceof Error ? error : new Error(String(error)), true);
+        this.failConnection(toConnectionError(error), true);
       }
     }
   }
@@ -329,11 +344,15 @@ export async function waitForOpen(socket: WebSocket): Promise<void> {
     };
     const onError = () => {
       cleanup();
-      reject(new Error("sync websocket connection failed"));
+      reject(new SyncRealtimeConnectionError("sync websocket connection failed"));
     };
     const onClose = () => {
       cleanup();
-      reject(new Error("sync websocket closed before the session started"));
+      reject(
+        new SyncRealtimeConnectionError(
+          "sync websocket closed before the session started",
+        ),
+      );
     };
 
     const cleanup = () => {
@@ -348,3 +367,16 @@ export async function waitForOpen(socket: WebSocket): Promise<void> {
   });
 }
 
+function toConnectionError(error: unknown): SyncRealtimeConnectionError {
+  if (error instanceof SyncRealtimeConnectionError) {
+    return error;
+  }
+
+  return new SyncRealtimeConnectionError(toErrorMessage(error), {
+    cause: error,
+  });
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

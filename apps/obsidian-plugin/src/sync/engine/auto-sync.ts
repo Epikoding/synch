@@ -2,6 +2,7 @@ import type { SyncTokenResponse } from "../remote/client";
 import type { PushPendingMutationsResult } from "./push-service";
 import {
   SyncRealtimeClient,
+  SyncRealtimeConnectionError,
   type SyncRealtimeSession,
   type SyncStorageStatus,
 } from "../remote/realtime-client";
@@ -183,7 +184,9 @@ export class SyncAutoLoop {
             this.markRealtimeDisconnected();
           },
           onError: (error) => {
-            this.handleError(error);
+            if (!isRealtimeConnectionError(error)) {
+              this.handleError(error);
+            }
           },
         },
       );
@@ -208,7 +211,9 @@ export class SyncAutoLoop {
         this.deps.onIdle?.();
       }
     } catch (error) {
-      this.handleError(error);
+      if (!isRealtimeConnectionError(error)) {
+        this.handleError(error);
+      }
       this.scheduleReconnect();
     }
   }
@@ -255,7 +260,9 @@ export class SyncAutoLoop {
         session.unwatchStorageStatus();
       }
     } catch (error) {
-      this.handleError(error);
+      if (!isRealtimeConnectionError(error)) {
+        this.handleError(error);
+      }
     }
   }
 
@@ -349,7 +356,9 @@ export class SyncAutoLoop {
         if (shouldPullNow) {
           this.requestPullWork(work.pullTargetCursor);
         }
-        this.handleError(error);
+        if (!isRealtimeConnectionError(error)) {
+          this.handleError(error);
+        }
         this.scheduleSyncRetry();
         return;
       }
@@ -404,4 +413,8 @@ export class SyncAutoLoop {
   private handleError(error: unknown): void {
     this.deps.onError?.(error);
   }
+}
+
+function isRealtimeConnectionError(error: unknown): boolean {
+  return error instanceof SyncRealtimeConnectionError;
 }

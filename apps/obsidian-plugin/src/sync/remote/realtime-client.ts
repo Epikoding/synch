@@ -30,7 +30,7 @@ export type {
   SyncStorageStatus,
   WebSocketFactory,
 } from "./realtime-types";
-export { SyncRealtimeError } from "./realtime-types";
+export { SyncRealtimeConnectionError, SyncRealtimeError } from "./realtime-types";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
