@@ -11,10 +11,12 @@ import type {
   SynchDeletedFile,
   SynchEntryVersionCursor,
   SynchFileRules,
+  SynchPluginUpdateStatus,
   SynchStorageStatus,
   SynchSyncProgress,
   SynchSyncState,
 } from "./view-models";
+import { SynchPluginUpdateChecker } from "./update-checker";
 import { normalizeExcludedFolders, type SyncFileRules } from "../sync/core/file-rules";
 import type { SyncTokenResponse } from "../sync/remote/client";
 import { SyncController } from "../sync/runtime/controller";
@@ -37,6 +39,12 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly plugin = this.deps.plugin;
   private readonly pluginDataStore = new SynchPluginDataStore(this.plugin);
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
+  private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
+  private pluginUpdateCheckPromise: Promise<void> | null = null;
+  private pluginUpdateStatus: SynchPluginUpdateStatus = {
+    state: "idle",
+    currentVersion: this.plugin.manifest.version,
+  };
   private storedRemoteVaultKeySecret: StoredRemoteVaultKeySecret | null = null;
   private storedSyncConnection: SyncConnection | null = null;
   private resumeAutoSyncPromise: Promise<void> | null = null;
@@ -154,6 +162,23 @@ export class SynchPluginController implements SynchSettingsController {
       .finally(() => {
         this.resumeAutoSyncPromise = null;
       });
+  }
+
+  getPluginUpdateStatus(): SynchPluginUpdateStatus {
+    return this.pluginUpdateStatus;
+  }
+
+  async ensurePluginUpdateCheck(): Promise<void> {
+    if (this.pluginUpdateStatus.state !== "idle") {
+      await this.pluginUpdateCheckPromise;
+      return;
+    }
+
+    await this.checkPluginUpdate();
+  }
+
+  async retryPluginUpdateCheck(): Promise<void> {
+    await this.checkPluginUpdate();
   }
 
   getAuthStatusLabel(): string {
@@ -332,6 +357,36 @@ export class SynchPluginController implements SynchSettingsController {
 
   private refreshUi(): void {
     this.deps.refreshUi();
+  }
+
+  private async checkPluginUpdate(): Promise<void> {
+    if (this.pluginUpdateCheckPromise) {
+      await this.pluginUpdateCheckPromise;
+      return;
+    }
+
+    this.pluginUpdateStatus = {
+      state: "checking",
+      currentVersion: this.plugin.manifest.version,
+    };
+    this.pluginUpdateCheckPromise = this.pluginUpdateChecker
+      .check(this.plugin.manifest.version)
+      .then((status) => {
+        this.pluginUpdateStatus = status;
+      })
+      .catch((error) => {
+        this.pluginUpdateStatus = {
+          state: "failed",
+          currentVersion: this.plugin.manifest.version,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      })
+      .finally(() => {
+        this.pluginUpdateCheckPromise = null;
+        this.refreshUi();
+      });
+
+    await this.pluginUpdateCheckPromise;
   }
 
   private async saveStoredRemoteVaultKeySecret(

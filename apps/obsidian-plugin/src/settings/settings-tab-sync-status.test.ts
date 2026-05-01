@@ -38,7 +38,8 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingNames().slice(0, 3)).toEqual([
+    expect(getSettingNames().slice(0, 4)).toEqual([
+      "Plugin update",
       "Sync",
       "Authentication",
       "Vault management",
@@ -121,7 +122,7 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingDescriptions()[0]).toBe(
+    expect(getSettingDescriptions()[1]).toBe(
       "Sync: synced 100% - 12 / 12 - Storage: 24.3 MB / 50 MB (49%)",
     );
   });
@@ -142,7 +143,7 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingDescriptions()[0]).toBe(
+    expect(getSettingDescriptions()[1]).toBe(
       "Sync: synced 100% - 12 / 12 - Storage: 24.3 MB",
     );
   });
@@ -160,6 +161,6 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingDescriptions()[0]).toBe("Sync: synced 100% - 12 / 12");
+    expect(getSettingDescriptions()[1]).toBe("Sync: synced 100% - 12 / 12");
   });
 });

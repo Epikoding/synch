@@ -24,6 +24,27 @@ export interface SynchStorageStatus {
   storageLimitBytes: number;
 }
 
+export type SynchPluginUpdateStatus =
+  | {
+      state: "idle" | "checking";
+      currentVersion: string;
+    }
+  | {
+      state: "up_to_date";
+      currentVersion: string;
+      latestVersion: string;
+    }
+  | {
+      state: "update_available";
+      currentVersion: string;
+      latestVersion: string;
+    }
+  | {
+      state: "failed";
+      currentVersion: string;
+      error: string;
+    };
+
 export interface SynchDeletedFile {
   entryId: string;
   path: string;

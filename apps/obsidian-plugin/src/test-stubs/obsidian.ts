@@ -15,6 +15,8 @@ class MockElement {
 
   empty(): void {}
 
+  addClass(_value: string): void {}
+
   createEl(_tag: string, options?: { text?: string; cls?: string }): MockElement {
     const element = new MockElement();
     if (options?.text) {
@@ -211,6 +213,9 @@ export class TFolder extends TAbstractFile {}
 
 export class Plugin {
   app = new App();
+  manifest = {
+    version: "0.0.1",
+  };
 
   async loadData(): Promise<unknown> {
     return null;
@@ -244,6 +249,14 @@ export class PluginSettingTab {
   constructor(public app: unknown, public plugin: unknown) {}
 
   hide(): void {}
+}
+
+export interface WorkspaceLeaf {}
+
+export class ItemView {
+  contentEl = new MockElement();
+
+  constructor(public leaf: WorkspaceLeaf) {}
 }
 
 export class Setting {

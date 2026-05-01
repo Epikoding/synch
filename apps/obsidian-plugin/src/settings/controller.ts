@@ -1,12 +1,16 @@
 import type {
   SynchDeletedFile,
   SynchFileRules,
+  SynchPluginUpdateStatus,
   SynchStorageStatus,
   SynchSyncProgress,
   SynchSyncState,
 } from "../plugin/view-models";
 
 export interface SynchSettingsController {
+  getPluginUpdateStatus(): SynchPluginUpdateStatus;
+  ensurePluginUpdateCheck(): Promise<void>;
+  retryPluginUpdateCheck(): Promise<void>;
   getAuthStatusLabel(): string;
   getSyncState(): SynchSyncState;
   getSyncStatusLabel(): string;

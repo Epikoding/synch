@@ -19,6 +19,13 @@ export function createSettingsTab(
       completedEntries: 0,
       totalEntries: 0,
     }),
+    getPluginUpdateStatus: () => ({
+      state: "up_to_date",
+      currentVersion: "0.0.1",
+      latestVersion: "0.0.1",
+    }),
+    ensurePluginUpdateCheck: vi.fn(async () => {}),
+    retryPluginUpdateCheck: vi.fn(async () => {}),
     getStorageStatus: () => null,
     watchStorageStatus: vi.fn(),
     unwatchStorageStatus: vi.fn(),

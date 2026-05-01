@@ -50,9 +50,76 @@ describe("SynchSettingTab", () => {
 
     const buttonTexts = getButtonComponents().map((button) => button.text);
     expect(getCreatedElementTexts()).toEqual(["Synch", "Account", "Self-hosted server"]);
-    expect(getSettingNames().slice(0, 2)).toEqual(["Authentication", "Server URL"]);
+    expect(getSettingNames().slice(0, 3)).toEqual([
+      "Plugin update",
+      "Authentication",
+      "Server URL",
+    ]);
     expect(buttonTexts).toEqual(["Sign in on this device", "Save"]);
     expect(getProgressBarComponents()).toEqual([]);
+  });
+
+  it("checks and shows plugin updates as the first settings field", () => {
+    const ensurePluginUpdateCheck = vi.fn(async () => {});
+    const tab = createSettingsTab({
+      ensurePluginUpdateCheck,
+      getPluginUpdateStatus: () => ({
+        state: "update_available",
+        currentVersion: "0.0.1",
+        latestVersion: "0.0.2",
+      }),
+    });
+
+    tab.display();
+
+    expect(ensurePluginUpdateCheck).toHaveBeenCalledTimes(1);
+    expect(getSettingNames()[0]).toBe("Plugin update");
+    expect(getSettingDescriptions()[0]).toBe(
+      "Version 0.0.2 is available. Current version: 0.0.1.",
+    );
+  });
+
+  it("shows checking, up-to-date, and failed plugin update states", async () => {
+    const tab = createSettingsTab({
+      getPluginUpdateStatus: () => ({
+        state: "checking",
+        currentVersion: "0.0.1",
+      }),
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()[0]).toBe("Checking latest version...");
+
+    resetObsidianMocks();
+    createSettingsTab({
+      getPluginUpdateStatus: () => ({
+        state: "up_to_date",
+        currentVersion: "0.0.1",
+        latestVersion: "0.0.1",
+      }),
+    }).display();
+
+    expect(getSettingDescriptions()[0]).toBe(
+      "Synch is up to date. Current version: 0.0.1",
+    );
+
+    resetObsidianMocks();
+    const retryPluginUpdateCheck = vi.fn(async () => {});
+    createSettingsTab({
+      retryPluginUpdateCheck,
+      getPluginUpdateStatus: () => ({
+        state: "failed",
+        currentVersion: "0.0.1",
+        error: "offline",
+      }),
+    }).display();
+
+    expect(getSettingDescriptions()[0]).toBe("Could not check for updates.");
+    expect(getButtonComponents()[0]?.text).toBe("Retry");
+
+    await getButtonComponents()[0]?.click();
+    expect(retryPluginUpdateCheck).toHaveBeenCalledTimes(1);
   });
 
   it("shows an editable self-hosted server URL before sign-in", async () => {
@@ -147,7 +214,7 @@ describe("SynchSettingTab", () => {
     const saveButton = getButtonComponents()[1];
     expect(apiBaseUrlInput?.disabled).toBe(true);
     expect(saveButton?.disabled).toBe(true);
-    expect(getSettingDescriptions()[1]).toBe(
+    expect(getSettingDescriptions()[2]).toBe(
       "Disconnect the current vault before changing servers.",
     );
 
