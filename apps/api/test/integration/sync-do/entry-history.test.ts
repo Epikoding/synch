@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import {
+	apiRequest,
 	issueSyncToken,
 	signUpAndCreateVault,
 	uniqueId,
@@ -78,7 +79,9 @@ describe("sync durable object entry history integration", () => {
 		expect(historicalBlob.state).toBe("pending_delete");
 		expect(historicalBlob.references).toEqual([]);
 		expect(historicalBlob.deleteAfter).not.toBeNull();
-		expect(historicalBlob.deleteAfter ?? 0).toBeGreaterThan(Date.now() + 23 * 60 * 60 * 1000);
+		expect(
+			historicalBlob.deleteAfter ?? Number.POSITIVE_INFINITY,
+		).toBeLessThanOrEqual(Date.now());
 
 		const history = await listEntryVersions(stub, session, {
 			entryId,
@@ -161,14 +164,17 @@ describe("sync durable object entry history integration", () => {
 					.map((reference) => reference.source),
 			}));
 		});
+		const blobAState = blobStates.find((blob) => blob.blobId === blobA);
+		if (blobAState) {
+			expect(blobAState).toEqual({
+				blobId: blobA,
+				state: "pending_delete",
+				deleteAfter: expect.any(Number),
+				references: [],
+			});
+		}
 		expect(blobStates).toEqual(
 			expect.arrayContaining([
-				{
-					blobId: blobA,
-					state: "pending_delete",
-					deleteAfter: expect.any(Number),
-					references: [],
-				},
 				{
 					blobId: blobB,
 					state: "live",
@@ -223,6 +229,102 @@ describe("sync durable object entry history integration", () => {
 		});
 		expect(history.versions).toEqual([]);
 		expect(history.hasMore).toBe(false);
+	});
+
+	it("keeps deleted entry blobs until before-delete history expires", async () => {
+		const primary = await signUpAndCreateVault();
+		const token = await issueSyncToken(
+			primary.sessionCookie,
+			primary.vaultId,
+			"local-vault-delete-history",
+		);
+		const stub = env.SYNC_COORDINATOR.getByName(primary.vaultId);
+		const session = {
+			userId: primary.userId,
+			localVaultId: "local-vault-delete-history",
+			vaultId: primary.vaultId,
+		};
+		const entryId = "entry-delete-history";
+		const blobId = uniqueId("blob-delete-history");
+
+		await uploadBlob(primary.vaultId, token.token, blobId, "deleted body");
+		await commitMutation(stub, session, {
+			mutationId: "mutation-delete-history-create",
+			entryId,
+			op: "upsert",
+			baseRevision: 0,
+			blobId,
+			encryptedMetadata: "meta-create",
+		});
+		await commitMutation(stub, session, {
+			mutationId: "mutation-delete-history-delete",
+			entryId,
+			op: "delete",
+			baseRevision: 1,
+			blobId: null,
+			encryptedMetadata: "meta-delete",
+		});
+
+		const beforeExpiry = await runInDurableObject(stub, async (instance, state) => {
+			await (instance as unknown as { runGc: () => Promise<void> }).runGc();
+			const blob = state.storage.sql
+				.exec<{ state: string; delete_after: number | null }>(
+					"SELECT state, delete_after FROM blobs WHERE blob_id = ?",
+					blobId,
+				)
+				.toArray()[0];
+			const version = state.storage.sql
+				.exec<{ reason: string; blob_id: string | null }>(
+					"SELECT reason, blob_id FROM entry_versions WHERE entry_id = ?",
+					entryId,
+				)
+				.toArray()[0];
+			return {
+				blob: {
+					state: blob?.state ?? null,
+					deleteAfter:
+						blob?.delete_after === null ? null : Number(blob?.delete_after),
+				},
+				version,
+			};
+		});
+		expect(beforeExpiry.blob.state).toBe("pending_delete");
+		expect(
+			beforeExpiry.blob.deleteAfter ?? Number.POSITIVE_INFINITY,
+		).toBeLessThanOrEqual(Date.now());
+		expect(beforeExpiry.version).toEqual({
+			reason: "before_delete",
+			blob_id: blobId,
+		});
+
+		const stillDownloadable = await apiRequest(
+			`/v1/vaults/${encodeURIComponent(primary.vaultId)}/blobs/${blobId}`,
+			{
+				headers: {
+					authorization: `Bearer ${token.token}`,
+				},
+			},
+		);
+		expect(stillDownloadable.status).toBe(200);
+
+		await runInDurableObject(stub, async (instance, state) => {
+			state.storage.sql.exec(
+				"UPDATE entry_versions SET expires_at = ? WHERE blob_id = ?",
+				Date.now() - 1,
+				blobId,
+			);
+			await (instance as unknown as { runGc: () => Promise<void> }).runGc();
+		});
+
+		const deleted = await apiRequest(
+			`/v1/vaults/${encodeURIComponent(primary.vaultId)}/blobs/${blobId}`,
+			{
+				headers: {
+					authorization: `Bearer ${token.token}`,
+				},
+			},
+		);
+		expect(deleted.status).toBe(404);
 	});
 
 	it("compacts acked sync commits while retaining sampled entry versions", async () => {

@@ -338,7 +338,7 @@ export class CoordinatorMutationStore {
 					this.blobStore.markBlobPendingDeleteIfUnreferenced(
 						tx,
 						currentBlobId,
-						now + versionHistoryRetentionMs,
+						now,
 					);
 				}
 
