@@ -323,6 +323,13 @@ export class Notice {
   constructor(_message: string) {}
 }
 
+export function setIcon(
+  parent: { setAttribute(name: string, value: string): void },
+  iconId: string,
+): void {
+  parent.setAttribute("data-icon", iconId);
+}
+
 export function setRequestUrlMock(mock: RequestUrlMock): void {
   requestUrlMock = mock;
 }

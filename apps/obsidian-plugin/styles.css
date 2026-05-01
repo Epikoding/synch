@@ -7,6 +7,43 @@
   font-size: var(--font-ui-small);
 }
 
+.synch-status-bar {
+  align-items: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 1.4em;
+}
+
+.synch-status-bar.synch-status-active .synch-status-bar-icon {
+  animation: synch-spin 0.9s linear infinite;
+}
+
+.synch-status-bar.synch-status-up-to-date {
+  color: var(--text-success);
+}
+
+.synch-status-bar.synch-status-offline,
+.synch-status-bar.synch-status-attention-needed {
+  color: var(--text-error);
+}
+
+.synch-status-bar-icon {
+  display: inline-flex;
+  height: 1em;
+  width: 1em;
+}
+
+.synch-status-bar-icon svg {
+  height: 1em;
+  width: 1em;
+}
+
+.synch-status-bar.synch-status-not-ready .synch-status-bar-icon {
+  opacity: 0.45;
+}
+
 .synch-sync-spinner {
   animation: synch-spin 0.9s linear infinite;
   color: var(--text-muted);
@@ -24,6 +61,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .synch-status-bar.synch-status-active .synch-status-bar-icon,
   .synch-sync-spinner {
     animation: none;
   }
