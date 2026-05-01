@@ -42,6 +42,7 @@ export default class SynchPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       controller.registerVaultEvents();
       void controller.ensureAutoSyncState();
+      void controller.ensureVersionHistoryPane();
     });
   }
 

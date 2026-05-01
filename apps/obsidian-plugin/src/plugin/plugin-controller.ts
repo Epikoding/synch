@@ -333,6 +333,10 @@ export class SynchPluginController implements SynchSettingsController {
     await this.versionHistoryController.openPane();
   }
 
+  async ensureVersionHistoryPane(): Promise<void> {
+    await this.versionHistoryController.ensurePane();
+  }
+
   async listActiveFileVersions(
     before: SynchEntryVersionCursor | null,
     limit: number,

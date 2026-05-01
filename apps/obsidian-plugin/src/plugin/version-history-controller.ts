@@ -1,4 +1,4 @@
-import { TFile, type Plugin } from "obsidian";
+import { TFile, type Plugin, type WorkspaceLeaf } from "obsidian";
 
 import type {
   SynchDeletedFile,
@@ -33,25 +33,28 @@ export class SynchVersionHistoryController
 
   constructor(private readonly deps: SynchVersionHistoryControllerDeps) {}
 
+  async ensurePane(): Promise<void> {
+    await this.getOrCreatePaneLeaf({ active: false, reveal: false });
+  }
+
   async openPane(): Promise<void> {
-    const existing = this.deps.plugin.app.workspace.getLeavesOfType(
-      SYNCH_VERSION_HISTORY_VIEW_TYPE,
-    )[0];
-    if (existing) {
-      this.deps.plugin.app.workspace.revealLeaf(existing);
-      return;
-    }
-
-    const leaf = this.deps.plugin.app.workspace.getRightLeaf(false);
-    if (!leaf) {
-      throw new Error("Unable to open the right sidebar.");
-    }
-
-    await leaf.setViewState({
-      type: SYNCH_VERSION_HISTORY_VIEW_TYPE,
-      active: true,
-    });
+    const leaf = await this.getOrCreatePaneLeaf({ active: true, reveal: true });
     this.deps.plugin.app.workspace.revealLeaf(leaf);
+  }
+
+  private async getOrCreatePaneLeaf(options: {
+    active: boolean;
+    reveal: boolean;
+  }): Promise<WorkspaceLeaf> {
+    return await this.deps.plugin.app.workspace.ensureSideLeaf(
+      SYNCH_VERSION_HISTORY_VIEW_TYPE,
+      "right",
+      {
+        active: options.active,
+        reveal: options.reveal,
+        split: false,
+      },
+    );
   }
 
   async listActiveFileVersions(
