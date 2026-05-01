@@ -199,6 +199,32 @@ describe("coordinator websocket control messages", () => {
 		});
 	});
 
+	it("detaches the current local vault over the websocket control channel", async () => {
+		const session = testSocketSession();
+		const sender = testWebSocket();
+		const stateRepository = socketStateRepository(session);
+		const socketService = socketServiceMock(session);
+		const service = createCoordinatorService({ stateRepository, socketService });
+
+		await service.handleSocketMessage(
+			sender,
+			JSON.stringify({
+				type: "detach_local_vault",
+				requestId: "request-detach",
+			}),
+		);
+
+		expect(stateRepository.deleteLocalVaultCursor).toHaveBeenCalledWith(
+			session.userId,
+			session.localVaultId,
+		);
+		expect(stateRepository.markHealthSummaryDirty).toHaveBeenCalled();
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
+			type: "local_vault_detached",
+			requestId: "request-detach",
+		});
+	});
+
 	it("enables storage status updates only after a socket watches them", async () => {
 		const session = testSocketSession();
 		const sender = testWebSocket();

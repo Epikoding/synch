@@ -219,6 +219,12 @@ export class SyncEngine {
     return await getOrCreateStoredLocalVaultId(this.requireStore(), remoteVaultId);
   }
 
+  async detachLocalVaultFromServer(): Promise<void> {
+    await this.withRealtimeSession(async (session) => {
+      await session.detachLocalVault();
+    });
+  }
+
   startAutoSync(): Promise<boolean> {
     return this.syncAutoLoop.start();
   }

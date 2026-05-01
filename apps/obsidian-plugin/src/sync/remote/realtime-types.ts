@@ -69,16 +69,17 @@ export interface SyncRealtimeSession {
     before: EntryVersionPageCursor | null;
     limit: number;
   }): Promise<EntryVersionsResponse>;
-  restoreEntryVersion(input: {
+	  restoreEntryVersion(input: {
     entryId: string;
     versionId: string;
     baseRevision: number;
     op: "upsert" | "delete";
     blobId: string | null;
     encryptedMetadata: string;
-  }): Promise<EntryVersionRestoredResponse>;
-  ackCursor(cursor: number): Promise<void>;
-  commitMutation(mutation: CommitMutationPayload): Promise<CommitAcceptedResult>;
+	  }): Promise<EntryVersionRestoredResponse>;
+	  ackCursor(cursor: number): Promise<void>;
+	  detachLocalVault(): Promise<void>;
+	  commitMutation(mutation: CommitMutationPayload): Promise<CommitAcceptedResult>;
   commitMutations(mutations: CommitMutationPayload[]): Promise<CommitMutationsResult>;
   close(): void;
 }
@@ -223,12 +224,16 @@ export type ServerMessage =
       code: string;
       message: string;
     }
-  | {
-      type: "cursor_acked";
-      requestId: string;
-      cursor: number;
-    }
-  | {
+	  | {
+	      type: "cursor_acked";
+	      requestId: string;
+	      cursor: number;
+	    }
+	  | {
+	      type: "local_vault_detached";
+	      requestId: string;
+	    }
+	  | {
       type: "heartbeat_ack";
       requestId: string;
     }

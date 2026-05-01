@@ -41,9 +41,10 @@ export function createPushSession(
     },
     async restoreEntryVersion() {
       throw new Error("push tests should not restore entry versions");
-    },
-    async ackCursor() {},
-    commitMutation,
+	    },
+	    async ackCursor() {},
+	    async detachLocalVault() {},
+	    commitMutation,
     async commitMutations(mutations): Promise<CommitMutationsResult> {
       if (commitMutations) {
         return await commitMutations(mutations);

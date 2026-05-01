@@ -4,6 +4,7 @@ export type {
 	CommitMutationMessage,
 	CommitMutationPayload,
 	CommitMutationsMessage,
+	DetachLocalVaultMessage,
 	HeartbeatMessage,
 	HelloMessage,
 	ListEntryStatesMessage,
@@ -51,6 +52,11 @@ export type CursorAckedMessage = {
 	type: "cursor_acked";
 	requestId: string;
 	cursor: number;
+};
+
+export type LocalVaultDetachedMessage = {
+	type: "local_vault_detached";
+	requestId: string;
 };
 
 export type HeartbeatAckMessage = {
@@ -191,6 +197,7 @@ export type ServerControlMessage =
 	| StorageStatusUpdatedMessage
 	| CommitAcceptedMessage
 	| CursorAckedMessage
+	| LocalVaultDetachedMessage
 	| HeartbeatAckMessage
 	| CommitRejectedMessage
 	| CommitMutationsCommittedMessage

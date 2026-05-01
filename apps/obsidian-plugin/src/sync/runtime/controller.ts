@@ -98,6 +98,14 @@ export class SyncController {
     return await this.syncEngine.getOrCreateLocalVaultId(remoteVaultId);
   }
 
+  async detachLocalVaultFromServer(): Promise<void> {
+    if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
+      return;
+    }
+
+    await this.syncEngine.detachLocalVaultFromServer();
+  }
+
   stopAutoSyncAndMarkNotReady(): void {
     this.syncEngine.stopAutoSync();
     this.setStorageStatus(null);

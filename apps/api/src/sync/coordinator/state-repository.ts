@@ -69,6 +69,10 @@ export class CoordinatorStateRepository {
 		this.cursorStore.recordLocalVaultCursor(userId, localVaultId, cursor);
 	}
 
+	deleteLocalVaultCursor(userId: string, localVaultId: string): void {
+		this.cursorStore.deleteLocalVaultCursor(userId, localVaultId);
+	}
+
 	markHealthSummaryDirty(now = Date.now()): void {
 		this.healthStore.markHealthSummaryDirty(now);
 	}

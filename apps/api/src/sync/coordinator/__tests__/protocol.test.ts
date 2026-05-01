@@ -59,6 +59,23 @@ describe("sync protocol schema", () => {
 		});
 	});
 
+	it("accepts a local vault detach request", () => {
+		const parsed = parseClientControlMessage({
+			type: "detach_local_vault",
+			requestId: "request-detach",
+		});
+
+		expect(parsed.success).toBe(true);
+		if (!parsed.success) {
+			throw new Error("expected detach local vault message to parse");
+		}
+
+		expect(parsed.data).toEqual({
+			type: "detach_local_vault",
+			requestId: "request-detach",
+		});
+	});
+
 	it("accepts an entry-state delta page request", () => {
 		const parsed = parseClientControlMessage({
 			type: "list_entry_states",

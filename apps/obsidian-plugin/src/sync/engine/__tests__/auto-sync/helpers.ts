@@ -88,9 +88,10 @@ export function createRealtimeClient(
         },
         async restoreEntryVersion() {
           throw new Error("auto-sync tests should not restore entry versions");
-        },
-        async ackCursor() {},
-        async commitMutation(_mutation: CommitMutationPayload) {
+	        },
+	        async ackCursor() {},
+	        async detachLocalVault() {},
+	        async commitMutation(_mutation: CommitMutationPayload) {
           return {
             cursor: 1,
             entryId: "entry-1",

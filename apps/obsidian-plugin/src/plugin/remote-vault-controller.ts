@@ -86,6 +86,11 @@ export class SynchRemoteVaultController {
 
   async disconnectRemoteVault(): Promise<void> {
     try {
+      try {
+        await this.deps.syncController.detachLocalVaultFromServer();
+      } catch {
+        // Local disconnect should continue when the server cannot be reached.
+      }
       await this.deps.remoteVaultManager.disconnectRemoteVault();
     } catch (error) {
       this.deps.notifyError(error, "Vault disconnect failed");

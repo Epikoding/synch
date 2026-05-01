@@ -44,12 +44,16 @@ type ClientMessage =
       blobId: string | null;
       encryptedMetadata: string;
     }
-  | {
-      type: "ack_cursor";
-      requestId: string;
-      cursor: number;
-    }
-  | {
+	  | {
+	      type: "ack_cursor";
+	      requestId: string;
+	      cursor: number;
+	    }
+	  | {
+	      type: "detach_local_vault";
+	      requestId: string;
+	    }
+	  | {
       type: "heartbeat";
       requestId: string;
     }

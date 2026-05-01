@@ -281,10 +281,11 @@ export function createRealtimeSession(input: {
     async restoreEntryVersion() {
       throw new Error("pull tests should not restore entry versions");
     },
-    async ackCursor(cursor: number) {
-      await input.onAckCursor?.(cursor);
-    },
-    async commitMutation() {
+	    async ackCursor(cursor: number) {
+	      await input.onAckCursor?.(cursor);
+	    },
+	    async detachLocalVault() {},
+	    async commitMutation() {
       throw new Error("pull tests should not commit mutations");
     },
     async commitMutations() {

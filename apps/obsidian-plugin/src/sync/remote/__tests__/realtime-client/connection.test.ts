@@ -144,4 +144,23 @@ describe("SyncRealtimeClient connection health", () => {
     expect(onClose).not.toHaveBeenCalled();
     session.close();
   });
+
+  it("detaches the local vault over the realtime control channel", async () => {
+    const { socket, session } = await openRealtimeSession();
+
+    const detachPromise = session.detachLocalVault();
+    await waitForSentMessage(socket, 1);
+    const detach = socket.sentMessageAt(1);
+    expect(detach).toMatchObject({
+      type: "detach_local_vault",
+    });
+
+    socket.emitMessage({
+      type: "local_vault_detached",
+      requestId: detach.requestId,
+    });
+
+    await expect(detachPromise).resolves.toBeUndefined();
+    session.close();
+  });
 });

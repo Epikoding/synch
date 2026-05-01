@@ -150,6 +150,16 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     }
   }
 
+  async detachLocalVault(): Promise<void> {
+    const message = await this.transport.request({
+      type: "detach_local_vault",
+    });
+
+    if (message.type !== "local_vault_detached") {
+      throw new Error("local vault detach did not produce a local_vault_detached response");
+    }
+  }
+
   async commitMutation(mutation: CommitMutationPayload): Promise<CommitAcceptedResult> {
     const batch = await this.commitMutations([mutation]);
     const result = batch.results[0];
@@ -192,5 +202,4 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     this.transport.close();
   }
 }
-
 

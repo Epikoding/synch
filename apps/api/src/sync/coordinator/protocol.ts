@@ -94,6 +94,11 @@ export const ackCursorMessageSchema = z.object({
 	cursor: nonNegativeInteger,
 });
 
+export const detachLocalVaultMessageSchema = z.object({
+	type: z.literal("detach_local_vault"),
+	requestId: requestIdSchema,
+});
+
 export const heartbeatMessageSchema = z.object({
 	type: z.literal("heartbeat"),
 	requestId: requestIdSchema,
@@ -114,6 +119,7 @@ export const clientControlMessageSchema = z.discriminatedUnion("type", [
 	listEntryVersionsMessageSchema,
 	restoreEntryVersionMessageSchema,
 	ackCursorMessageSchema,
+	detachLocalVaultMessageSchema,
 	heartbeatMessageSchema,
 	watchStorageStatusMessageSchema,
 	unwatchStorageStatusMessageSchema,
@@ -127,6 +133,7 @@ export type ListEntryStatesMessage = z.infer<typeof listEntryStatesMessageSchema
 export type ListEntryVersionsMessage = z.infer<typeof listEntryVersionsMessageSchema>;
 export type RestoreEntryVersionMessage = z.infer<typeof restoreEntryVersionMessageSchema>;
 export type AckCursorMessage = z.infer<typeof ackCursorMessageSchema>;
+export type DetachLocalVaultMessage = z.infer<typeof detachLocalVaultMessageSchema>;
 export type HeartbeatMessage = z.infer<typeof heartbeatMessageSchema>;
 export type WatchStorageStatusMessage = z.infer<typeof watchStorageStatusMessageSchema>;
 export type UnwatchStorageStatusMessage = z.infer<typeof unwatchStorageStatusMessageSchema>;

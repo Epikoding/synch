@@ -1,10 +1,13 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 
 import * as doSchema from "../../../db/do";
 import { CoordinatorBlobStore } from "./blob-store";
 
-type CursorDb = Pick<ReturnType<typeof drizzle<typeof doSchema>>, "insert" | "select">;
+type CursorDb = Pick<
+	ReturnType<typeof drizzle<typeof doSchema>>,
+	"delete" | "insert" | "select"
+>;
 
 const BETA_STORAGE_LIMIT_BYTES = 1_000_000_000;
 const BETA_MAX_FILE_SIZE_BYTES = 10_000_000;
@@ -39,6 +42,18 @@ export class CoordinatorCursorStore {
 
 	recordLocalVaultCursor(userId: string, localVaultId: string, cursor: number): void {
 		recordLocalVaultCursor(this.getDb(), userId, localVaultId, cursor, Date.now());
+	}
+
+	deleteLocalVaultCursor(userId: string, localVaultId: string): void {
+		this.getDb()
+			.delete(doSchema.localVaultCursors)
+			.where(
+				and(
+					eq(doSchema.localVaultCursors.userId, userId),
+					eq(doSchema.localVaultCursors.localVaultId, localVaultId),
+				),
+			)
+			.run();
 	}
 
 	recordCommittedCursor(

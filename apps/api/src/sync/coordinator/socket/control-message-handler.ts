@@ -18,6 +18,7 @@ import type { CoordinatorStateRepository } from "../state-repository";
 
 export type CoordinatorControlMessageUseCases = {
 	ackCursor(session: SocketSession, cursor: number): Promise<{ cursor: number }>;
+	detachLocalVault(session: SocketSession): Promise<void>;
 	commitMutations(
 		session: SocketSession,
 		message: CommitMutationsMessage,
@@ -221,6 +222,23 @@ export class CoordinatorControlMessageHandler {
 					type: "session_error",
 					code: "ack_failed",
 					message: error instanceof Error ? error.message : "ack failed",
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "detach_local_vault") {
+			try {
+				await this.useCases.detachLocalVault(session);
+				this.socketService.sendSocketMessage(ws, {
+					type: "local_vault_detached",
+					requestId: parsed.requestId,
+				});
+			} catch (error) {
+				this.socketService.sendSocketMessage(ws, {
+					type: "session_error",
+					code: "detach_failed",
+					message: error instanceof Error ? error.message : "detach failed",
 				});
 			}
 			return;
