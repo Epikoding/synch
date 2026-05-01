@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab } from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 
 import type { SynchSettingsController } from "./controller";
 import {
@@ -53,14 +53,14 @@ export class SynchSettingTab extends PluginSettingTab {
       !hasConnectedRemoteVault;
     this.setStorageStatusWatching(hasAuthenticatedSession && hasConnectedRemoteVault);
 
-    containerEl.createEl("h2", { text: "Synch" });
+    new Setting(containerEl).setName("Synch").setHeading();
     void this.controller.ensurePluginUpdateCheck();
     renderPluginUpdateSetting(containerEl, this.controller, () => this.refresh());
 
     if (hasAuthenticatedSession) {
       renderSyncStatusSetting(containerEl, this.controller);
     } else {
-      containerEl.createEl("h3", { text: "Account" });
+      new Setting(containerEl).setName("Account").setHeading();
     }
 
     renderAuthenticationSetting(
@@ -71,7 +71,7 @@ export class SynchSettingTab extends PluginSettingTab {
     );
 
     if (!hasAuthenticatedSession) {
-      containerEl.createEl("h3", { text: "Self-hosted server" });
+      new Setting(containerEl).setName("Self-hosted server").setHeading();
       renderApiBaseUrlSetting(containerEl, this.controller, {
         canChangeApiBaseUrl,
         hasConnectedRemoteVault,

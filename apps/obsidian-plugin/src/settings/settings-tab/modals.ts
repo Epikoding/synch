@@ -21,7 +21,7 @@ export class ExcludedFoldersModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h3", { text: "Excluded folders" });
+    new Setting(contentEl).setName("Excluded folders").setHeading();
     contentEl.createEl("p", {
       text: "Select folders that should never sync from this device.",
     });
@@ -108,7 +108,7 @@ export class DeletedFilesModal extends Modal {
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h3", { text: "Deleted files" });
+    new Setting(contentEl).setName("Deleted files").setHeading();
 
     if (this.error) {
       contentEl.createEl("p", {

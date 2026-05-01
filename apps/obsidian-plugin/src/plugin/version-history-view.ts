@@ -1,4 +1,4 @@
-import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, Setting, type WorkspaceLeaf } from "obsidian";
 
 import type {
   SynchEntryVersion,
@@ -108,7 +108,7 @@ export class SynchVersionHistoryView extends ItemView {
     root.empty();
     root.addClass("synch-history-view");
 
-    root.createEl("h4", { text: "Version history", cls: "synch-history-title" });
+    new Setting(root).setName("Version history").setHeading();
 
     if (this.loading && !this.state) {
       root.createEl("p", {

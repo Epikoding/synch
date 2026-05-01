@@ -38,7 +38,8 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingNames().slice(0, 4)).toEqual([
+    expect(getSettingNames().slice(0, 5)).toEqual([
+      "Synch",
       "Plugin update",
       "Sync",
       "Authentication",

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultApiBaseUrl } from "../config";
 import {
   getButtonComponents,
-  getCreatedElementTexts,
   getProgressBarComponents,
   getSettingDescriptions,
   getSettingNames,
@@ -49,10 +48,12 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     const buttonTexts = getButtonComponents().map((button) => button.text);
-    expect(getCreatedElementTexts()).toEqual(["Synch", "Account", "Self-hosted server"]);
-    expect(getSettingNames().slice(0, 3)).toEqual([
+    expect(getSettingNames().slice(0, 6)).toEqual([
+      "Synch",
       "Plugin update",
+      "Account",
       "Authentication",
+      "Self-hosted server",
       "Server URL",
     ]);
     expect(buttonTexts).toEqual(["Sign in on this device", "Save"]);
@@ -73,7 +74,7 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     expect(ensurePluginUpdateCheck).toHaveBeenCalledTimes(1);
-    expect(getSettingNames()[0]).toBe("Plugin update");
+    expect(getSettingNames()[1]).toBe("Plugin update");
     expect(getSettingDescriptions()[0]).toBe(
       "Version 0.0.2 is available. Current version: 0.0.1.",
     );

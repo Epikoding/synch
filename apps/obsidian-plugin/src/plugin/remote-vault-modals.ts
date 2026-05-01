@@ -63,7 +63,7 @@ class CreateRemoteVaultModal extends Modal {
       passwordErrorEl?.setText(this.getPasswordValidationError() ?? "");
     };
 
-    contentEl.createEl("h2", { text: "Create Vault" });
+    new Setting(contentEl).setName("Create Vault").setHeading();
     contentEl.createEl("p", {
       cls: "synch-modal-hint",
       text: "Create a new vault and wrap its vault key with a password on this device.",
@@ -197,7 +197,7 @@ class ConfirmCreateRemoteVaultBackupModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h2", { text: "Back Up Your Vault" });
+    new Setting(contentEl).setName("Back Up Your Vault").setHeading();
     contentEl.createEl("p", {
       cls: "synch-modal-hint",
       text: "Creating a remote vault can affect this local Obsidian vault's file structure or sync state.",
@@ -243,7 +243,7 @@ class ConfirmConnectNonEmptyLocalVaultModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h2", { text: "Connect Vault" });
+    new Setting(contentEl).setName("Connect Vault").setHeading();
     contentEl.createEl("p", {
       cls: "synch-modal-hint",
       text: "This local vault already contains files.",
@@ -301,7 +301,7 @@ class BootstrapRemoteVaultModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h2", { text: "Connect Vault" });
+    new Setting(contentEl).setName("Connect Vault").setHeading();
     contentEl.createEl("p", {
       cls: "synch-modal-hint",
       text: "Choose a vault from the server, then enter the password to connect it on this device.",
