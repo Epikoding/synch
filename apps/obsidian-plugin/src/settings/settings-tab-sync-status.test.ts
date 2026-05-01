@@ -17,6 +17,7 @@ describe("SynchSettingTab sync status", () => {
   it("shows sync progress percent after sign-in", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncStatusLabel: () => "Sync: not ready 0%",
       getSyncPercent: () => 0,
       getSyncProgress: () => ({
@@ -28,6 +29,33 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
 
     expect(getProgressBarComponents()[0]?.value).toBe(0);
+  });
+
+  it("prompts users to connect a remote vault before showing sync progress", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => false,
+      getSyncState: () => "syncing",
+      getSyncStatusLabel: () => "Sync: syncing 37%",
+      getSyncPercent: () => 37,
+      getSyncProgress: () => ({
+        completedEntries: 42,
+        totalEntries: 113,
+      }),
+      getStorageStatus: () => ({
+        storageUsedBytes: 24_300_000,
+        storageLimitBytes: 50_000_000,
+      }),
+    });
+
+    tab.display();
+
+    expect(getSettingNames()).toContain("Sync");
+    expect(getSettingDescriptions()[1]).toBe(
+      "Connect a remote vault to start syncing.",
+    );
+    expect(getProgressBarComponents()).toEqual([]);
+    expect(getExtraButtonComponents()).toEqual([]);
   });
 
   it("places authentication below sync after sign-in", () => {
@@ -50,6 +78,7 @@ describe("SynchSettingTab sync status", () => {
   it("shows sync progress when entries are syncing", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncState: () => "syncing",
       getSyncStatusLabel: () => "Sync: syncing 37%",
       getSyncPercent: () => 37,
@@ -67,6 +96,7 @@ describe("SynchSettingTab sync status", () => {
   it("shows a spinner while sync is active", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncState: () => "syncing",
       getSyncStatusLabel: () => "Sync: syncing 37%",
     });
@@ -86,6 +116,7 @@ describe("SynchSettingTab sync status", () => {
   it("shows a spinner while sync is reconnecting", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncState: () => "reconnecting",
       getSyncStatusLabel: () => "Sync: reconnecting 0%",
     });
@@ -98,6 +129,7 @@ describe("SynchSettingTab sync status", () => {
   it("does not show a spinner while sync is offline", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncState: () => "offline",
       getSyncStatusLabel: () => "Sync: offline 0%",
     });
@@ -110,6 +142,7 @@ describe("SynchSettingTab sync status", () => {
   it("hides the sync spinner when sync is idle", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncState: () => "up_to_date",
       getSyncStatusLabel: () => "Sync: up to date 100%",
     });
@@ -122,6 +155,7 @@ describe("SynchSettingTab sync status", () => {
   it("shows remote storage usage in the sync status when available", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncStatusLabel: () => "Sync: synced 100%",
       getSyncProgress: () => ({
         completedEntries: 12,
@@ -143,6 +177,7 @@ describe("SynchSettingTab sync status", () => {
   it("shows unlimited remote storage usage without a zero-byte limit", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncStatusLabel: () => "Sync: synced 100%",
       getSyncProgress: () => ({
         completedEntries: 12,
@@ -164,6 +199,7 @@ describe("SynchSettingTab sync status", () => {
   it("omits remote storage usage in the sync status before the websocket reports it", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
       getSyncStatusLabel: () => "Sync: synced 100%",
       getSyncProgress: () => ({
         completedEntries: 12,

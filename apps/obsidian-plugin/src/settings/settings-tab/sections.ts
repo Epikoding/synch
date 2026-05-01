@@ -97,7 +97,15 @@ function formatPluginUpdateDescription(
 export function renderSyncStatusSetting(
   containerEl: HTMLElement,
   controller: SynchSettingsController,
+  hasConnectedRemoteVault: boolean,
 ): void {
+  if (!hasConnectedRemoteVault) {
+    new Setting(containerEl)
+      .setName("Sync")
+      .setDesc("Connect a remote vault to start syncing.");
+    return;
+  }
+
   const syncProgress = controller.getSyncProgress();
   const syncSetting = new Setting(containerEl)
     .setName("Sync")

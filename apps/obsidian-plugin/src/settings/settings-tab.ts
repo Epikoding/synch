@@ -58,7 +58,7 @@ export class SynchSettingTab extends PluginSettingTab {
     renderPluginUpdateSetting(containerEl, this.controller, () => this.refresh());
 
     if (hasAuthenticatedSession) {
-      renderSyncStatusSetting(containerEl, this.controller);
+      renderSyncStatusSetting(containerEl, this.controller, hasConnectedRemoteVault);
     } else {
       new Setting(containerEl).setName("Account").setHeading();
     }
