@@ -87,7 +87,6 @@ export class CoordinatorMutationStore {
 		const now = Date.now();
 
 		return this.getDb().transaction((tx) => {
-			this.cursorStore.rememberVaultIdInTransaction(tx, session.vaultId);
 			const results: CommitMutationBatchResult[] = [];
 			let highestResponseCursor: number | null = null;
 			let highestBroadcastCursor: number | null = null;

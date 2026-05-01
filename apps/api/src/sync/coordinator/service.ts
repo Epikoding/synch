@@ -240,7 +240,6 @@ export class CoordinatorService {
 	}
 
 	private async readVersionHistoryRetentionMs(vaultId: string): Promise<number> {
-		this.stateRepository.rememberVaultId(vaultId);
 		return this.stateRepository.readVersionHistoryRetentionDays() * DAY_IN_MS;
 	}
 

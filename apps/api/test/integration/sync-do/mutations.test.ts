@@ -2,12 +2,13 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { signUpAndCreateVault } from "../../helpers/api";
+import { initializeCoordinatorState, signUpAndCreateVault } from "../../helpers/api";
 import type { SyncDoSession, SyncMutation } from "./helpers";
 
 describe("sync durable object mutation integration", () => {
 	it("deduplicates an idempotent retry by mutation id even when metadata ciphertext changes", async () => {
 		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
 		const stub = env.SYNC_COORDINATOR.getByName(primary.vaultId);
 
 		const retried = await runInDurableObject(stub, async (instance) => {

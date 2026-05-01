@@ -42,6 +42,7 @@ export async function commitMutation(
 	session: SyncDoSession,
 	mutation: SyncMutation,
 ): Promise<void> {
+	await initializeCoordinatorState(session.vaultId);
 	const result = await runInDurableObject(stub, async (instance) => {
 		const coordinator = instance as unknown as {
 			commitMutation: (
