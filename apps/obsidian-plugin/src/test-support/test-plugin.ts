@@ -358,6 +358,18 @@ class InMemorySyncStore implements SyncStore {
     this.pendingMutations.set(mutation.mutationId, normalizePendingMutation(mutation));
   }
 
+  async listBlockedDirtyEntriesByReason(
+    reason: PendingMutationBlockedReason,
+  ): Promise<PendingMutationRow[]> {
+    return [...this.pendingMutations.values()]
+      .filter(
+        (mutation) =>
+          mutation.status === "blocked" && mutation.blockedReason === reason,
+      )
+      .sort(comparePendingMutationsAscending)
+      .map(toPendingMutationRow);
+  }
+
   async unblockDirtyEntriesByReason(reason: PendingMutationBlockedReason): Promise<void> {
     for (const mutation of this.pendingMutations.values()) {
       if (mutation.status === "blocked" && mutation.blockedReason === reason) {
@@ -365,6 +377,8 @@ class InMemorySyncStore implements SyncStore {
           ...mutation,
           status: "pending",
           blockedReason: null,
+          blockedEncryptedSizeBytes: null,
+          blockedMaxFileSizeBytes: null,
         });
       }
     }
@@ -459,6 +473,10 @@ function normalizePendingMutation(mutation: PendingMutationRow): Required<Pendin
     ...mutation,
     status,
     blockedReason: status === "blocked" ? (mutation.blockedReason ?? "file_too_large") : null,
+    blockedEncryptedSizeBytes:
+      status === "blocked" ? (mutation.blockedEncryptedSizeBytes ?? null) : null,
+    blockedMaxFileSizeBytes:
+      status === "blocked" ? (mutation.blockedMaxFileSizeBytes ?? null) : null,
     baseBlobId: mutation.baseBlobId ?? null,
     baseHash: mutation.baseHash ?? null,
   };
@@ -484,6 +502,8 @@ function toPendingMutationRow(row: Required<PendingMutationRow>): PendingMutatio
   if (row.status === "blocked") {
     mutation.status = row.status;
     mutation.blockedReason = row.blockedReason;
+    mutation.blockedEncryptedSizeBytes = row.blockedEncryptedSizeBytes;
+    mutation.blockedMaxFileSizeBytes = row.blockedMaxFileSizeBytes;
   }
   return mutation;
 }

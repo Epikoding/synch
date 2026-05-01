@@ -54,6 +54,8 @@ export function createEmptyEntryRecord(entryId: string): EntryRecord {
     pendingOp: null,
     pendingStatus: null,
     pendingBlockedReason: null,
+    pendingBlockedEncryptedSizeBytes: null,
+    pendingBlockedMaxFileSizeBytes: null,
     pendingBaseRevision: null,
     pendingBaseBlobId: null,
     pendingBaseHash: null,
@@ -193,6 +195,8 @@ export function toPendingMutationRow(row: EntryRecord): PendingMutationRow | nul
   if (row.pendingStatus === "blocked") {
     mutation.status = row.pendingStatus;
     mutation.blockedReason = row.pendingBlockedReason;
+    mutation.blockedEncryptedSizeBytes = row.pendingBlockedEncryptedSizeBytes ?? null;
+    mutation.blockedMaxFileSizeBytes = row.pendingBlockedMaxFileSizeBytes ?? null;
   }
   return mutation;
 }
@@ -206,6 +210,10 @@ export function normalizePendingMutation(
     status,
     blockedReason:
       status === "blocked" ? (mutation.blockedReason ?? "file_too_large") : null,
+    blockedEncryptedSizeBytes:
+      status === "blocked" ? (mutation.blockedEncryptedSizeBytes ?? null) : null,
+    blockedMaxFileSizeBytes:
+      status === "blocked" ? (mutation.blockedMaxFileSizeBytes ?? null) : null,
     baseBlobId: mutation.baseBlobId ?? null,
     baseHash: mutation.baseHash ?? null,
   };
@@ -222,6 +230,8 @@ export function toDirtyEntryRecord(
     pendingOp: mutation.op,
     pendingStatus: mutation.status,
     pendingBlockedReason: mutation.blockedReason,
+    pendingBlockedEncryptedSizeBytes: mutation.blockedEncryptedSizeBytes,
+    pendingBlockedMaxFileSizeBytes: mutation.blockedMaxFileSizeBytes,
     pendingBaseRevision: mutation.baseRevision,
     pendingBaseBlobId: mutation.baseBlobId,
     pendingBaseHash: mutation.baseHash,
@@ -250,6 +260,8 @@ export function clearPendingMutation(entry: EntryRecord): EntryRecord {
     pendingOp: null,
     pendingStatus: null,
     pendingBlockedReason: null,
+    pendingBlockedEncryptedSizeBytes: null,
+    pendingBlockedMaxFileSizeBytes: null,
     pendingBaseRevision: null,
     pendingBaseBlobId: null,
     pendingBaseHash: null,

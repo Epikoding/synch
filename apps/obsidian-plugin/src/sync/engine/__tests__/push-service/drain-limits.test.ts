@@ -91,12 +91,117 @@ describe("SyncPushService drain: limits", () => {
       mutationId: "mutation-too-large",
       status: "blocked",
       blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: expect.any(Number),
+      blockedMaxFileSizeBytes: 1,
     });
     expect(await store.getEntryById("entry-too-large")).toMatchObject({
       entryId: "entry-too-large",
       path: "Folder/too-large.md",
       hash,
     });
+    await store.close();
+  });
+
+  it("unblocks file-size blocked mutations when the server limit increases", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    await store.markEntryDirty({
+      mutationId: "mutation-newly-allowed",
+      entryId: "entry-newly-allowed",
+      op: "upsert",
+      status: "blocked",
+      blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: 50,
+      blockedMaxFileSizeBytes: 10,
+      baseRevision: 0,
+      blobId: "blob-newly-allowed",
+      hash: "hash-newly-allowed",
+      encryptedMetadata: "metadata-newly-allowed",
+      createdAt: 1,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-still-too-large",
+      entryId: "entry-still-too-large",
+      op: "upsert",
+      status: "blocked",
+      blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: 150,
+      blockedMaxFileSizeBytes: 10,
+      baseRevision: 0,
+      blobId: "blob-still-too-large",
+      hash: "hash-still-too-large",
+      encryptedMetadata: "metadata-still-too-large",
+      createdAt: 2,
+    });
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes(path) {
+          throw new Error(`unexpected read for ${path}`);
+        },
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.unblockFileSizeBlockedMutations(100)).resolves.toBe(1);
+
+    const pending = await store.listDirtyEntries();
+    expect(pending).toEqual([
+      expect.objectContaining({
+        mutationId: "mutation-newly-allowed",
+      }),
+    ]);
+    expect(pending[0]?.status).toBeUndefined();
+    expect(pending[0]?.blockedReason).toBeUndefined();
+    expect(await store.getDirtyEntryMutation("entry-still-too-large")).toMatchObject({
+      mutationId: "mutation-still-too-large",
+      status: "blocked",
+      blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: 150,
+    });
+    await store.close();
+  });
+
+  it("unblocks file-size blocked mutations when file size policy is unlimited", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    await store.markEntryDirty({
+      mutationId: "mutation-unblocked-unlimited",
+      entryId: "entry-unblocked-unlimited",
+      op: "upsert",
+      status: "blocked",
+      blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: null,
+      blockedMaxFileSizeBytes: 10,
+      baseRevision: 0,
+      blobId: "blob-unblocked-unlimited",
+      hash: "hash-unblocked-unlimited",
+      encryptedMetadata: "metadata-unblocked-unlimited",
+      createdAt: 1,
+    });
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes(path) {
+          throw new Error(`unexpected read for ${path}`);
+        },
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.unblockFileSizeBlockedMutations(0)).resolves.toBe(1);
+
+    expect(await store.listDirtyEntries()).toEqual([
+      expect.objectContaining({
+        mutationId: "mutation-unblocked-unlimited",
+      }),
+    ]);
     await store.close();
   });
 

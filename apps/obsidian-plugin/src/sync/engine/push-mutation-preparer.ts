@@ -65,10 +65,13 @@ export class PushMutationPreparer {
       mutation.blobId === mutation.baseBlobId && mutation.hash === mutation.baseHash
         ? 0
         : encryptedBytes.byteLength;
-    // TODO: When paid plans can raise this limit, recheck blocked mutations
-    // against the current server policy so newly allowed files can sync.
     if (maxFileSizeBytes > 0 && encryptedBytes.byteLength > maxFileSizeBytes) {
-      await this.blockOversizedUpsert(store, mutation);
+      await this.blockOversizedUpsert(
+        store,
+        mutation,
+        encryptedBytes.byteLength,
+        maxFileSizeBytes,
+      );
       return {
         skipped: true,
         reason: "file_too_large",
@@ -123,11 +126,15 @@ export class PushMutationPreparer {
   private async blockOversizedUpsert(
     store: PushMutationStore,
     mutation: PendingMutationRow,
+    encryptedSizeBytes: number,
+    maxFileSizeBytes: number,
   ): Promise<void> {
     await store.updateDirtyEntry({
       ...mutation,
       status: "blocked",
       blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: encryptedSizeBytes,
+      blockedMaxFileSizeBytes: maxFileSizeBytes,
     });
   }
 

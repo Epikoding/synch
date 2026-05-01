@@ -77,6 +77,81 @@ describe("SyncAutoLoop local changes", () => {
     await store.close();
   });
 
+  it("pushes file-size blocked mutations unblocked by the current session policy", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const pushPendingMutations = vi.fn(async () => createPushResult());
+    const unblockFileSizeBlockedMutations = vi.fn(async () => 1);
+    const pullOnce = vi.fn(async () => {});
+    let session: SyncRealtimeSession | null = null;
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations,
+      unblockFileSizeBlockedMutations,
+      pullOnce,
+      realtimeClient: createRealtimeClient(undefined, (nextSession) => {
+        session = nextSession;
+      }),
+    });
+
+    await autoLoop.start();
+    await Promise.resolve();
+
+    expect(unblockFileSizeBlockedMutations).toHaveBeenCalledWith(session);
+    expect(pushPendingMutations).toHaveBeenCalledWith(session);
+    expect(pullOnce).toHaveBeenCalledTimes(0);
+    autoLoop.stop();
+    await store.close();
+  });
+
+  it("reopens the realtime session after file-size unblock initialization fails", async () => {
+    vi.useFakeTimers();
+
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const pushPendingMutations = vi.fn(async () => createPushResult());
+    const unblockFileSizeBlockedMutations = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("transient unblock failure"))
+      .mockResolvedValueOnce(0);
+    const pullOnce = vi.fn(async () => {});
+    const onError = vi.fn();
+    const closedSessions: SyncRealtimeSession[] = [];
+    let openCount = 0;
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations,
+      unblockFileSizeBlockedMutations,
+      pullOnce,
+      realtimeClient: createRealtimeClient(
+        () => {
+          openCount += 1;
+        },
+        (session) => {
+          const close = session.close.bind(session);
+          session.close = () => {
+            closedSessions.push(session);
+            close();
+          };
+        },
+      ),
+      reconnectDelayMs: 100,
+      onError,
+    });
+
+    await autoLoop.start();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(openCount).toBe(2);
+    expect(unblockFileSizeBlockedMutations).toHaveBeenCalledTimes(2);
+    expect(closedSessions).toHaveLength(1);
+    expect(onError).toHaveBeenCalledTimes(1);
+    autoLoop.stop();
+    await store.close();
+  });
+
   it("keeps pushing when the push service reports more pending work", async () => {
     vi.useFakeTimers();
 

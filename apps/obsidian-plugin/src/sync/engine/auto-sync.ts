@@ -24,6 +24,9 @@ export interface SyncAutoLoopDeps {
   pushPendingMutations: (
     session: SyncRealtimeSession,
   ) => Promise<PushPendingMutationsResult>;
+  unblockFileSizeBlockedMutations?: (
+    session: SyncRealtimeSession,
+  ) => Promise<number>;
   pullOnce: (session: SyncRealtimeSession) => Promise<unknown>;
   realtimeClient?: SyncRealtimeClientLike;
   pushDebounceMs?: number;
@@ -196,19 +199,33 @@ export class SyncAutoLoop {
       }
 
       this.realtimeSession = session;
-      this.reconnectAttempt = 0;
-      if (this.storageStatusWatching) {
-        this.applyStorageStatusWatch();
-      }
-      if (session.serverCursor > cursor) {
-        this.deps.onSyncScheduled?.();
-        this.requestPullWork(session.serverCursor);
-      }
-      this.state.set("live");
-      if (this.hasPendingWork()) {
-        void this.drain();
-      } else {
-        this.deps.onIdle?.();
+      try {
+        this.reconnectAttempt = 0;
+        if (this.storageStatusWatching) {
+          this.applyStorageStatusWatch();
+        }
+        const unblockedFileSizeMutations =
+          (await this.deps.unblockFileSizeBlockedMutations?.(session)) ?? 0;
+        if (unblockedFileSizeMutations > 0) {
+          this.deps.onSyncScheduled?.();
+          this.requestPush();
+        }
+        if (session.serverCursor > cursor) {
+          this.deps.onSyncScheduled?.();
+          this.requestPullWork(session.serverCursor);
+        }
+        this.state.set("live");
+        if (this.hasPendingWork()) {
+          void this.drain();
+        } else {
+          this.deps.onIdle?.();
+        }
+      } catch (error) {
+        if (this.realtimeSession === session) {
+          this.realtimeSession = null;
+        }
+        session.close();
+        throw error;
       }
     } catch (error) {
       if (!isRealtimeConnectionError(error)) {

@@ -63,6 +63,9 @@ export interface SyncMutationStore {
   ): Promise<void>;
   getDirtyEntryMutation(entryId: string): Promise<PendingMutationRow | null>;
   listDirtyEntries(limit?: number): Promise<PendingMutationRow[]>;
+  listBlockedDirtyEntriesByReason(
+    reason: PendingMutationBlockedReason,
+  ): Promise<PendingMutationRow[]>;
   updateDirtyEntry(mutation: PendingMutationRow): Promise<void>;
   unblockDirtyEntriesByReason(reason: PendingMutationBlockedReason): Promise<void>;
   clearDirtyEntryByMutationId(mutationId: string): Promise<void>;

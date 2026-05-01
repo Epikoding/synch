@@ -41,7 +41,10 @@ export interface SyncPushServiceDeps {
 export interface SyncPushStore
   extends SyncCursorStore,
     Pick<SyncEntryStore, "countSyncProgress">,
-    Pick<SyncMutationStore, "listDirtyEntries">,
+    Pick<
+      SyncMutationStore,
+      "listBlockedDirtyEntriesByReason" | "listDirtyEntries" | "updateDirtyEntry"
+    >,
     Pick<SyncStoreLifecycle, "flush">,
     PushMutationStore {}
 
@@ -205,6 +208,36 @@ export class SyncPushService {
     };
   }
 
+  async unblockFileSizeBlockedMutations(maxFileSizeBytes: number): Promise<number> {
+    const store = this.deps.getSyncStore();
+    if (!store) {
+      throw new Error("Sync store is not initialized.");
+    }
+
+    const blocked = await store.listBlockedDirtyEntriesByReason("file_too_large");
+    let unblocked = 0;
+    for (const mutation of blocked) {
+      if (!shouldUnblockFileSizeMutation(mutation, maxFileSizeBytes)) {
+        continue;
+      }
+
+      await store.updateDirtyEntry({
+        ...mutation,
+        status: "pending",
+        blockedReason: null,
+        blockedEncryptedSizeBytes: null,
+        blockedMaxFileSizeBytes: null,
+      });
+      unblocked += 1;
+    }
+
+    if (unblocked > 0) {
+      await store.flush();
+    }
+
+    return unblocked;
+  }
+
   private async reportProgress(store: SyncPushStore): Promise<void> {
     const progress = await store.countSyncProgress();
     if (progress.totalEntries <= 0) {
@@ -239,6 +272,21 @@ export class SyncPushService {
       }),
     );
   }
+}
+
+function shouldUnblockFileSizeMutation(
+  mutation: PendingMutationRow,
+  maxFileSizeBytes: number,
+): boolean {
+  if (maxFileSizeBytes === 0) {
+    return true;
+  }
+
+  const encryptedSizeBytes = mutation.blockedEncryptedSizeBytes;
+  return (
+    typeof encryptedSizeBytes === "number" &&
+    encryptedSizeBytes <= maxFileSizeBytes
+  );
 }
 
 async function mapWithConcurrency<T, U>(

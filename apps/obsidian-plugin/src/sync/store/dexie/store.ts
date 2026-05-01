@@ -384,6 +384,17 @@ export class DexieSyncStore implements SyncStore {
     await this.markEntryDirty(mutation);
   }
 
+  async listBlockedDirtyEntriesByReason(
+    reason: PendingMutationBlockedReason,
+  ): Promise<PendingMutationRow[]> {
+    const blocked = await this.db.entries
+      .where("pendingStatus")
+      .equals("blocked")
+      .filter((entry) => entry.pendingBlockedReason === reason)
+      .toArray();
+    return blocked.map((row) => toPendingMutationRow(row)).filter(isPresent);
+  }
+
   async unblockDirtyEntriesByReason(
     reason: PendingMutationBlockedReason,
   ): Promise<void> {
@@ -398,6 +409,8 @@ export class DexieSyncStore implements SyncStore {
           ...entry,
           pendingStatus: "pending",
           pendingBlockedReason: null,
+          pendingBlockedEncryptedSizeBytes: null,
+          pendingBlockedMaxFileSizeBytes: null,
         });
       }
     });

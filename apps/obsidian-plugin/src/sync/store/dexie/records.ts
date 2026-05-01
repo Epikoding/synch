@@ -44,6 +44,8 @@ export interface EntryRecord {
   pendingOp: PendingMutationOp | null;
   pendingStatus: PendingMutationStatus | null;
   pendingBlockedReason: PendingMutationBlockedReason | null;
+  pendingBlockedEncryptedSizeBytes: number | null;
+  pendingBlockedMaxFileSizeBytes: number | null;
   pendingBaseRevision: number | null;
   pendingBaseBlobId: string | null;
   pendingBaseHash: string | null;

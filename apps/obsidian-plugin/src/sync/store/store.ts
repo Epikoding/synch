@@ -73,6 +73,8 @@ export interface PendingMutationRow {
   op: "upsert" | "delete";
   status?: "pending" | "blocked";
   blockedReason?: PendingMutationBlockedReason | null;
+  blockedEncryptedSizeBytes?: number | null;
+  blockedMaxFileSizeBytes?: number | null;
   baseRevision: number;
   baseBlobId?: string | null;
   baseHash?: string | null;

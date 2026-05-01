@@ -109,6 +109,12 @@ export class SyncEngine {
       await this.withSyncActivity("push", async () => {
         return await this.syncPushService.pushPendingMutations(session);
       }),
+    unblockFileSizeBlockedMutations: async (session) =>
+      await this.withSyncActivity("local", async () => {
+        return await this.syncPushService.unblockFileSizeBlockedMutations(
+          session.maxFileSizeBytes,
+        );
+      }),
     pullOnce: async (session) =>
       await this.withSyncActivity("pull", async () => {
         return await this.syncPullService.pullOnce(session);
