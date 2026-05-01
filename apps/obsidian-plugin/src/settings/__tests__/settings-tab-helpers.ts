@@ -49,6 +49,13 @@ export function createSettingsTab(
     updateExcludedFolders: vi.fn(async () => {}),
     listSelectableExcludedFolderPaths: () => [],
     listDeletedFiles: vi.fn(async () => []),
+    previewDeletedFile: vi.fn(async () => ({
+      status: "unavailable" as const,
+      path: "deleted.md",
+      reason: null,
+      capturedAt: null,
+      message: "This version has no previewable content.",
+    })),
     restoreDeletedFiles: vi.fn(async () => {}),
     ...overrides,
   };

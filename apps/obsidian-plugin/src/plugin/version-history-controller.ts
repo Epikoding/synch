@@ -5,6 +5,7 @@ import type {
   SynchEntryVersion,
   SynchEntryVersionCursor,
   SynchEntryVersionsPage,
+  SynchVersionPreview,
 } from "./view-models";
 import {
   SYNCH_VERSION_HISTORY_VIEW_TYPE,
@@ -123,6 +124,18 @@ export class SynchVersionHistoryController
     this.deps.refreshUi();
   }
 
+  async previewActiveFileVersion(versionId: string): Promise<SynchVersionPreview> {
+    const file = this.deps.plugin.app.workspace.getActiveFile();
+    if (!(file instanceof TFile)) {
+      throw new Error("Open a synced file before previewing version history.");
+    }
+    const version = this.activeFileVersionsById.get(versionId);
+    if (!version) {
+      throw new Error("Refresh version history before previewing this version.");
+    }
+    return await this.deps.syncController.previewEntryVersionForPath(file.path, version);
+  }
+
   async listDeletedFiles(): Promise<SynchDeletedFile[]> {
     if (!this.deps.hasAuthenticatedSession() || !this.deps.hasConnectedRemoteVault()) {
       throw new Error("Connect and sign in before viewing deleted files.");
@@ -142,6 +155,14 @@ export class SynchVersionHistoryController
       await this.deps.syncController.restoreDeletedEntry(entryId);
     }
     this.deps.refreshUi();
+  }
+
+  async previewDeletedFile(entryId: string): Promise<SynchVersionPreview> {
+    if (!this.deps.hasAuthenticatedSession() || !this.deps.hasConnectedRemoteVault()) {
+      throw new Error("Connect and sign in before previewing deleted files.");
+    }
+
+    return await this.deps.syncController.previewDeletedEntry(entryId);
   }
 
   refreshViews(): void {

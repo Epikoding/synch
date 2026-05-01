@@ -36,6 +36,7 @@ import type { UserVisibleSyncProgress } from "./user-visible-status";
 import { SyncVaultEventHandler } from "./vault-event-handler";
 import {
   SyncVersionHistoryService,
+  type SyncEntryVersionPreview,
   type SyncEntryVersionsPage,
 } from "./version-history-service";
 
@@ -180,8 +181,11 @@ export class SyncEngine {
     onConflict: (event) => this.deps.notifySyncConflict(event),
   });
   private readonly syncVersionHistoryService = new SyncVersionHistoryService({
+    getApiBaseUrl: () => this.deps.getApiBaseUrl(),
+    getSyncToken: async () => await this.deps.getSyncToken(),
     getStore: () => this.requireStore(),
     getRemoteVaultKey: () => this.deps.getRemoteVaultKey(),
+    pullClient: new SyncPullClient(this.syncRequestClient),
     withRealtimeSession: async (work) => await this.withRealtimeSession(work),
     runLocalMutationWork: async (work) => await this.runLocalMutationWork(work),
     pullOnce: async (session) => {
@@ -298,6 +302,13 @@ export class SyncEngine {
     );
   }
 
+  async previewEntryVersionForPath(
+    path: string,
+    version: EntryVersion,
+  ): Promise<SyncEntryVersionPreview> {
+    return await this.syncVersionHistoryService.previewEntryVersionForPath(path, version);
+  }
+
   async restoreEntryVersionForPath(
     path: string,
     version: EntryVersion,
@@ -311,6 +322,12 @@ export class SyncEngine {
 
   async restoreDeletedEntry(entryId: string): Promise<void> {
     await this.syncVersionHistoryService.restoreDeletedEntry(entryId);
+  }
+
+  async previewDeletedEntry(
+    entryId: string,
+  ): Promise<SyncEntryVersionPreview> {
+    return await this.syncVersionHistoryService.previewDeletedEntry(entryId);
   }
 
   async waitForLocalMutationWork(): Promise<void> {

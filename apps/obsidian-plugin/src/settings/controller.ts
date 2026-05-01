@@ -5,6 +5,7 @@ import type {
   SynchStorageStatus,
   SynchSyncProgress,
   SynchSyncState,
+  SynchVersionPreview,
 } from "../plugin/view-models";
 
 export interface SynchSettingsController {
@@ -39,5 +40,6 @@ export interface SynchSettingsController {
   updateExcludedFolders(paths: string[]): Promise<void>;
   listSelectableExcludedFolderPaths(): string[];
   listDeletedFiles(): Promise<SynchDeletedFile[]>;
+  previewDeletedFile(entryId: string): Promise<SynchVersionPreview>;
   restoreDeletedFiles(entryIds: string[]): Promise<void>;
 }

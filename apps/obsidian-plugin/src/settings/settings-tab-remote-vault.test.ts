@@ -134,6 +134,45 @@ describe("SynchSettingTab remote vault settings", () => {
     expect(restoreDeletedFiles).toHaveBeenCalledWith(["entry-ready"]);
   });
 
+  it("previews deleted files from the modal", async () => {
+    const previewDeletedFile = vi.fn(async () => ({
+      status: "text" as const,
+      path: "Notes/ready.md",
+      reason: "before_delete" as const,
+      capturedAt: 1,
+      text: "previous content",
+    }));
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      listDeletedFiles: vi.fn(async () => [
+        {
+          entryId: "entry-ready",
+          path: "Notes/ready.md",
+          revision: 3,
+          deletedAt: 1,
+          dirty: false,
+        },
+      ]),
+      previewDeletedFile,
+    });
+
+    tab.display();
+    await getButtonComponents()
+      .find((button) => button.text === "View deleted files")
+      ?.click();
+    await nextTask();
+
+    expect(getButtonComponents().some((button) => button.text === "Preview")).toBe(true);
+    await getButtonComponents()
+      .find((button) => button.text === "Preview")
+      ?.click();
+    await nextTask();
+
+    expect(previewDeletedFile).toHaveBeenCalledWith("entry-ready");
+    expect(getCreatedElementTexts()).toContain("previous content");
+  });
+
   it("does not show vault configuration sync controls after sign-in", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,

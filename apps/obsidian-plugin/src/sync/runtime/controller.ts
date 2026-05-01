@@ -19,6 +19,7 @@ import {
 } from "../store/dexie";
 import type { DeletedSyncEntryRow, SyncConnection } from "../store/store";
 import { SyncEngine, type SyncEngineEntryVersionsPage } from "./engine";
+import type { SyncEntryVersionPreview } from "./version-history-service";
 import {
   formatUserVisibleSyncState,
   getUserVisibleSyncDisplayPercent,
@@ -264,6 +265,16 @@ export class SyncController {
     return await this.syncEngine.listEntryVersionsForPath(path, before, limit);
   }
 
+  async previewEntryVersionForPath(
+    path: string,
+    version: EntryVersion,
+  ): Promise<SyncEntryVersionPreview> {
+    if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
+      throw new Error("Connect and sign in before previewing version history.");
+    }
+    return await this.syncEngine.previewEntryVersionForPath(path, version);
+  }
+
   async restoreEntryVersionForPath(path: string, version: EntryVersion): Promise<void> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
       throw new Error("Connect and sign in before restoring version history.");
@@ -283,6 +294,15 @@ export class SyncController {
       throw new Error("Connect and sign in before restoring deleted files.");
     }
     await this.syncEngine.restoreDeletedEntry(entryId);
+  }
+
+  async previewDeletedEntry(
+    entryId: string,
+  ): Promise<SyncEntryVersionPreview> {
+    if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
+      throw new Error("Connect and sign in before previewing deleted files.");
+    }
+    return await this.syncEngine.previewDeletedEntry(entryId);
   }
 
   private setSyncStatus(status: UserVisibleSyncState): void {

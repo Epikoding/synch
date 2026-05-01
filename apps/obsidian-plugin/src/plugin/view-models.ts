@@ -75,3 +75,19 @@ export interface SynchEntryVersionsPage {
   hasMore: boolean;
   nextBefore: SynchEntryVersionCursor | null;
 }
+
+export type SynchVersionPreview =
+  | {
+      status: "text";
+      path: string;
+      reason: SynchEntryVersion["reason"];
+      capturedAt: number;
+      text: string;
+    }
+  | {
+      status: "unavailable";
+      path: string;
+      reason: SynchEntryVersion["reason"] | null;
+      capturedAt: number | null;
+      message: string;
+    };

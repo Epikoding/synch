@@ -198,6 +198,8 @@ export function renderRemoteVaultSettings(
         button.setButtonText("View deleted files").onClick(() => {
           new DeletedFilesModal(app, {
             listDeletedFiles: async () => await controller.listDeletedFiles(),
+            previewDeletedFile: async (entryId) =>
+              await controller.previewDeletedFile(entryId),
             restoreDeletedFiles: async (entryIds) => {
               await controller.restoreDeletedFiles(entryIds);
               refresh();

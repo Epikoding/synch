@@ -4,7 +4,9 @@ import type {
   SynchEntryVersion,
   SynchEntryVersionCursor,
   SynchEntryVersionsPage,
+  SynchVersionPreview,
 } from "./view-models";
+import { VersionPreviewModal } from "./version-preview-modal";
 
 export const SYNCH_VERSION_HISTORY_VIEW_TYPE = "synch-version-history";
 const HISTORY_PAGE_SIZE = 25;
@@ -24,6 +26,7 @@ export interface VersionHistoryViewController {
     before: SynchEntryVersionCursor | null,
     limit: number,
   ): Promise<VersionHistoryViewState>;
+  previewActiveFileVersion(versionId: string): Promise<SynchVersionPreview>;
   restoreActiveFileVersion(versionId: string): Promise<void>;
 }
 
@@ -196,7 +199,17 @@ export class SynchVersionHistoryView extends ItemView {
       cls: "synch-history-row-meta",
     });
 
-    const button = row.createEl("button", {
+    const buttons = row.createDiv({ cls: "synch-history-row-actions" });
+    const preview = buttons.createEl("button", {
+      text: "Preview",
+      cls: "synch-history-preview",
+    });
+    preview.disabled = this.loading;
+    preview.addEventListener("click", () => {
+      void this.previewVersion(version);
+    });
+
+    const button = buttons.createEl("button", {
       text: restoreDisabled ? "Sync first" : "Restore",
       cls: "synch-history-restore",
     });
@@ -238,6 +251,17 @@ export class SynchVersionHistoryView extends ItemView {
       );
       this.loading = false;
       this.render();
+    }
+  }
+
+  private async previewVersion(version: SynchEntryVersion): Promise<void> {
+    try {
+      const preview = await this.controller.previewActiveFileVersion(version.versionId);
+      new VersionPreviewModal(this.app, preview).open();
+    } catch (error) {
+      new Notice(
+        `Version preview failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

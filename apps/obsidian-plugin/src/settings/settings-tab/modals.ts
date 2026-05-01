@@ -1,6 +1,10 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 
-import type { SynchDeletedFile } from "../../plugin/view-models";
+import type {
+  SynchDeletedFile,
+  SynchVersionPreview,
+} from "../../plugin/view-models";
+import { VersionPreviewModal } from "../../plugin/version-preview-modal";
 import { formatDeletedFileTimestamp } from "./format";
 
 export class ExcludedFoldersModal extends Modal {
@@ -73,6 +77,7 @@ export class DeletedFilesModal extends Modal {
     app: App,
     private readonly options: {
       listDeletedFiles: () => Promise<SynchDeletedFile[]>;
+      previewDeletedFile: (entryId: string) => Promise<SynchVersionPreview>;
       restoreDeletedFiles: (entryIds: string[]) => Promise<void>;
     },
   ) {
@@ -141,6 +146,14 @@ export class DeletedFilesModal extends Modal {
               ? "Sync first"
               : `Deleted ${formatDeletedFileTimestamp(file.deletedAt)}`,
           );
+        setting.addButton((button) => {
+          button
+            .setButtonText("Preview")
+            .setDisabled(this.loading)
+            .onClick(() => {
+              void this.previewDeletedFile(file.entryId);
+            });
+        });
         setting.addToggle((toggle) => {
           toggle
             .setValue(this.selectedEntryIds.has(file.entryId))
@@ -211,5 +224,16 @@ export class DeletedFilesModal extends Modal {
     }
     new Notice(`Deleted file restore finished: ${parts.join(", ")}.`);
     await this.loadDeletedFiles();
+  }
+
+  private async previewDeletedFile(entryId: string): Promise<void> {
+    try {
+      const preview = await this.options.previewDeletedFile(entryId);
+      new VersionPreviewModal(this.app, preview).open();
+    } catch (error) {
+      new Notice(
+        `Deleted file preview failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }

@@ -16,6 +16,7 @@ import type {
   SynchStorageStatus,
   SynchSyncProgress,
   SynchSyncState,
+  SynchVersionPreview,
 } from "./view-models";
 import { SynchPluginUpdateChecker } from "./update-checker";
 import { normalizeExcludedFolders, type SyncFileRules } from "../sync/core/file-rules";
@@ -344,12 +345,20 @@ export class SynchPluginController implements SynchSettingsController {
     return await this.versionHistoryController.listActiveFileVersions(before, limit);
   }
 
+  async previewActiveFileVersion(versionId: string): Promise<SynchVersionPreview> {
+    return await this.versionHistoryController.previewActiveFileVersion(versionId);
+  }
+
   async restoreActiveFileVersion(versionId: string): Promise<void> {
     await this.versionHistoryController.restoreActiveFileVersion(versionId);
   }
 
   async listDeletedFiles(): Promise<SynchDeletedFile[]> {
     return await this.versionHistoryController.listDeletedFiles();
+  }
+
+  async previewDeletedFile(entryId: string): Promise<SynchVersionPreview> {
+    return await this.versionHistoryController.previewDeletedFile(entryId);
   }
 
   async restoreDeletedFiles(entryIds: string[]): Promise<void> {

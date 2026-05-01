@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { encryptSyncMetadata } from "../core/crypto";
+import { hashBytes } from "../core/content";
+import { encryptSyncBlob, encryptSyncMetadata } from "../core/crypto";
 import type { SyncRealtimeSession } from "../remote/realtime-client";
 import {
   createInitializedTestSyncStore,
@@ -194,6 +195,257 @@ describe("SyncVersionHistoryService", () => {
     await store.close();
   });
 
+  it("previews an active upsert version as verified text", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-active",
+      path: "Folder/active.md",
+      revision: 3,
+      blobId: "blob-current",
+      hash: "hash-current",
+      deleted: false,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const body = "old body\nwith two lines";
+    const version = await createEntryVersion({
+      entryId: "entry-active",
+      sourceRevision: 2,
+      versionId: "version-old",
+      body,
+    });
+    const pullClient = createPullClient({
+      "blob-old": await encryptSyncBlob(TEST_VAULT_KEY, new TextEncoder().encode(body), {
+        blobId: "blob-old",
+      }),
+    });
+    const service = createService(store, { pullClient });
+
+    await expect(
+      service.previewEntryVersionForPath("Folder/active.md", version),
+    ).resolves.toEqual({
+      status: "text",
+      path: "Folder/active.md",
+      reason: "before_delete",
+      capturedAt: 200,
+      text: body,
+    });
+
+    await store.close();
+  });
+
+  it("previews a deleted file from its newest upsert version", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-deleted",
+      path: "Folder/deleted.md",
+      revision: 3,
+      blobId: null,
+      hash: null,
+      deleted: true,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const body = "deleted body";
+    const version = await createEntryVersion({
+      entryId: "entry-deleted",
+      sourceRevision: 2,
+      versionId: "version-old",
+      path: "Folder/deleted.md",
+      body,
+    });
+    const session = createRealtimeSession({
+      listEntryVersions: async () => ({
+        entryId: "entry-deleted",
+        versions: [
+          {
+            versionId: "version-delete",
+            sourceRevision: 3,
+            op: "delete",
+            blobId: null,
+            encryptedMetadata: "delete-metadata",
+            reason: "before_restore",
+            capturedAt: 300,
+          },
+          version,
+        ],
+        hasMore: false,
+        nextBefore: null,
+      }),
+    });
+    const service = createService(store, {
+      pullClient: createPullClient({
+        "blob-old": await encryptSyncBlob(TEST_VAULT_KEY, new TextEncoder().encode(body), {
+          blobId: "blob-old",
+        }),
+      }),
+      withRealtimeSession: async (work) => await work(session),
+    });
+
+    await expect(service.previewDeletedEntry("entry-deleted")).resolves.toEqual(
+      expect.objectContaining({
+        status: "text",
+        path: "Folder/deleted.md",
+        text: body,
+      }),
+    );
+
+    await store.close();
+  });
+
+  it("returns unavailable preview when a deleted file has no upsert version", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-deleted",
+      path: "Folder/deleted.md",
+      revision: 3,
+      blobId: null,
+      hash: null,
+      deleted: true,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const session = createRealtimeSession({
+      listEntryVersions: async () => ({
+        entryId: "entry-deleted",
+        versions: [
+          {
+            versionId: "version-delete",
+            sourceRevision: 3,
+            op: "delete",
+            blobId: null,
+            encryptedMetadata: "delete-metadata",
+            reason: "before_restore",
+            capturedAt: 300,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      }),
+    });
+    const service = createService(store, {
+      withRealtimeSession: async (work) => await work(session),
+    });
+
+    await expect(service.previewDeletedEntry("entry-deleted")).resolves.toEqual({
+      status: "unavailable",
+      path: "Folder/deleted.md",
+      reason: null,
+      capturedAt: null,
+      message: "This version has no previewable content.",
+    });
+
+    await store.close();
+  });
+
+  it("returns unavailable preview for a version without a blob", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-active",
+      path: "Folder/active.md",
+      revision: 3,
+      blobId: "blob-current",
+      hash: "hash-current",
+      deleted: false,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const service = createService(store);
+
+    await expect(
+      service.previewEntryVersionForPath("Folder/active.md", {
+        versionId: "version-delete",
+        sourceRevision: 2,
+        op: "delete",
+        blobId: null,
+        encryptedMetadata: "delete-metadata",
+        reason: "before_delete",
+        capturedAt: 200,
+      }),
+    ).resolves.toEqual({
+      status: "unavailable",
+      path: "Folder/active.md",
+      reason: "before_delete",
+      capturedAt: 200,
+      message: "This version has no previewable content.",
+    });
+
+    await store.close();
+  });
+
+  it("rejects active preview when the downloaded blob hash mismatches metadata", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-active",
+      path: "Folder/active.md",
+      revision: 3,
+      blobId: "blob-current",
+      hash: "hash-current",
+      deleted: false,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const version = await createEntryVersion({
+      entryId: "entry-active",
+      sourceRevision: 2,
+      versionId: "version-old",
+      body: "expected body",
+    });
+    const service = createService(store, {
+      pullClient: createPullClient({
+        "blob-old": await encryptSyncBlob(
+          TEST_VAULT_KEY,
+          new TextEncoder().encode("different body"),
+          { blobId: "blob-old" },
+        ),
+      }),
+    });
+
+    await expect(
+      service.previewEntryVersionForPath("Folder/active.md", version),
+    ).rejects.toThrow("Version preview hash does not match metadata.");
+
+    await store.close();
+  });
+
+  it("rejects active preview when blob download fails", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-active",
+      path: "Folder/active.md",
+      revision: 3,
+      blobId: "blob-current",
+      hash: "hash-current",
+      deleted: false,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const version = await createEntryVersion({
+      entryId: "entry-active",
+      sourceRevision: 2,
+      versionId: "version-old",
+    });
+    const service = createService(store, {
+      pullClient: {
+        async downloadBlob() {
+          throw new Error("download failed");
+        },
+      },
+    });
+
+    await expect(
+      service.previewEntryVersionForPath("Folder/active.md", version),
+    ).rejects.toThrow("download failed");
+
+    await store.close();
+  });
+
   it("throws when a deleted entry has no restorable upsert version", async () => {
     const store = await createInitializedTestSyncStore(createTestPlugin());
     await store.upsertEntry({
@@ -295,8 +547,16 @@ function createService(
   overrides: Partial<ConstructorParameters<typeof SyncVersionHistoryService>[0]> = {},
 ): SyncVersionHistoryService {
   return new SyncVersionHistoryService({
+    getApiBaseUrl: () => "http://127.0.0.1:8787",
+    getSyncToken: async () => ({
+      token: "sync-token",
+      vaultId: "vault-1",
+      localVaultId: "local-vault-1",
+      expiresAt: Date.now() + 60_000,
+    }),
     getStore: () => store,
     getRemoteVaultKey: () => TEST_VAULT_KEY,
+    pullClient: createPullClient({}),
     withRealtimeSession: async (work) => await work(createRealtimeSession({})),
     runLocalMutationWork: async (work) => await work(),
     pullOnce: vi.fn(),
@@ -335,6 +595,8 @@ async function createEntryVersion(input: {
   entryId: string;
   sourceRevision: number;
   versionId: string;
+  path?: string;
+  body?: string;
 }): Promise<{
   versionId: string;
   sourceRevision: number;
@@ -344,6 +606,7 @@ async function createEntryVersion(input: {
   reason: "before_delete";
   capturedAt: number;
 }> {
+  const body = input.body ?? "old body";
   return {
     versionId: input.versionId,
     sourceRevision: input.sourceRevision,
@@ -352,8 +615,8 @@ async function createEntryVersion(input: {
     encryptedMetadata: await encryptSyncMetadata(
       TEST_VAULT_KEY,
       {
-        path: "Folder/active.md",
-        hash: "hash-old",
+        path: input.path ?? "Folder/active.md",
+        hash: await hashBytes(new TextEncoder().encode(body)),
       },
       {
         entryId: input.entryId,
@@ -364,5 +627,26 @@ async function createEntryVersion(input: {
     ),
     reason: "before_delete",
     capturedAt: 200,
+  };
+}
+
+function createPullClient(
+  blobs: Record<string, Uint8Array>,
+): {
+  downloadBlob(
+    apiBaseUrl: string,
+    syncToken: string,
+    vaultId: string,
+    blobId: string,
+  ): Promise<Uint8Array>;
+} {
+  return {
+    async downloadBlob(_apiBaseUrl, _syncToken, _vaultId, blobId) {
+      const blob = blobs[blobId];
+      if (!blob) {
+        throw new Error(`missing blob fixture for ${blobId}`);
+      }
+      return blob;
+    },
   };
 }

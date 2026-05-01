@@ -1,4 +1,7 @@
-import { decryptSyncMetadata, encryptSyncMetadata } from "../core/crypto";
+import { hashBytes } from "../core/content";
+import { decryptSyncBlob, decryptSyncMetadata, encryptSyncMetadata } from "../core/crypto";
+import type { SyncTokenResponse } from "../remote/client";
+import type { SyncPullClient } from "../remote/pull-client";
 import type {
   EntryVersion,
   EntryVersionPageCursor,
@@ -14,10 +17,14 @@ import type {
 } from "../store/ports";
 
 const VERSION_RESTORE_PAGE_SIZE = 25;
+const VERSION_PREVIEW_UNAVAILABLE_MESSAGE = "This version has no previewable content.";
 
 export interface SyncVersionHistoryServiceDeps {
+  getApiBaseUrl: () => string;
+  getSyncToken: () => Promise<SyncTokenResponse>;
   getStore: () => SyncVersionHistoryStore;
   getRemoteVaultKey: () => Uint8Array;
+  pullClient: Pick<SyncPullClient, "downloadBlob">;
   withRealtimeSession: <T>(
     work: (session: SyncRealtimeSession) => Promise<T>,
   ) => Promise<T>;
@@ -82,6 +89,19 @@ export class SyncVersionHistoryService {
     });
   }
 
+  async previewEntryVersionForPath(
+    path: string,
+    version: EntryVersion,
+  ): Promise<SyncEntryVersionPreview> {
+    const store = this.deps.getStore();
+    const entry = await store.getEntryByPath(path);
+    if (!entry || entry.deleted) {
+      throw new Error("The active file is not synced.");
+    }
+
+    return await this.previewEntryVersion(entry.entryId, version, path);
+  }
+
   async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
     return await this.deps.getStore().listDeletedEntries();
   }
@@ -105,6 +125,28 @@ export class SyncVersionHistoryService {
 
       await this.restoreEntryVersion(entry, version);
     });
+  }
+
+  async previewDeletedEntry(entryId: string): Promise<SyncEntryVersionPreview> {
+    const store = this.deps.getStore();
+    const entry = await store.getEntryById(entryId);
+    if (!entry || !entry.deleted || entry.revision <= 0) {
+      throw new Error("Deleted file is not synced.");
+    }
+
+    const version = await this.findLatestRestorableEntryVersion(entry.entryId);
+    const path = entry.path ?? entry.entryId;
+    if (!version) {
+      return {
+        status: "unavailable",
+        path,
+        reason: null,
+        capturedAt: null,
+        message: VERSION_PREVIEW_UNAVAILABLE_MESSAGE,
+      };
+    }
+
+    return await this.previewEntryVersion(entry.entryId, version, path);
   }
 
   private async findLatestRestorableEntryVersion(
@@ -169,6 +211,66 @@ export class SyncVersionHistoryService {
       await this.deps.pullOnce(session);
     });
   }
+
+  private async previewEntryVersion(
+    entryId: string,
+    version: EntryVersion,
+    fallbackPath: string,
+  ): Promise<SyncEntryVersionPreview> {
+    if (version.op !== "upsert" || !version.blobId) {
+      return {
+        status: "unavailable",
+        path: fallbackPath,
+        reason: version.reason,
+        capturedAt: version.capturedAt,
+        message: VERSION_PREVIEW_UNAVAILABLE_MESSAGE,
+      };
+    }
+
+    const metadata = await decryptSyncMetadata(
+      this.deps.getRemoteVaultKey(),
+      version.encryptedMetadata,
+      {
+        entryId,
+        revision: version.sourceRevision,
+        op: version.op,
+        blobId: version.blobId,
+      },
+    );
+    const token = await this.deps.getSyncToken();
+    const encryptedBytes = await this.deps.pullClient.downloadBlob(
+      this.deps.getApiBaseUrl(),
+      token.token,
+      token.vaultId,
+      version.blobId,
+    );
+    const bytes = await decryptSyncBlob(this.deps.getRemoteVaultKey(), encryptedBytes, {
+      blobId: version.blobId,
+    });
+    const actualHash = await hashBytes(bytes);
+    if (metadata.hash !== actualHash) {
+      throw new Error("Version preview hash does not match metadata.");
+    }
+
+    const text = decodeUtf8Text(bytes);
+    if (text === null) {
+      return {
+        status: "unavailable",
+        path: metadata.path,
+        reason: version.reason,
+        capturedAt: version.capturedAt,
+        message: "This version is not a UTF-8 text file.",
+      };
+    }
+
+    return {
+      status: "text",
+      path: metadata.path,
+      reason: version.reason,
+      capturedAt: version.capturedAt,
+      text,
+    };
+  }
 }
 
 export interface SyncEntryVersionsPage {
@@ -177,4 +279,28 @@ export interface SyncEntryVersionsPage {
   versions: EntryVersion[];
   hasMore: boolean;
   nextBefore: EntryVersionPageCursor | null;
+}
+
+export type SyncEntryVersionPreview =
+  | {
+      status: "text";
+      path: string;
+      reason: EntryVersion["reason"];
+      capturedAt: number;
+      text: string;
+    }
+  | {
+      status: "unavailable";
+      path: string;
+      reason: EntryVersion["reason"] | null;
+      capturedAt: number | null;
+      message: string;
+    };
+
+function decodeUtf8Text(bytes: Uint8Array): string | null {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
 }
