@@ -27,7 +27,10 @@ export function testWebSocket(): WebSocket {
 export function createMockCoordinatorStateRepository(
 	overrides: Record<string, unknown> = {},
 ): CoordinatorStateRepository {
-	return overrides as unknown as CoordinatorStateRepository;
+	return {
+		readVersionHistoryRetentionDays: vi.fn(() => 1),
+		...overrides,
+	} as unknown as CoordinatorStateRepository;
 }
 
 export function createMockCoordinatorSocketService(
@@ -81,5 +84,6 @@ export function socketStateRepository(_session = testSocketSession()) {
 			storageUsedBytes: 24_300_000,
 			storageLimitBytes: 100_000_000,
 		})),
+		readVersionHistoryRetentionDays: vi.fn(() => 1),
 	});
 }

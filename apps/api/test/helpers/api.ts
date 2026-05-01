@@ -1,4 +1,5 @@
 import { env, exports as workerExports } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
 
 import { createRuntimeApp } from "../../src/runtime";
 
@@ -41,6 +42,27 @@ export const DEFAULT_VAULT_WRAPPER = {
 		},
 	},
 };
+
+export async function initializeCoordinatorState(vaultId: string): Promise<void> {
+	const stub = env.SYNC_COORDINATOR.getByName(vaultId);
+	await runInDurableObject(stub, async (_instance, state) => {
+		state.storage.sql.exec(
+			`
+			INSERT INTO coordinator_state (
+				id,
+				vault_id,
+				storage_limit_bytes,
+				max_file_size_bytes,
+				version_history_retention_days
+			)
+			VALUES (1, ?, 1000000000, 10000000, 1)
+			ON CONFLICT(id) DO UPDATE SET
+				vault_id = excluded.vault_id
+			`,
+			vaultId,
+		);
+	});
+}
 
 type IssueTokenResponse = {
 	token: string;

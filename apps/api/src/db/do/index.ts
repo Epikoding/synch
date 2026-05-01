@@ -93,8 +93,11 @@ export const coordinatorState = sqliteTable("coordinator_state", {
 	vaultId: text("vault_id").notNull(),
 	currentCursor: integer("current_cursor").notNull().default(0),
 	storageUsedBytes: integer("storage_used_bytes").notNull().default(0),
-	storageLimitBytes: integer("storage_limit_bytes"),
-	maxFileSizeBytes: integer("max_file_size_bytes"),
+	storageLimitBytes: integer("storage_limit_bytes").notNull(),
+	maxFileSizeBytes: integer("max_file_size_bytes").notNull(),
+	versionHistoryRetentionDays: integer("version_history_retention_days")
+		.notNull()
+		.default(1),
 	healthSummaryDirty: integer("health_summary_dirty").notNull().default(0),
 	lastCommitAt: integer("last_commit_at"),
 	lastActivityAt: integer("last_activity_at"),

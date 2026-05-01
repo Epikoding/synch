@@ -268,12 +268,8 @@ describe("coordinator websocket control messages", () => {
 					iss: "synch",
 					exp: 1,
 					iat: 1,
-				})),
+			})),
 			} as never,
-			subscriptionPolicyService: {
-				readOrganizationPolicy: vi.fn(async () => getSubscriptionPlanPolicy("free")),
-				readVaultPolicy: vi.fn(async () => getSubscriptionPlanPolicy("free")),
-			},
 		});
 
 		await service.stageBlob(new Request("http://example.com"), session.vaultId, "blob-1", 100);
@@ -287,10 +283,13 @@ describe("coordinator websocket control messages", () => {
 		});
 	});
 
-	it("allows blob staging when self-hosted quota limits are unlimited", async () => {
+	it("stages blobs without reading subscription policy limits", async () => {
 		const session = testSocketSession();
 		const stateRepository = socketStateRepository(session);
 		const socketService = socketServiceMock(session);
+		const readVaultPolicy = vi.fn(async () =>
+			getSubscriptionPlanPolicy("self_hosted"),
+		);
 		const service = createCoordinatorService({
 			stateRepository,
 			socketService,
@@ -309,7 +308,7 @@ describe("coordinator websocket control messages", () => {
 				readOrganizationPolicy: vi.fn(async () =>
 					getSubscriptionPlanPolicy("self_hosted"),
 				),
-				readVaultPolicy: vi.fn(async () => getSubscriptionPlanPolicy("self_hosted")),
+				readVaultPolicy,
 			},
 		});
 
@@ -323,15 +322,15 @@ describe("coordinator websocket control messages", () => {
 		expect(stateRepository.stageBlob).toHaveBeenCalledWith(
 			"blob-unlimited",
 			50_000_000,
-			0,
 			expect.any(Number),
 			expect.any(Number),
 		);
+		expect(readVaultPolicy).not.toHaveBeenCalled();
 		expect(socketService.broadcastStorageStatus).toHaveBeenCalledWith({
 			type: "storage_status_updated",
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
-				storageLimitBytes: 0,
+				storageLimitBytes: 100_000_000,
 			},
 		});
 	});

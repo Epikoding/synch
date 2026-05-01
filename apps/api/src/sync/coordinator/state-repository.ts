@@ -100,6 +100,22 @@ export class CoordinatorStateRepository {
 		return this.healthStore.readStorageStatus();
 	}
 
+	readVersionHistoryRetentionDays(): number {
+		const row = this.ctx.storage.sql
+			.exec<{ version_history_retention_days: number }>(
+				`
+				SELECT version_history_retention_days
+				FROM coordinator_state
+				WHERE id = 1
+				`,
+			)
+			.toArray()[0];
+		if (!row) {
+			throw new Error("vault sync state is not initialized");
+		}
+		return Number(row.version_history_retention_days);
+	}
+
 	compactSyncedCommits(now: number, activeCursorTtlMs: number, limit: number): number {
 		return this.cursorStore.compactSyncedCommits(now, activeCursorTtlMs, limit);
 	}
@@ -120,14 +136,12 @@ export class CoordinatorStateRepository {
 	async stageBlob(
 		blobId: string,
 		sizeBytes: number,
-		storageLimitBytes: number,
 		now: number,
 		deleteAfter: number,
 	): Promise<void> {
 		await this.blobStore.stageBlob(
 			blobId,
 			sizeBytes,
-			storageLimitBytes,
 			now,
 			deleteAfter,
 		);

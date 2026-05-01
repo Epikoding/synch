@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
 
-import { apiRequest } from "../../helpers/api";
+import { apiRequest, initializeCoordinatorState } from "../../helpers/api";
 
 export type SyncDoSession = {
 	userId: string;
@@ -24,6 +24,7 @@ export async function uploadBlob(
 	blobId: string,
 	body: string,
 ): Promise<void> {
+	await initializeCoordinatorState(vaultId);
 	const payload = new TextEncoder().encode(body);
 	const uploaded = await apiRequest(`/v1/vaults/${encodeURIComponent(vaultId)}/blobs/${blobId}`, {
 		method: "PUT",

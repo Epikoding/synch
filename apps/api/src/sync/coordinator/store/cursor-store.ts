@@ -8,6 +8,7 @@ type CursorDb = Pick<ReturnType<typeof drizzle<typeof doSchema>>, "insert" | "se
 
 const BETA_STORAGE_LIMIT_BYTES = 1_000_000_000;
 const BETA_MAX_FILE_SIZE_BYTES = 10_000_000;
+const BETA_VERSION_HISTORY_RETENTION_DAYS = 1;
 
 export class CoordinatorCursorStore {
 	private readonly blobStore: CoordinatorBlobStore;
@@ -57,6 +58,7 @@ export class CoordinatorCursorStore {
 				currentCursor: input.cursor,
 				storageLimitBytes: BETA_STORAGE_LIMIT_BYTES,
 				maxFileSizeBytes: BETA_MAX_FILE_SIZE_BYTES,
+				versionHistoryRetentionDays: BETA_VERSION_HISTORY_RETENTION_DAYS,
 				lastCommitAt: input.now,
 			})
 			.onConflictDoUpdate({
@@ -139,6 +141,7 @@ function initializeVaultState(db: CursorDb, vaultId: string): void {
 			currentCursor: currentCursor(db),
 			storageLimitBytes: BETA_STORAGE_LIMIT_BYTES,
 			maxFileSizeBytes: BETA_MAX_FILE_SIZE_BYTES,
+			versionHistoryRetentionDays: BETA_VERSION_HISTORY_RETENTION_DAYS,
 		})
 		.onConflictDoUpdate({
 			target: doSchema.coordinatorState.id,

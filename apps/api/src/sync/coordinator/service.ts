@@ -11,7 +11,6 @@ import type {
 	RestoreEntryVersionResult,
 	SocketSession,
 } from "./types";
-import type { SubscriptionPlanPolicy } from "../../subscription/policy";
 import {
 	SubscriptionPolicyService,
 	type SubscriptionPolicyReader,
@@ -69,7 +68,6 @@ export class CoordinatorService {
 			stateRepository,
 			socketService,
 			blobRepository,
-			subscriptionPolicyService,
 			blobGracePeriodMs,
 			async (key, timestamp, now) => await this.deferMaintenance(key, timestamp, now),
 			async (now) => await this.markHealthSummaryDirty(now),
@@ -243,12 +241,8 @@ export class CoordinatorService {
 	}
 
 	private async readVersionHistoryRetentionMs(vaultId: string): Promise<number> {
-		const policy = await this.subscriptionPolicyService.readVaultPolicy(vaultId);
-		return versionHistoryRetentionMs(policy);
+		this.stateRepository.rememberVaultId(vaultId);
+		return this.stateRepository.readVersionHistoryRetentionDays() * DAY_IN_MS;
 	}
 
-}
-
-function versionHistoryRetentionMs(policy: SubscriptionPlanPolicy): number {
-	return policy.limits.versionHistoryRetentionDays * DAY_IN_MS;
 }

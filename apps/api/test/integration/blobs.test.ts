@@ -1,17 +1,44 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import {
-	getSubscriptionPlanPolicy,
-} from "../../src/subscription/policy";
 import { describe, expect, it } from "vitest";
 
-import { apiRequest, issueSyncToken, signUpAndCreateVault, uniqueId } from "../helpers/api";
+import {
+	apiRequest,
+	initializeCoordinatorState,
+	issueSyncToken,
+	signUpAndCreateVault,
+	uniqueId,
+} from "../helpers/api";
 
 describe("blob integration", () => {
-	const policy = getSubscriptionPlanPolicy("free");
+	it("rejects blob uploads before the vault sync state is initialized", async () => {
+		const primary = await signUpAndCreateVault();
+		const token = await issueSyncToken(
+			primary.sessionCookie,
+			primary.vaultId,
+			"blob-before-state-device",
+		);
+		const blobId = uniqueId("blob");
+		const payload = new TextEncoder().encode("blob before state");
+
+		const rejected = await apiRequest(
+			`/v1/vaults/${encodeURIComponent(primary.vaultId)}/blobs/${blobId}`,
+			{
+				method: "PUT",
+				headers: {
+					authorization: `Bearer ${token.token}`,
+					"x-blob-size": String(payload.byteLength),
+				},
+				body: payload,
+			},
+		);
+
+		expect(rejected.status).toBe(409);
+	});
 
 	it("round-trips blob bytes through the vault blob endpoints", async () => {
 		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "blob-device");
 		const blobId = uniqueId("blob");
 		const payload = new TextEncoder().encode("blob bytes from vitest");
@@ -44,6 +71,7 @@ describe("blob integration", () => {
 
 	it("rejects uploads that would exceed the vault storage quota", async () => {
 		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "quota-device");
 		const firstBlobId = uniqueId("blob");
 		const firstPayload = new TextEncoder().encode("1234");
@@ -65,7 +93,7 @@ describe("blob integration", () => {
 		await runInDurableObject(stub, async (_instance, state) => {
 			state.storage.sql.exec(
 				"UPDATE coordinator_state SET storage_used_bytes = ? WHERE id = 1",
-				policy.limits.storageLimitBytes - 1,
+				1_000_000_000 - 1,
 			);
 		});
 
@@ -97,6 +125,7 @@ describe("blob integration", () => {
 
 	it("rejects uploads above the free plan file size limit", async () => {
 		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "size-limit-device");
 		const blobId = uniqueId("blob");
 		const payload = new TextEncoder().encode("small body");
@@ -105,8 +134,8 @@ describe("blob integration", () => {
 			method: "PUT",
 			headers: {
 				authorization: `Bearer ${token.token}`,
-				"x-blob-size": String(
-					policy.limits.maxFileSizeBytes + 1,
+					"x-blob-size": String(
+					10_000_000 + 1,
 				),
 			},
 			body: payload,
@@ -117,6 +146,7 @@ describe("blob integration", () => {
 
 	it("rejects uploads whose declared size does not match R2's stored size", async () => {
 		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "size-device");
 		const blobId = uniqueId("blob");
 		const payload = new TextEncoder().encode("actual bytes");

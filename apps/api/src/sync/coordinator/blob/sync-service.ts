@@ -1,4 +1,3 @@
-import type { SubscriptionPolicyReader } from "../../../subscription/policy-service";
 import { apiError } from "../../../errors";
 import type { SyncTokenService } from "../../access/token-service";
 import { blobObjectKey } from "../../blob/object-key";
@@ -15,7 +14,6 @@ export class BlobSyncService {
 		private readonly stateRepository: CoordinatorStateRepository,
 		private readonly socketService: CoordinatorSocketService,
 		private readonly blobRepository: BlobRepository,
-		private readonly subscriptionPolicyService: SubscriptionPolicyReader,
 		private readonly blobGracePeriodMs: number,
 		private readonly deferMaintenance: (
 			key: MaintenanceJobKey,
@@ -31,33 +29,26 @@ export class BlobSyncService {
 		blobId: string,
 		sizeBytes: number,
 	): Promise<void> {
-		const claims = await this.syncTokenService.requireSyncToken(request, vaultId);
-		this.stateRepository.rememberVaultId(claims.vaultId);
-		const policy = await this.subscriptionPolicyService.readVaultPolicy(claims.vaultId);
-		if (
-			policy.limits.maxFileSizeBytes > 0 &&
-			sizeBytes > policy.limits.maxFileSizeBytes
-		) {
-			throw apiError(
-				413,
-				"file_too_large",
-				`blob exceeds maximum file size of ${policy.limits.maxFileSizeBytes} bytes`,
-			);
-		}
+		await this.syncTokenService.requireSyncToken(request, vaultId);
 
 		const now = Date.now();
 		try {
 			await this.stateRepository.stageBlob(
 				blobId,
 				sizeBytes,
-				policy.limits.storageLimitBytes,
 				now,
 				now + this.blobGracePeriodMs,
 			);
 			await this.deferMaintenance("blob_gc", now + this.blobGracePeriodMs, now);
 			await this.markHealthSummaryDirty(now);
-			this.broadcastStorageStatus(policy.limits.storageLimitBytes);
+			this.broadcastStorageStatus();
 		} catch (error) {
+			if (error instanceof Error && error.message.includes("not initialized")) {
+				throw apiError(409, "sync_state_uninitialized", error.message);
+			}
+			if (error instanceof Error && error.message.includes("maximum file size")) {
+				throw apiError(413, "file_too_large", error.message);
+			}
 			if (error instanceof Error && error.message.includes("already live")) {
 				throw apiError(409, "conflict", error.message);
 			}
@@ -133,14 +124,11 @@ export class BlobSyncService {
 		return nextGcAt;
 	}
 
-	private broadcastStorageStatus(storageLimitBytes?: number): void {
+	private broadcastStorageStatus(): void {
 		const storageStatus = this.stateRepository.readStorageStatus();
 		this.socketService.broadcastStorageStatus({
 			type: "storage_status_updated",
-			storageStatus: {
-				...storageStatus,
-				storageLimitBytes: storageLimitBytes ?? storageStatus.storageLimitBytes,
-			},
+			storageStatus,
 		});
 	}
 }

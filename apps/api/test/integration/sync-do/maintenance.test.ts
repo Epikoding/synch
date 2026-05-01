@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import {
+	initializeCoordinatorState,
 	issueSyncToken,
 	jsonRequest,
 	signUpAndCreateVault,
@@ -75,6 +76,7 @@ describe("sync durable object maintenance integration", () => {
 
 	it("garbage-collects an uncommitted staged blob", async () => {
 		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "local-vault-blob");
 		const stub = env.SYNC_COORDINATOR.getByName(primary.vaultId);
 		const blobId = "blob-staged-gc";

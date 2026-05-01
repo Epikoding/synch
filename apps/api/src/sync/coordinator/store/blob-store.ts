@@ -15,11 +15,32 @@ export class CoordinatorBlobStore {
 	async stageBlob(
 		blobId: string,
 		sizeBytes: number,
-		storageLimitBytes: number,
 		now: number,
 		deleteAfter: number,
 	): Promise<void> {
 		this.getDb().transaction((tx) => {
+			const storage = tx
+				.select({
+					usedBytes: doSchema.coordinatorState.storageUsedBytes,
+					storageLimitBytes: doSchema.coordinatorState.storageLimitBytes,
+					maxFileSizeBytes: doSchema.coordinatorState.maxFileSizeBytes,
+				})
+				.from(doSchema.coordinatorState)
+				.where(eq(doSchema.coordinatorState.id, 1))
+				.limit(1)
+				.get();
+			if (!storage) {
+				throw new Error("vault sync state is not initialized");
+			}
+
+			const storageLimitBytes = Number(storage.storageLimitBytes);
+			const maxFileSizeBytes = Number(storage.maxFileSizeBytes);
+			if (maxFileSizeBytes > 0 && sizeBytes > maxFileSizeBytes) {
+				throw new Error(
+					`blob exceeds maximum file size of ${maxFileSizeBytes} bytes`,
+				);
+			}
+
 			const existing = tx
 				.select({
 					state: doSchema.blobs.state,
@@ -38,15 +59,7 @@ export class CoordinatorBlobStore {
 			}
 
 			if (!existing) {
-				const storage = tx
-					.select({
-						usedBytes: doSchema.coordinatorState.storageUsedBytes,
-					})
-					.from(doSchema.coordinatorState)
-					.where(eq(doSchema.coordinatorState.id, 1))
-					.limit(1)
-					.get();
-				const usedBytes = Number(storage?.usedBytes ?? 0);
+				const usedBytes = Number(storage.usedBytes);
 				if (
 					storageLimitBytes > 0 &&
 					usedBytes + sizeBytes > storageLimitBytes
@@ -59,7 +72,6 @@ export class CoordinatorBlobStore {
 				tx.update(doSchema.coordinatorState)
 					.set({
 						storageUsedBytes: usedBytes + sizeBytes,
-						storageLimitBytes,
 					})
 					.where(eq(doSchema.coordinatorState.id, 1))
 					.run();
