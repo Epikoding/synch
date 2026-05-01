@@ -94,6 +94,18 @@ describe("SynchSettingTab sync status", () => {
     expect(getExtraButtonComponents()).toHaveLength(1);
   });
 
+  it("does not show a spinner while sync is offline", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      getSyncState: () => "offline",
+      getSyncStatusLabel: () => "Sync: offline 0%",
+    });
+
+    tab.display();
+
+    expect(getExtraButtonComponents()).toEqual([]);
+  });
+
   it("hides the sync spinner when sync is idle", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,

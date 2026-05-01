@@ -100,9 +100,60 @@ describe("SyncController", () => {
     expect(startAutoSync).toHaveBeenCalledTimes(1);
     expect(resumeAutoSyncConnection).not.toHaveBeenCalled();
   });
+
+  it("shows offline instead of not ready when a stored vault cannot activate offline", async () => {
+    const notifyError = vi.fn();
+    const controller = new SyncController(
+      createDeps({
+        hasActiveRemoteVaultSession: () => false,
+        hasConnectedRemoteVault: () => true,
+        isOffline: () => true,
+        notifyError,
+      }),
+    );
+
+    await controller.ensureAutoSyncState();
+
+    expect(controller.getSyncState()).toBe("offline");
+    expect(controller.getSyncStatusLabel()).toBe("Sync: offline 0%");
+    expect(notifyError).not.toHaveBeenCalled();
+  });
+
+  it("preserves offline while a stored vault is still inactive", async () => {
+    const controller = new SyncController(
+      createDeps({
+        hasActiveRemoteVaultSession: () => false,
+        hasConnectedRemoteVault: () => true,
+        isOffline: () => false,
+      }),
+    );
+    controller.markOffline();
+
+    await controller.ensureAutoSyncState();
+
+    expect(controller.getSyncState()).toBe("offline");
+  });
+
+  it("keeps attention needed when an inactive stored vault had a non-offline failure", async () => {
+    const controller = new SyncController(
+      createDeps({
+        hasActiveRemoteVaultSession: () => false,
+        hasConnectedRemoteVault: () => true,
+        isOffline: () => false,
+      }),
+    );
+    controller.markOffline();
+    controller.markAttentionNeeded();
+
+    await controller.resumeAutoSync();
+
+    expect(controller.getSyncState()).toBe("attention_needed");
+  });
 });
 
-function createDeps(): ConstructorParameters<typeof SyncController>[0] {
+function createDeps(
+  overrides: Partial<ConstructorParameters<typeof SyncController>[0]> = {},
+): ConstructorParameters<typeof SyncController>[0] {
   return {
     plugin: createTestPlugin(),
     getApiBaseUrl: () => "http://127.0.0.1:8787",
@@ -115,8 +166,10 @@ function createDeps(): ConstructorParameters<typeof SyncController>[0] {
       maxFileBytes: 10_000_000,
     }),
     hasActiveRemoteVaultSession: () => true,
+    hasConnectedRemoteVault: () => true,
     hasAuthenticatedSession: () => true,
     notifyError: vi.fn(),
+    ...overrides,
   };
 }
 

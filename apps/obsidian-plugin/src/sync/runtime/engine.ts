@@ -1,5 +1,10 @@
 import type { Plugin } from "obsidian";
 
+import {
+  isOffline as detectOffline,
+  isOfflineLikeError,
+  type OfflineDetector,
+} from "../../http/network-status";
 import { SyncAutoLoop } from "../engine/auto-sync";
 import type { SyncTokenResponse } from "../remote/client";
 import { SyncEventGate } from "../engine/event-gate";
@@ -60,6 +65,7 @@ export interface SyncEngineDeps {
   setSyncProgress: (progress: UserVisibleSyncProgress | null) => void;
   setSyncStatus: (status: UserVisibleSyncState) => void;
   setStorageStatus: (status: SyncStorageStatus | null) => void;
+  isOffline?: OfflineDetector;
 }
 
 export class SyncEngine {
@@ -121,24 +127,29 @@ export class SyncEngine {
       }),
     onConnectionStateChange: (state) => {
       if (state === "reconnecting") {
-        this.deps.setSyncStatus("reconnecting");
+        this.setOnlineSyncStatus("reconnecting");
         return;
       }
 
       if (state === "connecting") {
-        this.deps.setSyncStatus("syncing");
+        this.setOnlineSyncStatus("syncing");
       }
     },
     onStorageStatusChange: (status) => {
       this.deps.setStorageStatus(status);
     },
     onSyncScheduled: () => {
-      this.deps.setSyncStatus("syncing");
+      this.setOnlineSyncStatus("syncing");
     },
     onIdle: () => {
       this.deps.setSyncStatus("up_to_date");
     },
     onError: (error) => {
+      if (isOfflineLikeError(error, this.deps.isOffline)) {
+        this.deps.setSyncStatus("offline");
+        return;
+      }
+
       this.deps.setSyncStatus("attention_needed");
       this.deps.notifyError(error, "Auto sync failed");
     },
@@ -371,6 +382,14 @@ export class SyncEngine {
     }
 
     return this.syncStore;
+  }
+
+  private isOffline(): boolean {
+    return detectOffline(this.deps.isOffline);
+  }
+
+  private setOnlineSyncStatus(status: "reconnecting" | "syncing"): void {
+    this.deps.setSyncStatus(this.isOffline() ? "offline" : status);
   }
 }
 

@@ -1,6 +1,7 @@
 export type UserVisibleSyncState =
   | "not_ready"
   | "syncing"
+  | "offline"
   | "reconnecting"
   | "up_to_date"
   | "attention_needed";
@@ -47,6 +48,8 @@ export function formatUserVisibleSyncState(
       return `Sync: not ready ${percent}%`;
     case "syncing":
       return `Sync: syncing ${percent}%`;
+    case "offline":
+      return `Sync: offline ${percent}%`;
     case "reconnecting":
       return `Sync: reconnecting ${percent}%`;
     case "up_to_date":

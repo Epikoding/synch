@@ -13,6 +13,28 @@ type VaultEventCallback = (...args: unknown[]) => void;
 const TEST_VAULT_KEY = new Uint8Array(Array.from({ length: 32 }, (_, index) => index + 1));
 
 describe("SyncEngine", () => {
+  it("reports offline sync startup failures through status without a notice", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const setSyncStatus = vi.fn();
+    const notifyError = vi.fn();
+    const engine = createEngine(plugin, {
+      getSyncToken: async () => {
+        throw new Error("offline");
+      },
+      setSyncStatus,
+      notifyError,
+    });
+    engine.setStore(store);
+
+    await engine.startAutoSync();
+
+    expect(setSyncStatus).toHaveBeenCalledWith("offline");
+    expect(notifyError).not.toHaveBeenCalled();
+    engine.stopAutoSync();
+    await store.close();
+  });
+
   it("unblocks quota-blocked mutations without unblocking file-size blocks", async () => {
     const plugin = createPlugin({}, async () => encodeUtf8("body"));
     const store = await createInitializedTestSyncStore(plugin);

@@ -1,5 +1,6 @@
 import { Notice, type Plugin, TFolder } from "obsidian";
 
+import { isOfflineLikeError } from "../http/network-status";
 import { AuthManager } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -87,6 +88,7 @@ export class SynchPluginController implements SynchSettingsController {
     getRemoteVaultKey: () => this.getActiveRemoteVaultKey(),
     getSyncFileRules: () => this.getSyncFileRules(),
     hasActiveRemoteVaultSession: () => this.hasActiveRemoteVaultSession(),
+    hasConnectedRemoteVault: () => this.hasConnectedRemoteVault(),
     hasAuthenticatedSession: () => this.hasAuthenticatedSession(),
     notifyError: (error, prefix) => {
       this.notifyError(error, prefix);
@@ -154,10 +156,9 @@ export class SynchPluginController implements SynchSettingsController {
       return;
     }
 
-    this.resumeAutoSyncPromise = this.syncController
-      .resumeAutoSync()
+    this.resumeAutoSyncPromise = this.resumeAutoSyncWhenPossible()
       .catch((error) => {
-        this.notifyError(error, "Auto sync resume failed");
+        this.notifyUnlessOffline(error, "Auto sync resume failed");
       })
       .finally(() => {
         this.resumeAutoSyncPromise = null;
@@ -406,8 +407,35 @@ export class SynchPluginController implements SynchSettingsController {
       await this.remoteVaultManager.restorePersistedRemoteVaultSession();
       await this.initializeSyncStoreForActiveRemoteVault();
     } catch (error) {
-      this.notifyError(error, "Vault restore failed");
+      this.notifyUnlessOffline(error, "Vault restore failed");
     }
+  }
+
+  private async resumeAutoSyncWhenPossible(): Promise<void> {
+    await this.restoreOfflineSessionBeforeResume();
+    await this.syncController.resumeAutoSync();
+  }
+
+  private async restoreOfflineSessionBeforeResume(): Promise<void> {
+    if (
+      this.getSyncState() !== "offline" ||
+      this.hasActiveRemoteVaultSession() ||
+      !this.hasConnectedRemoteVault()
+    ) {
+      return;
+    }
+
+    await this.tryRestorePersistedRemoteVaultSession();
+  }
+
+  private notifyUnlessOffline(error: unknown, prefix: string): void {
+    if (isOfflineLikeError(error)) {
+      this.syncController.markOffline();
+      return;
+    }
+
+    this.syncController.markAttentionNeeded();
+    this.notifyError(error, prefix);
   }
 
   private async initializeSyncStoreForActiveRemoteVault(): Promise<void> {

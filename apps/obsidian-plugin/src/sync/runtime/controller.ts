@@ -1,5 +1,10 @@
 import { Notice, type Plugin } from "obsidian";
 
+import {
+  isOffline as detectOffline,
+  isOfflineLikeError,
+  type OfflineDetector,
+} from "../../http/network-status";
 import type { SyncTokenResponse } from "../remote/client";
 import type {
   EntryVersion,
@@ -29,10 +34,12 @@ export interface SyncControllerDeps {
   getRemoteVaultKey: () => Uint8Array;
   getSyncFileRules: () => SyncFileRules;
   hasActiveRemoteVaultSession: () => boolean;
+  hasConnectedRemoteVault: () => boolean;
   hasAuthenticatedSession: () => boolean;
   notifyError: (error: unknown, prefix: string) => void;
   notify?: (message: string, timeout?: number) => void;
   onStatusChange?: () => void;
+  isOffline?: OfflineDetector;
 }
 
 export class SyncController {
@@ -55,6 +62,7 @@ export class SyncController {
     setSyncProgress: (progress) => this.setSyncProgress(progress),
     setSyncStatus: (status) => this.setSyncStatus(status),
     setStorageStatus: (status) => this.setStorageStatus(status),
+    isOffline: this.deps.isOffline,
   });
   private storageStatus: SyncStorageStatus | null = null;
 
@@ -149,6 +157,11 @@ export class SyncController {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
       this.syncEngine.stopAutoSync();
       this.setStorageStatus(null);
+      if (this.shouldShowOfflineBeforeReady()) {
+        this.setSyncStatus("offline");
+        return;
+      }
+
       this.setSyncProgress({
         completedEntries: 0,
         totalEntries: 0,
@@ -171,6 +184,11 @@ export class SyncController {
         this.syncEngine.notifyLocalChange();
       }
     } catch (error) {
+      if (isOfflineLikeError(error, this.deps.isOffline)) {
+        this.setSyncStatus("offline");
+        return;
+      }
+
       this.setSyncStatus("attention_needed");
       this.deps.notifyError(error, "Auto sync initialization failed");
     }
@@ -178,6 +196,9 @@ export class SyncController {
 
   async resumeAutoSync(): Promise<void> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
+      if (this.shouldShowOfflineBeforeReady()) {
+        this.setSyncStatus("offline");
+      }
       return;
     }
 
@@ -206,9 +227,22 @@ export class SyncController {
       await this.syncEngine.reconcileOnce();
       this.syncEngine.notifyLocalChange();
     } catch (error) {
+      if (isOfflineLikeError(error, this.deps.isOffline)) {
+        this.setSyncStatus("offline");
+        return;
+      }
+
       this.setSyncStatus("attention_needed");
       this.deps.notifyError(error, "Sync file rule update failed");
     }
+  }
+
+  markOffline(): void {
+    this.setSyncStatus("offline");
+  }
+
+  markAttentionNeeded(): void {
+    this.setSyncStatus("attention_needed");
   }
 
   async listEntryVersionsForPath(
@@ -322,6 +356,14 @@ export class SyncController {
 
     this.notify(
       `Sync conflict detected for "${event.originalPath}". The remote version will be kept.`,
+    );
+  }
+
+  private shouldShowOfflineBeforeReady(): boolean {
+    return (
+      this.deps.hasAuthenticatedSession() &&
+      this.deps.hasConnectedRemoteVault() &&
+      (this.syncStatus === "offline" || detectOffline(this.deps.isOffline))
     );
   }
 }
