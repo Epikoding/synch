@@ -22,11 +22,14 @@ export function localizedPath(locale: Locale, path = "/") {
 }
 
 export function blogSlug(id: string, locale: Locale) {
-	return id.replace(new RegExp(`^${locale}/`), "");
+	return id
+		.replace(new RegExp(`^${locale}/`), "")
+		.replace(new RegExp(`/${locale}$`), "")
+		.replace(/\/index$/, "");
 }
 
 export function isLocaleEntry(id: string, locale: Locale) {
-	return id.startsWith(`${locale}/`);
+	return id.startsWith(`${locale}/`) || id.endsWith(`/${locale}`);
 }
 
 export const ui = {
@@ -48,6 +51,14 @@ export const ui = {
 		},
 		home: {
 			heroTitle: ["End-to-end encrypted sync", "for Obsidian."],
+			featuredTitle: "Learn more",
+			featuredPosts: [
+				{
+					title: "How does Synch's end-to-end encryption work?",
+					body: "A plain-English walkthrough of how Synch encrypts vault data, protects the vault key, and unlocks encrypted data on another device.",
+					href: "/blog/encryption-and-decryption"
+				}
+			],
 			heroBody:
 				"An open-source alternative to Obsidian Sync. Your notes are encrypted locally before leaving your device, ensuring complete privacy and control over your data.",
 			getStarted: "Get Started",
@@ -135,6 +146,14 @@ export const ui = {
 		},
 		home: {
 			heroTitle: ["Obsidian을 위한", "종단간 암호화 동기화."],
+			featuredTitle: "더 알아보기",
+			featuredPosts: [
+				{
+					title: "Synch의 종단 간 암호화는 어떻게 작동할까요?",
+					body: "Synch가 어떻게 데이터를 암호화하고, 키를 보호하며, 다른 기기에서 안전하게 데이터를 여는지 알기 쉽게 설명합니다.",
+					href: "/blog/encryption-and-decryption"
+				}
+			],
 			heroBody:
 				"Obsidian Sync를 대체할 수 있는 오픈소스 동기화 서비스입니다. 노트는 기기 안에서 먼저 암호화된 뒤 전송되므로, 내 데이터는 내가 안전하게 관리할 수 있습니다.",
 			getStarted: "시작하기",

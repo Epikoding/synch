@@ -1,5 +1,6 @@
 ---
-import { getLocale, ui, type Locale } from "../i18n";
+import { getRelativeLocaleUrl } from "astro:i18n";
+import { getLocale, ui, type Locale, locales } from "../i18n";
 
 interface Props {
   locale?: Locale;
@@ -7,12 +8,26 @@ interface Props {
 
 const locale = Astro.props.locale ?? getLocale(Astro.currentLocale);
 const t = ui[locale].nav;
+const routePath = Astro.url.pathname
+  .replace(new RegExp(`^/${locale}(/|$)`), "")
+  .replace(/^\//, "");
 ---
 
 <footer class="py-8 text-xs text-zinc-600 flex flex-col sm:flex-row items-center justify-between gap-4">
   <p>MIT License &copy; {new Date().getFullYear()}</p>
   <nav class="flex items-center gap-4">
-    <a href="/terms" class="hover:text-zinc-400 transition-colors">{t.terms}</a>
-    <a href="/privacy" class="hover:text-zinc-400 transition-colors">{t.privacy}</a>
+    <select
+      class="bg-transparent text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer outline-none"
+      onchange="window.location.href = this.value"
+      aria-label="Select language"
+    >
+      {locales.map((l) => (
+        <option value={getRelativeLocaleUrl(l, routePath || undefined)} selected={l === locale} class="bg-[#0a0a0a] text-zinc-400">
+          {l === 'en' ? 'English' : '한국어'}
+        </option>
+      ))}
+    </select>
+    <a href={getRelativeLocaleUrl(locale, "terms")} class="hover:text-zinc-400 transition-colors">{t.terms}</a>
+    <a href={getRelativeLocaleUrl(locale, "privacy")} class="hover:text-zinc-400 transition-colors">{t.privacy}</a>
   </nav>
 </footer>

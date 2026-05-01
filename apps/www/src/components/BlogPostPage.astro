@@ -1,35 +1,27 @@
 ---
+import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 import type { CollectionEntry } from "astro:content";
 import Footer from "./Footer.astro";
 import Header from "./Header.astro";
 import Layout from "../layouts/Layout.astro";
-import { ui, type Locale } from "../i18n";
+import type { Locale } from "../i18n";
 
 interface Props {
-  Content: unknown;
+  Content: AstroComponentFactory;
   locale: Locale;
   post: CollectionEntry<"blog">;
 }
 
 const { Content, locale, post } = Astro.props;
-const t = ui[locale];
 ---
 
 <Layout title={`${post.data.title} - Synch`} locale={locale}>
-  <div class="max-w-3xl mx-auto px-6 w-full flex-1 flex flex-col">
+  <div class="max-w-2xl mx-auto px-6 w-full flex-1 flex flex-col">
     <Header locale={locale} />
 
-    <main class="flex-1 py-16">
+    <main class="flex-1 py-24">
       <article class="blog-content max-w-none">
         <h1>{post.data.title}</h1>
-        <p class="lead">{post.data.description}</p>
-        <time datetime={post.data.pubDate.toISOString()}>
-          {post.data.pubDate.toLocaleDateString(t.blog.dateLocale, {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </time>
         <Content />
       </article>
     </main>
@@ -41,21 +33,45 @@ const t = ui[locale];
 <style is:global>
   @reference "../styles/global.css";
   .blog-content h1 {
-    @apply text-3xl font-semibold text-zinc-200 mb-4;
-  }
-  .blog-content .lead {
-    @apply text-zinc-500 mb-3;
-  }
-  .blog-content time {
-    @apply block text-sm text-zinc-600 mb-10;
+    @apply text-2xl sm:text-3xl text-zinc-200 tracking-tight font-normal mb-12;
   }
   .blog-content h2 {
-    @apply text-xl font-medium text-zinc-200 mt-10 mb-4;
+    @apply text-xl text-zinc-300 font-normal mt-16 mb-6 tracking-tight;
+  }
+  .blog-content h3 {
+    @apply text-lg text-zinc-300 font-normal mt-12 mb-4 tracking-tight;
   }
   .blog-content p {
     @apply text-zinc-400 mb-6 leading-relaxed;
   }
+  .blog-content blockquote {
+    @apply border-l border-zinc-800 pl-5 my-8 text-zinc-400 italic;
+  }
+  .blog-content blockquote p {
+    @apply mb-0;
+  }
+  .blog-content pre {
+    @apply overflow-x-auto rounded border border-zinc-800/50 bg-zinc-900/50 px-4 py-3 my-8 text-sm text-zinc-300;
+  }
+  .blog-content code {
+    @apply rounded bg-zinc-800/50 px-1.5 py-0.5 text-sm text-zinc-300 font-mono;
+  }
+  .blog-content pre code {
+    @apply bg-transparent p-0 text-zinc-400;
+  }
+  .blog-content img {
+    @apply my-10 rounded border border-zinc-800/50;
+  }
   .blog-content a {
-    @apply text-zinc-300 border-b border-zinc-700 hover:text-zinc-100 hover:border-zinc-500 transition-colors;
+    @apply text-zinc-300 underline decoration-zinc-700 hover:text-zinc-200 hover:decoration-zinc-500 transition-colors underline-offset-4;
+  }
+  .blog-content ul {
+    @apply space-y-3 list-disc list-outside ml-4 mb-6 text-zinc-400 marker:text-zinc-700;
+  }
+  .blog-content ol {
+    @apply space-y-3 list-decimal list-outside ml-4 mb-6 text-zinc-400 marker:text-zinc-700;
+  }
+  .blog-content hr {
+    @apply my-12 border-t border-zinc-800;
   }
 </style>
