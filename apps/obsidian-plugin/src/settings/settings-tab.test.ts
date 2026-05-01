@@ -4,6 +4,7 @@ import { getDefaultApiBaseUrl } from "../config";
 import {
   getButtonComponents,
   getProgressBarComponents,
+  getSettingClasses,
   getSettingDescriptions,
   getSettingNames,
   getTextComponents,
@@ -78,6 +79,7 @@ describe("SynchSettingTab", () => {
     expect(getSettingDescriptions()[0]).toBe(
       "Version 0.0.2 is available. Current version: 0.0.1.",
     );
+    expect(getSettingClasses()[1]).toContain("synch-plugin-update-available");
   });
 
   it("shows checking, up-to-date, and failed plugin update states", async () => {
@@ -104,6 +106,7 @@ describe("SynchSettingTab", () => {
     expect(getSettingDescriptions()[0]).toBe(
       "Synch is up to date. Current version: 0.0.1",
     );
+    expect(getSettingClasses()[1]).not.toContain("synch-plugin-update-available");
 
     resetObsidianMocks();
     const retryPluginUpdateCheck = vi.fn(async () => {});

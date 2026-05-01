@@ -7,6 +7,10 @@
   font-size: var(--font-ui-small);
 }
 
+.synch-plugin-update-available .setting-item-description {
+  color: var(--text-warning);
+}
+
 .synch-status-bar {
   align-items: center;
   color: var(--text-muted);

@@ -9,6 +9,7 @@ const extraButtonComponents: MockExtraButtonComponent[] = [];
 const createdElementTexts: string[] = [];
 const settingNames: string[] = [];
 const settingDescriptions: string[] = [];
+const settingClasses: string[][] = [];
 
 class MockElement {
   text = "";
@@ -260,7 +261,16 @@ export class ItemView {
 }
 
 export class Setting {
-  constructor(_containerEl: unknown) {}
+  settingEl = {
+    classes: [] as string[],
+    addClass: (value: string): void => {
+      this.settingEl.classes.push(value);
+    },
+  };
+
+  constructor(_containerEl: unknown) {
+    settingClasses.push(this.settingEl.classes);
+  }
 
   setName(value: string): this {
     settingNames.push(value);
@@ -366,6 +376,10 @@ export function getSettingDescriptions(): string[] {
   return [...settingDescriptions];
 }
 
+export function getSettingClasses(): string[][] {
+  return settingClasses.map((classes) => [...classes]);
+}
+
 export function resetObsidianMocks(): void {
   requestUrlMock = null;
   buttonComponents.length = 0;
@@ -376,6 +390,7 @@ export function resetObsidianMocks(): void {
   createdElementTexts.length = 0;
   settingNames.length = 0;
   settingDescriptions.length = 0;
+  settingClasses.length = 0;
 }
 
 export async function requestUrl(input: unknown): Promise<unknown> {

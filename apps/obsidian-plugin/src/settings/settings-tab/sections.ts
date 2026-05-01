@@ -18,6 +18,10 @@ export function renderPluginUpdateSetting(
     .setName("Plugin update")
     .setDesc(formatPluginUpdateDescription(updateStatus));
 
+  if (updateStatus.state === "update_available") {
+    updateSetting.settingEl.addClass("synch-plugin-update-available");
+  }
+
   if (updateStatus.state === "failed") {
     updateSetting.addButton((button) =>
       button.setButtonText("Retry").onClick(async () => {
