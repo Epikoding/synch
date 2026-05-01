@@ -6,6 +6,9 @@ import { CoordinatorBlobStore } from "./blob-store";
 
 type CursorDb = Pick<ReturnType<typeof drizzle<typeof doSchema>>, "insert" | "select">;
 
+const BETA_STORAGE_LIMIT_BYTES = 1_000_000_000;
+const BETA_MAX_FILE_SIZE_BYTES = 10_000_000;
+
 export class CoordinatorCursorStore {
 	private readonly blobStore: CoordinatorBlobStore;
 
@@ -18,7 +21,7 @@ export class CoordinatorCursorStore {
 	}
 
 	rememberVaultId(vaultId: string): void {
-		rememberVaultId(this.getDb(), vaultId);
+		initializeVaultState(this.getDb(), vaultId);
 	}
 
 	readVaultId(): string | null {
@@ -52,6 +55,8 @@ export class CoordinatorCursorStore {
 				id: 1,
 				vaultId: input.vaultId,
 				currentCursor: input.cursor,
+				storageLimitBytes: BETA_STORAGE_LIMIT_BYTES,
+				maxFileSizeBytes: BETA_MAX_FILE_SIZE_BYTES,
 				lastCommitAt: input.now,
 			})
 			.onConflictDoUpdate({
@@ -74,7 +79,7 @@ export class CoordinatorCursorStore {
 	}
 
 	rememberVaultIdInTransaction(db: CursorDb, vaultId: string): void {
-		rememberVaultId(db, vaultId);
+		initializeVaultState(db, vaultId);
 	}
 
 	currentCursorInTransaction(db: CursorDb): number {
@@ -126,12 +131,14 @@ export class CoordinatorCursorStore {
 	}
 }
 
-function rememberVaultId(db: CursorDb, vaultId: string): void {
+function initializeVaultState(db: CursorDb, vaultId: string): void {
 	db.insert(doSchema.coordinatorState)
 		.values({
 			id: 1,
 			vaultId,
 			currentCursor: currentCursor(db),
+			storageLimitBytes: BETA_STORAGE_LIMIT_BYTES,
+			maxFileSizeBytes: BETA_MAX_FILE_SIZE_BYTES,
 		})
 		.onConflictDoUpdate({
 			target: doSchema.coordinatorState.id,
