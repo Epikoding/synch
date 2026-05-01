@@ -15,7 +15,7 @@ import { DexieSyncStore } from "./store";
 import type { SyncConnection, SyncStore } from "../store";
 
 export async function createDexieSyncStore(plugin: Plugin): Promise<SyncStore> {
-  const store = new DexieSyncStore(plugin, getOrCreateLocalVaultId(plugin));
+  const store = new DexieSyncStore(getOrCreateLocalVaultId(plugin));
   await store.initialize();
   return store;
 }

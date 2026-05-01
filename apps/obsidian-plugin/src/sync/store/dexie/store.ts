@@ -1,5 +1,3 @@
-import type { Plugin } from "obsidian";
-
 import type {
   CachedSyncBlobRow,
   DeletedSyncEntryRow,
@@ -45,10 +43,7 @@ import type { EntryRecord, MetadataRecord } from "./records";
 export class DexieSyncStore implements SyncStore {
   private readonly db: SyncDexieDatabase;
 
-  constructor(
-    private readonly plugin: Plugin,
-    private readonly localVaultId: string,
-  ) {
+  constructor(private readonly localVaultId: string) {
     this.db = new SyncDexieDatabase(syncStoreDbName(localVaultId));
   }
 

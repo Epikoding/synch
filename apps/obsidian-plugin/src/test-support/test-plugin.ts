@@ -82,9 +82,7 @@ export function createTestPlugin(): Plugin {
   } as unknown as Plugin;
 }
 
-export async function createInitializedTestSyncStore(
-  plugin: Plugin = createTestPlugin(),
-): Promise<SyncStore> {
+export async function createInitializedTestSyncStore(): Promise<SyncStore> {
   const store = new InMemorySyncStore();
   await store.writeSyncConnection({
     localVaultId: await store.readLocalVaultId(),

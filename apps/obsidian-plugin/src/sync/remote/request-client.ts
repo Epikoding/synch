@@ -1,6 +1,5 @@
 import {
   defaultHttpClient,
-  extractErrorMessage,
   stripTrailingSlash,
   type HttpClient,
   type HttpResponseLike,

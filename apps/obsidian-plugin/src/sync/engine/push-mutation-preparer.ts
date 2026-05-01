@@ -5,7 +5,6 @@ import { queueLocalUpsertMutation } from "../core/mutation-queue";
 import type { SyncTokenResponse } from "../remote/client";
 import type { PendingMutationRow } from "../store/store";
 import type {
-  PreparedPushMutation,
   PreparePushMutationResult,
   PushMutationCommitterDeps,
   PushMutationStore,

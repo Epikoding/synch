@@ -78,7 +78,7 @@ export class SyncVersionHistoryService {
         throw new Error("Sync local changes before restoring version history.");
       }
 
-      await this.restoreEntryVersion(store, entry, version);
+      await this.restoreEntryVersion(entry, version);
     });
   }
 
@@ -103,7 +103,7 @@ export class SyncVersionHistoryService {
         throw new Error("No restorable version exists for this deleted file.");
       }
 
-      await this.restoreEntryVersion(store, entry, version);
+      await this.restoreEntryVersion(entry, version);
     });
   }
 
@@ -133,7 +133,6 @@ export class SyncVersionHistoryService {
   }
 
   private async restoreEntryVersion(
-    store: SyncVersionHistoryStore,
     entry: SyncEntryRow,
     version: EntryVersion,
   ): Promise<void> {

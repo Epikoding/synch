@@ -23,7 +23,6 @@ import type {
   PushMutationCommitResult,
   PushMutationCommitterDeps,
   PushMutationStore,
-  SkippedPushMutation,
 } from "./push-mutation-types";
 
 export type {
