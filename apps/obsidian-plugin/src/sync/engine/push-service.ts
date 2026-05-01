@@ -41,10 +41,7 @@ export interface SyncPushServiceDeps {
 export interface SyncPushStore
   extends SyncCursorStore,
     Pick<SyncEntryStore, "countSyncProgress">,
-    Pick<
-      SyncMutationStore,
-      "listDirtyEntries" | "unblockDirtyEntriesByReason"
-    >,
+    Pick<SyncMutationStore, "listDirtyEntries">,
     Pick<SyncStoreLifecycle, "flush">,
     PushMutationStore {}
 
@@ -95,13 +92,6 @@ export class SyncPushService {
     let stopAfterCurrentBatch = false;
 
     try {
-      if (
-        session.storageLimitBytes <= 0 ||
-        session.storageUsedBytes < session.storageLimitBytes
-      ) {
-        await store.unblockDirtyEntriesByReason("storage_quota_exceeded");
-      }
-
       while (processedMutations < DEFAULT_PUSH_DRAIN_LIMIT) {
         const remainingBudget = DEFAULT_PUSH_DRAIN_LIMIT - processedMutations;
         const pending = await store.listDirtyEntries(

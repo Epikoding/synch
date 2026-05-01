@@ -13,6 +13,51 @@ type VaultEventCallback = (...args: unknown[]) => void;
 const TEST_VAULT_KEY = new Uint8Array(Array.from({ length: 32 }, (_, index) => index + 1));
 
 describe("SyncEngine", () => {
+  it("unblocks quota-blocked mutations without unblocking file-size blocks", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    await store.markEntryDirty({
+      mutationId: "mutation-quota",
+      entryId: "entry-quota",
+      op: "upsert",
+      status: "blocked",
+      blockedReason: "storage_quota_exceeded",
+      baseRevision: 0,
+      blobId: "blob-quota",
+      hash: "hash-quota",
+      encryptedMetadata: "metadata-quota",
+      createdAt: 1,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-large",
+      entryId: "entry-large",
+      op: "upsert",
+      status: "blocked",
+      blockedReason: "file_too_large",
+      baseRevision: 0,
+      blobId: "blob-large",
+      hash: "hash-large",
+      encryptedMetadata: "metadata-large",
+      createdAt: 2,
+    });
+    const engine = createEngine(plugin);
+    engine.setStore(store);
+
+    await engine.unblockQuotaBlockedMutations();
+
+    const pending = await store.listDirtyEntries();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.mutationId).toBe("mutation-quota");
+    expect(pending[0]?.status).toBeUndefined();
+    expect(pending[0]?.blockedReason).toBeUndefined();
+    expect(await store.getDirtyEntryMutation("entry-large")).toMatchObject({
+      mutationId: "mutation-large",
+      status: "blocked",
+      blockedReason: "file_too_large",
+    });
+    await store.close();
+  });
+
   it("does not let baseline progress overwrite an active pull", async () => {
     const plugin = createPlugin({}, async () => encodeUtf8("body"));
     const store = await createInitializedTestSyncStore(plugin);

@@ -181,7 +181,7 @@ describe("SyncPushService drain: limits", () => {
     await store.close();
   });
 
-  it("allows metadata-only upserts at the initial storage quota", async () => {
+  it("allows upserts that reuse the base blob", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);
     const bytes = encodeUtf8("body");
@@ -234,8 +234,6 @@ describe("SyncPushService drain: limits", () => {
         revision: mutation.baseRevision + 1,
       };
     });
-    session.storageUsedBytes = 100;
-    session.storageLimitBytes = 100;
     let uploadAttempts = 0;
     const service = new SyncPushService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",

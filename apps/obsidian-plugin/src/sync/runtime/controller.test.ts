@@ -11,12 +11,17 @@ describe("SyncController", () => {
   });
 
   it("schedules a push on startup when persisted pending mutations remain", async () => {
-    vi.spyOn(SyncEngine.prototype, "reconcileOnce").mockResolvedValue({
+    const reconcileOnce = vi.spyOn(SyncEngine.prototype, "reconcileOnce").mockResolvedValue({
       filesScanned: 1,
       filesQueuedForUpsert: 0,
       filesQueuedForDelete: 0,
     });
-    vi.spyOn(SyncEngine.prototype, "hasPendingMutations").mockResolvedValue(true);
+    const unblockQuotaBlockedMutations = vi
+      .spyOn(SyncEngine.prototype, "unblockQuotaBlockedMutations")
+      .mockResolvedValue();
+    const hasPendingMutations = vi
+      .spyOn(SyncEngine.prototype, "hasPendingMutations")
+      .mockResolvedValue(true);
     const startAutoSync = vi
       .spyOn(SyncEngine.prototype, "startAutoSync")
       .mockResolvedValue(true);
@@ -29,7 +34,14 @@ describe("SyncController", () => {
     await controller.ensureAutoSyncState();
 
     expect(startAutoSync).toHaveBeenCalledTimes(1);
+    expect(unblockQuotaBlockedMutations).toHaveBeenCalledTimes(1);
     expect(notifyLocalChange).toHaveBeenCalledTimes(1);
+    expect(reconcileOnce.mock.invocationCallOrder[0]).toBeLessThan(
+      unblockQuotaBlockedMutations.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(unblockQuotaBlockedMutations.mock.invocationCallOrder[0]).toBeLessThan(
+      hasPendingMutations.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(startAutoSync.mock.invocationCallOrder[0]).toBeLessThan(
       notifyLocalChange.mock.invocationCallOrder[0] ?? 0,
     );

@@ -159,6 +159,7 @@ export class SyncController {
 
     try {
       const reconcile = await this.syncEngine.reconcileOnce();
+      await this.syncEngine.unblockQuotaBlockedMutations();
       await this.syncEngine.waitForLocalMutationWork();
       await this.syncEngine.startAutoSync();
       const hasPendingMutations = await this.syncEngine.hasPendingMutations();
