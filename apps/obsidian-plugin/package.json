@@ -8,6 +8,8 @@
     "dev": "node esbuild.config.mjs",
     "build": "tsgo --noEmit --skipLibCheck && node esbuild.config.mjs production",
     "bump:version": "node scripts/bump-release-version.mjs",
+    "release-notes:prepare": "node scripts/prepare-release-notes.mjs",
+    "release-notes:reset": "node scripts/reset-release-notes.mjs",
     "sync:metadata": "node scripts/sync-release-metadata.mjs",
     "release:prepare": "pnpm run sync:metadata && pnpm run build",
     "test": "vitest --config vitest.config.mts",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Obsidian Plugin Release Notes"
+  short_description: "Ensure plugin release notes before git publishing"
+  default_prompt: "Use $obsidian-plugin-release-notes before committing to main or opening a PR."
