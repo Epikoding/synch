@@ -15,6 +15,13 @@
       "when": 1777534317126,
       "tag": "0001_milky_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1777597832142,
+      "tag": "0002_lazy_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

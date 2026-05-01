@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import type { SyncTokenService } from "../access/token-service";
 import type { CoordinatorProxyRepository } from "../coordinator/proxy-repository";
-import type { SubscriptionPolicyReader } from "../../subscription/policy-service";
 import { blobObjectKey } from "./object-key";
 import type { BlobRepository } from "./repository";
 import { BLOB_SIZE_HEADER, parseBlobSizeHeader } from "./size";
@@ -15,7 +14,6 @@ export function registerBlobRoutes(
 		syncTokenService: SyncTokenService;
 		blobRepository: BlobRepository;
 		coordinatorProxyRepository: CoordinatorProxyRepository;
-		subscriptionPolicyService: SubscriptionPolicyReader;
 	},
 ): void {
 	app.put(
@@ -31,7 +29,7 @@ export function registerBlobRoutes(
 			const request = c.req.raw;
 			const { vaultId, blobId } = c.req.valid("param");
 
-			const claims = await deps.syncTokenService.requireSyncToken(request, vaultId);
+			await deps.syncTokenService.requireSyncToken(request, vaultId);
 			if (!request.body) {
 				return c.json(
 					{
@@ -51,20 +49,6 @@ export function registerBlobRoutes(
 					400,
 				);
 			}
-			const policy = await deps.subscriptionPolicyService.readVaultPolicy(claims.vaultId);
-			if (
-				policy.limits.maxFileSizeBytes > 0 &&
-				declaredSize > policy.limits.maxFileSizeBytes
-			) {
-				return c.json(
-					{
-						error: "file_too_large",
-						message: `blob exceeds maximum file size of ${policy.limits.maxFileSizeBytes} bytes`,
-					},
-					413,
-				);
-			}
-
 			const staged = await deps.coordinatorProxyRepository.stageBlob(
 				vaultId,
 				blobId,

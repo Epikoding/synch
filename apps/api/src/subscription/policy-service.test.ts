@@ -39,15 +39,12 @@ describe("SubscriptionPolicyService", () => {
 		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});
 
-	it("applies organization limit overrides on top of the plan policy", async () => {
+	it("applies organization synced vault overrides on top of the plan policy", async () => {
 		const policy = await new SubscriptionPolicyService(
 			false,
 			fakePolicyDb({
 				organization: {
 					syncedVaultsOverride: 3,
-					storageLimitBytesOverride: 5_000_000_000,
-					maxFileSizeBytesOverride: 50_000_000,
-					versionHistoryRetentionDaysOverride: 30,
 				},
 				subscriptions: [],
 			}),
@@ -55,17 +52,14 @@ describe("SubscriptionPolicyService", () => {
 
 		expect(policy.id).toBe("free");
 		expect(policy.limits.syncedVaults).toBe(3);
-		expect(policy.limits.storageLimitBytes).toBe(5_000_000_000);
-		expect(policy.limits.maxFileSizeBytes).toBe(50_000_000);
-		expect(policy.limits.versionHistoryRetentionDays).toBe(30);
+		expect(policy.limits.storageLimitBytes).toBe(100_000_000);
+		expect(policy.limits.maxFileSizeBytes).toBe(3_000_000);
+		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});
 
 	it("keeps plan limits when organization overrides are null", () => {
 		const policy = applySubscriptionPlanLimitOverrides(getSubscriptionPlanPolicy("free"), {
 			syncedVaults: null,
-			storageLimitBytes: null,
-			maxFileSizeBytes: null,
-			versionHistoryRetentionDays: null,
 		});
 
 		expect(policy.limits.syncedVaults).toBe(1);
@@ -77,15 +71,12 @@ describe("SubscriptionPolicyService", () => {
 	it("allows zero-valued organization overrides", () => {
 		const policy = applySubscriptionPlanLimitOverrides(getSubscriptionPlanPolicy("free"), {
 			syncedVaults: 0,
-			storageLimitBytes: 0,
-			maxFileSizeBytes: 0,
-			versionHistoryRetentionDays: 0,
 		});
 
 		expect(policy.limits.syncedVaults).toBe(0);
-		expect(policy.limits.storageLimitBytes).toBe(0);
-		expect(policy.limits.maxFileSizeBytes).toBe(0);
-		expect(policy.limits.versionHistoryRetentionDays).toBe(0);
+		expect(policy.limits.storageLimitBytes).toBe(100_000_000);
+		expect(policy.limits.maxFileSizeBytes).toBe(3_000_000);
+		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});
 
 	it("keeps period-scoped subscription access until the paid period ends", () => {
@@ -113,9 +104,6 @@ describe("SubscriptionPolicyService", () => {
 function fakePolicyDb(input: {
 	organization: {
 		syncedVaultsOverride: number | null;
-		storageLimitBytesOverride: number | null;
-		maxFileSizeBytesOverride: number | null;
-		versionHistoryRetentionDaysOverride: number | null;
 	} | null;
 	subscriptions: Array<{ status: string; periodEnd: Date | null }>;
 }): D1Db {

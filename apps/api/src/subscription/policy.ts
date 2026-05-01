@@ -28,9 +28,6 @@ export type SubscriptionPlanPolicy = {
 
 export type SubscriptionPlanLimitOverrides = {
 	syncedVaults?: number | null;
-	storageLimitBytes?: number | null;
-	maxFileSizeBytes?: number | null;
-	versionHistoryRetentionDays?: number | null;
 };
 
 export const SUBSCRIPTION_PLAN_POLICIES = {
@@ -109,13 +106,9 @@ export function applySubscriptionPlanLimitOverrides(
 		limits: {
 			syncedVaults:
 				overrides.syncedVaults ?? policy.limits.syncedVaults,
-			storageLimitBytes:
-				overrides.storageLimitBytes ?? policy.limits.storageLimitBytes,
-			maxFileSizeBytes:
-				overrides.maxFileSizeBytes ?? policy.limits.maxFileSizeBytes,
-			versionHistoryRetentionDays:
-				overrides.versionHistoryRetentionDays ??
-				policy.limits.versionHistoryRetentionDays,
+			storageLimitBytes: policy.limits.storageLimitBytes,
+			maxFileSizeBytes: policy.limits.maxFileSizeBytes,
+			versionHistoryRetentionDays: policy.limits.versionHistoryRetentionDays,
 		},
 	};
 }

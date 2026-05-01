@@ -11,10 +11,6 @@ import type {
 	RestoreEntryVersionResult,
 	SocketSession,
 } from "./types";
-import {
-	SubscriptionPolicyService,
-	type SubscriptionPolicyReader,
-} from "../../subscription/policy-service";
 import type { SyncTokenService } from "../access/token-service";
 import { blobObjectKeyPrefix } from "../blob/object-key";
 import { BlobRepository } from "../blob/repository";
@@ -51,8 +47,6 @@ export class CoordinatorService {
 		private readonly socketService: CoordinatorSocketService,
 		private readonly blobRepository: BlobRepository,
 		syncStatusRepository: VaultSyncStatusRepository | null = null,
-		private readonly subscriptionPolicyService: SubscriptionPolicyReader =
-			new SubscriptionPolicyService(),
 		blobGracePeriodMs = DEFAULT_BLOB_GRACE_PERIOD_MS,
 		cursorActiveTtlMs = DEFAULT_CURSOR_ACTIVE_TTL_MS,
 		private maintenanceScheduler: CoordinatorMaintenanceScheduler | null = null,
@@ -95,7 +89,6 @@ export class CoordinatorService {
 		this.controlMessageHandler = new CoordinatorControlMessageHandler(
 			socketService,
 			stateRepository,
-			subscriptionPolicyService,
 			{
 				ackCursor: async (session, cursor) => await this.ackCursor(session, cursor),
 				commitMutations: async (session, message) =>

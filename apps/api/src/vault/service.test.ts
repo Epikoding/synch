@@ -80,7 +80,6 @@ describe("VaultService", () => {
 		} as unknown as VaultRepository;
 		const service = new VaultService(vaultRepository, {
 			readOrganizationPolicy: vi.fn(async () => getSubscriptionPlanPolicy("self_hosted")),
-			readVaultPolicy: vi.fn(async () => getSubscriptionPlanPolicy("self_hosted")),
 		});
 
 		const created = await service.createVault("user-1", "Work", INITIAL_WRAPPER);
@@ -98,7 +97,6 @@ describe("VaultService", () => {
 		} as unknown as VaultRepository;
 		const service = new VaultService(vaultRepository, {
 			readOrganizationPolicy: vi.fn(async () => getSubscriptionPlanPolicy("self_hosted")),
-			readVaultPolicy: vi.fn(async () => getSubscriptionPlanPolicy("self_hosted")),
 		});
 
 		await expect(service.createVault("user-1", "Work", INITIAL_WRAPPER)).rejects.toMatchObject({

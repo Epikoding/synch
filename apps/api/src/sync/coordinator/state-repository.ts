@@ -100,11 +100,22 @@ export class CoordinatorStateRepository {
 		return this.healthStore.readStorageStatus();
 	}
 
-	readVersionHistoryRetentionDays(): number {
+	readVaultLimits(): {
+		storageLimitBytes: number;
+		maxFileSizeBytes: number;
+		versionHistoryRetentionDays: number;
+	} {
 		const row = this.ctx.storage.sql
-			.exec<{ version_history_retention_days: number }>(
+			.exec<{
+				storage_limit_bytes: number;
+				max_file_size_bytes: number;
+				version_history_retention_days: number;
+			}>(
 				`
-				SELECT version_history_retention_days
+				SELECT
+					storage_limit_bytes,
+					max_file_size_bytes,
+					version_history_retention_days
 				FROM coordinator_state
 				WHERE id = 1
 				`,
@@ -113,7 +124,15 @@ export class CoordinatorStateRepository {
 		if (!row) {
 			throw new Error("vault sync state is not initialized");
 		}
-		return Number(row.version_history_retention_days);
+		return {
+			storageLimitBytes: Number(row.storage_limit_bytes),
+			maxFileSizeBytes: Number(row.max_file_size_bytes),
+			versionHistoryRetentionDays: Number(row.version_history_retention_days),
+		};
+	}
+
+	readVersionHistoryRetentionDays(): number {
+		return this.readVaultLimits().versionHistoryRetentionDays;
 	}
 
 	compactSyncedCommits(now: number, activeCursorTtlMs: number, limit: number): number {

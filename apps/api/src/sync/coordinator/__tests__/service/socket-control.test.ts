@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { getSubscriptionPlanPolicy } from "../../../../subscription/policy";
 
 import {
 	createCoordinatorService,
@@ -154,10 +153,6 @@ describe("coordinator websocket control messages", () => {
 		const service = createCoordinatorService({
 			stateRepository,
 			socketService,
-			subscriptionPolicyService: {
-				readOrganizationPolicy: vi.fn(async () => getSubscriptionPlanPolicy("free")),
-				readVaultPolicy: vi.fn(async () => getSubscriptionPlanPolicy("free")),
-			},
 		});
 
 		await service.handleSocketMessage(
@@ -175,7 +170,7 @@ describe("coordinator websocket control messages", () => {
 			cursor: 11,
 			policy: {
 				storageLimitBytes: 100_000_000,
-				maxFileSizeBytes: 3_000_000,
+				maxFileSizeBytes: 10_000_000,
 			},
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
@@ -283,13 +278,10 @@ describe("coordinator websocket control messages", () => {
 		});
 	});
 
-	it("stages blobs without reading subscription policy limits", async () => {
+	it("stages blobs without subscription policy limits", async () => {
 		const session = testSocketSession();
 		const stateRepository = socketStateRepository(session);
 		const socketService = socketServiceMock(session);
-		const readVaultPolicy = vi.fn(async () =>
-			getSubscriptionPlanPolicy("self_hosted"),
-		);
 		const service = createCoordinatorService({
 			stateRepository,
 			socketService,
@@ -304,12 +296,6 @@ describe("coordinator websocket control messages", () => {
 					iat: 1,
 				})),
 			} as never,
-			subscriptionPolicyService: {
-				readOrganizationPolicy: vi.fn(async () =>
-					getSubscriptionPlanPolicy("self_hosted"),
-				),
-				readVaultPolicy,
-			},
 		});
 
 		await service.stageBlob(
@@ -325,7 +311,6 @@ describe("coordinator websocket control messages", () => {
 			expect.any(Number),
 			expect.any(Number),
 		);
-		expect(readVaultPolicy).not.toHaveBeenCalled();
 		expect(socketService.broadcastStorageStatus).toHaveBeenCalledWith({
 			type: "storage_status_updated",
 			storageStatus: {

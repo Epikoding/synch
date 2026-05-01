@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import type { D1Db } from "../db/client";
 import * as schema from "../db/d1";
@@ -10,7 +10,6 @@ import {
 
 export type SubscriptionPolicyReader = {
 	readOrganizationPolicy(organizationId: string): Promise<SubscriptionPlanPolicy>;
-	readVaultPolicy(vaultId: string): Promise<SubscriptionPlanPolicy>;
 };
 
 const ACTIVE_ACCESS_STATUSES = new Set(["active", "trialing"]);
@@ -47,10 +46,6 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 		const organizations = await this.db
 			.select({
 				syncedVaultsOverride: schema.organization.syncedVaultsOverride,
-				storageLimitBytesOverride: schema.organization.storageLimitBytesOverride,
-				maxFileSizeBytesOverride: schema.organization.maxFileSizeBytesOverride,
-				versionHistoryRetentionDaysOverride:
-					schema.organization.versionHistoryRetentionDaysOverride,
 			})
 			.from(schema.organization)
 			.where(eq(schema.organization.id, organizationId))
@@ -63,35 +58,7 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 
 		return applySubscriptionPlanLimitOverrides(basePolicy, {
 			syncedVaults: organization.syncedVaultsOverride,
-			storageLimitBytes: organization.storageLimitBytesOverride,
-			maxFileSizeBytes: organization.maxFileSizeBytesOverride,
-			versionHistoryRetentionDays:
-				organization.versionHistoryRetentionDaysOverride,
 		});
-	}
-
-	async readVaultPolicy(vaultId: string): Promise<SubscriptionPlanPolicy> {
-		if (this.selfHosted) {
-			return getSubscriptionPlanPolicy("self_hosted");
-		}
-		if (!this.db) {
-			return getSubscriptionPlanPolicy("free");
-		}
-
-		const rows = await this.db
-			.select({
-				organizationId: schema.vault.organizationId,
-			})
-			.from(schema.vault)
-			.where(and(eq(schema.vault.id, vaultId), isNull(schema.vault.deletedAt)))
-			.limit(1);
-
-		const organizationId = rows[0]?.organizationId;
-		if (!organizationId) {
-			return getSubscriptionPlanPolicy("free");
-		}
-
-		return await this.readOrganizationPolicy(organizationId);
 	}
 
 }

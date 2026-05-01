@@ -9,8 +9,6 @@ import type {
 	RestoreEntryVersionResult,
 	SocketSession,
 } from "../types";
-import type { SubscriptionPlanPolicy } from "../../../subscription/policy";
-import type { SubscriptionPolicyReader } from "../../../subscription/policy-service";
 import {
 	formatClientControlMessageError,
 	parseClientControlMessage,
@@ -42,7 +40,6 @@ export class CoordinatorControlMessageHandler {
 	constructor(
 		private readonly socketService: CoordinatorSocketService,
 		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly subscriptionPolicyService: SubscriptionPolicyReader,
 		private readonly useCases: CoordinatorControlMessageUseCases,
 		private readonly markHealthSummaryDirty: () => Promise<void>,
 	) {}
@@ -98,22 +95,17 @@ export class CoordinatorControlMessageHandler {
 					session.localVaultId,
 					parsed.lastKnownCursor,
 				);
-				const policy = await this.subscriptionPolicyService.readVaultPolicy(
-					session.vaultId,
-				);
+				const limits = this.stateRepository.readVaultLimits();
 				await this.markHealthSummaryDirty();
 				this.socketService.sendSocketMessage(ws, {
 					type: "hello_ack",
 					requestId: parsed.requestId,
 					cursor: this.stateRepository.currentCursor(),
 					policy: {
-						storageLimitBytes: policy.limits.storageLimitBytes,
-						maxFileSizeBytes: policy.limits.maxFileSizeBytes,
+						storageLimitBytes: limits.storageLimitBytes,
+						maxFileSizeBytes: limits.maxFileSizeBytes,
 					},
-					storageStatus: storageStatusWithPolicy(
-						this.stateRepository.readStorageStatus(),
-						policy,
-					),
+					storageStatus: this.stateRepository.readStorageStatus(),
 				});
 			} catch (error) {
 				this.socketService.sendSocketMessage(ws, {
@@ -243,9 +235,6 @@ export class CoordinatorControlMessageHandler {
 		}
 
 		if (parsed.type === "watch_storage_status") {
-			const policy = await this.subscriptionPolicyService.readVaultPolicy(
-				session.vaultId,
-			);
 			const nextSession = {
 				...session,
 				wantsStorageStatus: true,
@@ -253,10 +242,7 @@ export class CoordinatorControlMessageHandler {
 			this.socketService.attachSocketSession(ws, nextSession);
 			this.socketService.sendSocketMessage(ws, {
 				type: "storage_status_updated",
-				storageStatus: storageStatusWithPolicy(
-					this.stateRepository.readStorageStatus(),
-					policy,
-				),
+				storageStatus: this.stateRepository.readStorageStatus(),
 			});
 			return;
 		}
@@ -275,16 +261,6 @@ export class CoordinatorControlMessageHandler {
 			message: "unsupported websocket message type",
 		});
 	}
-}
-
-function storageStatusWithPolicy(
-	status: { storageUsedBytes: number; storageLimitBytes: number },
-	policy: SubscriptionPlanPolicy,
-) {
-	return {
-		...status,
-		storageLimitBytes: policy.limits.storageLimitBytes,
-	};
 }
 
 function websocketRequestError(

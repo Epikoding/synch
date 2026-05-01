@@ -2,7 +2,6 @@ import { vi } from "vitest";
 
 import type { SyncTokenService } from "../../../access/token-service";
 import type { BlobRepository } from "../../../blob/repository";
-import type { SubscriptionPolicyReader } from "../../../../subscription/policy-service";
 import { CoordinatorService } from "../../service";
 import type { CoordinatorSocketService } from "../../socket/service";
 import type { CoordinatorStateRepository } from "../../state-repository";
@@ -44,13 +43,11 @@ export function createCoordinatorService({
 	stateRepository = createMockCoordinatorStateRepository(),
 	socketService = createMockCoordinatorSocketService(),
 	blobRepository = {} as BlobRepository,
-	subscriptionPolicyService,
 }: {
 	syncTokenService?: SyncTokenService;
 	stateRepository?: CoordinatorStateRepository;
 	socketService?: CoordinatorSocketService;
 	blobRepository?: BlobRepository;
-	subscriptionPolicyService?: SubscriptionPolicyReader;
 } = {}): CoordinatorService {
 	return new CoordinatorService(
 		syncTokenService,
@@ -58,7 +55,6 @@ export function createCoordinatorService({
 		socketService,
 		blobRepository,
 		null,
-		subscriptionPolicyService,
 	);
 }
 
@@ -83,6 +79,11 @@ export function socketStateRepository(_session = testSocketSession()) {
 		readStorageStatus: vi.fn(() => ({
 			storageUsedBytes: 24_300_000,
 			storageLimitBytes: 100_000_000,
+		})),
+		readVaultLimits: vi.fn(() => ({
+			storageLimitBytes: 100_000_000,
+			maxFileSizeBytes: 10_000_000,
+			versionHistoryRetentionDays: 1,
 		})),
 		readVersionHistoryRetentionDays: vi.fn(() => 1),
 	});

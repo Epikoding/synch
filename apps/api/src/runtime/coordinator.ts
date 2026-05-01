@@ -1,5 +1,3 @@
-import { createDb } from "../db/client";
-import { SubscriptionPolicyService } from "../subscription/policy-service";
 import { SyncTokenService } from "../sync/access/token-service";
 import { BlobRepository } from "../sync/blob/repository";
 import { CoordinatorMaintenanceScheduler } from "../sync/coordinator/maintenance-scheduler";
@@ -15,17 +13,12 @@ export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
 	const blobRepository = new BlobRepository(env.SYNC_BLOBS);
 	const syncStatusRepository = new VaultSyncStatusRepository(env.DB);
 	const syncTokenService = new SyncTokenService(env.SYNC_TOKEN_SECRET);
-	const subscriptionPolicyService = new SubscriptionPolicyService(
-		env.SELF_HOSTED,
-		createDb(env.DB),
-	);
 	const coordinatorService = new CoordinatorService(
 		syncTokenService,
 		stateRepository,
 		socketService,
 		blobRepository,
 		syncStatusRepository,
-		subscriptionPolicyService,
 	);
 	const maintenanceScheduler = new CoordinatorMaintenanceScheduler(ctx, {
 		blob_gc: async (now) => {
