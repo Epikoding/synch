@@ -96,6 +96,126 @@ describe("sync durable object mutation integration", () => {
 		expect(committed.entries).toEqual(["entry-1"]);
 	});
 
+	it("assigns consecutive cursors to accepted mutations in one batch", async () => {
+		const primary = await signUpAndCreateVault();
+		await initializeCoordinatorState(primary.vaultId);
+		const stub = env.SYNC_COORDINATOR.getByName(primary.vaultId);
+
+		const committed = await runInDurableObject(stub, async (instance, state) => {
+			const coordinator = instance as unknown as {
+				commitMutations: (
+					session: SyncDoSession,
+					message: {
+						type: "commit_mutations";
+						requestId: string;
+						mutations: SyncMutation[];
+					},
+				) => Promise<{
+					message: {
+						type: string;
+						requestId: string;
+						cursor: number;
+						results: Array<{
+							status: "accepted" | "rejected";
+							mutationId: string;
+							entryId: string;
+							cursor?: number;
+							revision?: number;
+							code?: string;
+						}>;
+					};
+					broadcastCursor: number | null;
+				}>;
+			};
+
+			const session = {
+				userId: primary.userId,
+				localVaultId: "local-vault-a",
+				vaultId: primary.vaultId,
+			};
+
+			const result = await coordinator.commitMutations(session, {
+				type: "commit_mutations",
+				requestId: "request-cursor-batch",
+				mutations: [
+					{
+						mutationId: "mutation-a",
+						entryId: "entry-a",
+						op: "upsert",
+						baseRevision: 0,
+						blobId: null,
+						encryptedMetadata: "ciphertext-a",
+					},
+					{
+						mutationId: "mutation-b",
+						entryId: "entry-b",
+						op: "upsert",
+						baseRevision: 0,
+						blobId: null,
+						encryptedMetadata: "ciphertext-b",
+					},
+					{
+						mutationId: "mutation-c",
+						entryId: "entry-c",
+						op: "upsert",
+						baseRevision: 1,
+						blobId: null,
+						encryptedMetadata: "ciphertext-c",
+					},
+				],
+			});
+			const stateRow = state.storage.sql
+				.exec<{ current_cursor: number }>(
+					"SELECT current_cursor FROM coordinator_state WHERE id = 1",
+				)
+				.toArray()[0];
+			const entries = state.storage.sql
+				.exec<{ entry_id: string; updated_seq: number }>(
+					"SELECT entry_id, updated_seq FROM entries ORDER BY entry_id",
+				)
+				.toArray();
+
+			return {
+				result,
+				currentCursor: Number(stateRow?.current_cursor ?? 0),
+				entries: entries.map((entry) => ({
+					entryId: entry.entry_id,
+					updatedSeq: Number(entry.updated_seq),
+				})),
+			};
+		});
+
+		expect(committed.result.message.results).toMatchObject([
+			{
+				status: "accepted",
+				mutationId: "mutation-a",
+				entryId: "entry-a",
+				cursor: 1,
+				revision: 1,
+			},
+			{
+				status: "accepted",
+				mutationId: "mutation-b",
+				entryId: "entry-b",
+				cursor: 2,
+				revision: 1,
+			},
+			{
+				status: "rejected",
+				mutationId: "mutation-c",
+				entryId: "entry-c",
+				code: "stale_revision",
+			},
+		]);
+		expect(committed.result.message.cursor).toBe(2);
+		expect(committed.result.broadcastCursor).toBe(2);
+		expect(committed.currentCursor).toBe(2);
+		expect(committed.entries).toEqual([
+			{ entryId: "entry-a", updatedSeq: 1 },
+			{ entryId: "entry-b", updatedSeq: 2 },
+		]);
+	});
+
 	it("deduplicates a latest idempotent retry from the entry row", async () => {
 		const primary = await signUpAndCreateVault();
 		await initializeCoordinatorState(primary.vaultId);

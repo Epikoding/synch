@@ -90,7 +90,33 @@ export class CoordinatorMutationStore {
 			const results: CommitMutationBatchResult[] = [];
 			let highestResponseCursor: number | null = null;
 			let highestBroadcastCursor: number | null = null;
+			let initialCursor: number | null = null;
+			let nextCursor: number | null = null;
 			const seenMutationIds = new Set<string>();
+			const allocateCursor = (): number => {
+				if (nextCursor === null) {
+					const state = tx
+						.select({
+							vaultId: doSchema.coordinatorState.vaultId,
+							currentCursor: doSchema.coordinatorState.currentCursor,
+						})
+						.from(doSchema.coordinatorState)
+						.where(eq(doSchema.coordinatorState.id, 1))
+						.limit(1)
+						.get();
+					if (!state) {
+						throw new Error("vault sync state is not initialized");
+					}
+					if (state.vaultId !== session.vaultId) {
+						throw new Error("durable object vault id mismatch");
+					}
+					initialCursor = Number(state.currentCursor);
+					nextCursor = initialCursor;
+				}
+
+				nextCursor += 1;
+				return nextCursor;
+			};
 			const insertEntryVersion = (input: {
 				versionId: string;
 				entryId: string;
@@ -266,29 +292,7 @@ export class CoordinatorMutationStore {
 					});
 				}
 
-				const state = tx
-					.select({
-						vaultId: doSchema.coordinatorState.vaultId,
-						currentCursor: doSchema.coordinatorState.currentCursor,
-					})
-					.from(doSchema.coordinatorState)
-					.where(eq(doSchema.coordinatorState.id, 1))
-					.limit(1)
-					.get();
-				if (!state) {
-					throw new Error("vault sync state is not initialized");
-				}
-				if (state.vaultId !== session.vaultId) {
-					throw new Error("durable object vault id mismatch");
-				}
-				const cursor = Number(state.currentCursor) + 1;
-				tx.update(doSchema.coordinatorState)
-					.set({
-						currentCursor: cursor,
-						lastCommitAt: now,
-					})
-					.where(eq(doSchema.coordinatorState.id, 1))
-					.run();
+				const cursor = allocateCursor();
 
 				tx.insert(doSchema.entries)
 					.values({
@@ -361,6 +365,20 @@ export class CoordinatorMutationStore {
 					entryId: mutation.entryId,
 					revision,
 				});
+			}
+
+			if (
+				nextCursor !== null &&
+				initialCursor !== null &&
+				nextCursor > initialCursor
+			) {
+				tx.update(doSchema.coordinatorState)
+					.set({
+						currentCursor: nextCursor,
+						lastCommitAt: now,
+					})
+					.where(eq(doSchema.coordinatorState.id, 1))
+					.run();
 			}
 
 			const responseCursor =
