@@ -209,7 +209,12 @@ export class PullEntryStateApplier {
       manifest,
       options,
     );
-    const pathsToWrite = uniqueSyncPaths(plans.map((plan) => plan.finalPath));
+    await this.markAlreadyCurrentVaultWrites(store, plans);
+    const pathsToWrite = uniqueSyncPaths(
+      plans
+        .filter((plan) => !plan.skipVaultWrite)
+        .map((plan) => plan.finalPath),
+    );
     const pendingConflicts: PreparedPendingConflict[] = [];
     const preparedPendingMutationIds = new Set<string>();
     const batches: PreparedPathBatch[] = [];
@@ -261,6 +266,59 @@ export class PullEntryStateApplier {
       batches,
       deferred,
     };
+  }
+
+  private async markAlreadyCurrentVaultWrites(
+    store: PullEntryStateStore,
+    plans: PlannedEntryState[],
+  ): Promise<void> {
+    for (const plan of plans) {
+      if (await this.isAlreadyAppliedToVault(store, plan)) {
+        plan.skipVaultWrite = true;
+      }
+    }
+  }
+
+  private async isAlreadyAppliedToVault(
+    store: PullEntryStateStore,
+    plan: PlannedEntryState,
+  ): Promise<boolean> {
+    if (
+      plan.state.deleted ||
+      !plan.finalPath ||
+      plan.pathConflict ||
+      plan.adoptedLocalEntry ||
+      !plan.state.blobId ||
+      !plan.hash
+    ) {
+      return false;
+    }
+
+    const pending = await store.getDirtyEntryMutation(plan.state.entryId);
+    if (pending) {
+      return false;
+    }
+
+    const remote = await store.getRemoteStateById(plan.state.entryId);
+    if (
+      !remote ||
+      remote.deleted ||
+      remote.revision !== plan.state.revision ||
+      remote.path !== plan.finalPath ||
+      remote.blobId !== plan.state.blobId ||
+      remote.hash !== plan.hash
+    ) {
+      return false;
+    }
+
+    const local = await store.getLocalStateById(plan.state.entryId);
+    return (
+      !!local &&
+      !local.deleted &&
+      local.path === plan.finalPath &&
+      local.blobId === plan.state.blobId &&
+      local.hash === plan.hash
+    );
   }
 
   private async applyPreparedManifest(
@@ -319,8 +377,8 @@ export class PullEntryStateApplier {
                 hash: plan.hash,
                 deleted: plan.state.deleted,
                 updatedAt: plan.state.updatedAt,
-                localMtime: null,
-                localSize: null,
+                localMtime: plan.skipVaultWrite ? (plan.existing?.localMtime ?? null) : null,
+                localSize: plan.skipVaultWrite ? (plan.existing?.localSize ?? null) : null,
               });
             }
             for (const pendingConflict of batchPendingConflicts) {

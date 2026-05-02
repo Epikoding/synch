@@ -26,6 +26,7 @@ export type PlannedEntryState = {
   state: RemoteEntryState;
   existing: SyncEntryRow | null;
   adoptedLocalEntry: AdoptedLocalEntry | null;
+  skipVaultWrite: boolean;
   metadata: SyncedEntryMetadata;
   finalPath: string | null;
   hash: string | null;

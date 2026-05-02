@@ -105,6 +105,80 @@ describe("SyncPullService paging", () => {
     await store.close();
   });
 
+  it("skips downloading and writing blobs already applied from an accepted push", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    const body = "already uploaded locally";
+    const path = "Folder/already-current.md";
+    const blobId = "blob-already-current";
+    const hash = await hashText(body);
+    await store.setCursor(7);
+    await store.upsertEntry({
+      entryId: "entry-current",
+      path,
+      revision: 3,
+      blobId,
+      hash,
+      deleted: false,
+      updatedAt: 1,
+      localMtime: 123,
+      localSize: body.length,
+    });
+
+    const adapter = createVaultAdapter({ [path]: body });
+    const session = createRealtimeSession({
+      pages: [
+        {
+          cursor: 8,
+          hasMore: false,
+          commits: [
+            createCommit({
+              cursor: 8,
+              entryId: "entry-current",
+              revision: 3,
+              blobId,
+              encryptedMetadata: await encryptRemoteMetadata({
+                entryId: "entry-current",
+                revision: 3,
+                blobId,
+                path,
+                hash,
+              }),
+            }),
+          ],
+        },
+      ],
+    });
+    const service = new SyncPullService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      vaultAdapter: adapter,
+      pullClient: createPullClient({}),
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.pullOnce(session)).resolves.toEqual({
+      cursor: 8,
+      entriesApplied: 1,
+      filesWritten: 0,
+      filesDeleted: 0,
+      conflictsCreated: 0,
+    });
+    expect(adapter.text(path)).toBe(body);
+    expect(await store.getCursor()).toBe(8);
+    expect(await store.getEntryById("entry-current")).toMatchObject({
+      path,
+      revision: 3,
+      blobId,
+      hash,
+      localMtime: 123,
+      localSize: body.length,
+    });
+    await store.close();
+  });
+
   it("reports remote pull progress across pages instead of capping totals at apply windows", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);

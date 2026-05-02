@@ -154,6 +154,7 @@ export class PullManifestPlanner {
         state,
         existing,
         adoptedLocalEntry,
+        skipVaultWrite: false,
         metadata,
         finalPath,
         hash,

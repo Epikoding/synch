@@ -28,7 +28,9 @@ export class PullBlobPreparer {
     token: SyncTokenResponse,
     plans: PlannedEntryState[],
   ): Promise<PreparedEntryBlob[]> {
-    const blobPlans = plans.filter((plan) => plan.finalPath && !plan.state.deleted);
+    const blobPlans = plans.filter(
+      (plan) => plan.finalPath && !plan.state.deleted && !plan.skipVaultWrite,
+    );
 
     return await mapWithConcurrency(
       blobPlans,

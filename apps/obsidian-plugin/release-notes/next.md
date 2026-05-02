@@ -12,3 +12,4 @@
 - Hide sync progress until a remote vault is connected.
 - Detach the local vault cursor on remote vault disconnect, while still allowing local disconnect when the server cannot be reached.
 - Prevent pushed local changes from advancing the pull checkpoint before earlier remote changes have been applied.
+- Avoid rewriting files during pull when the same change was already accepted from this vault.
