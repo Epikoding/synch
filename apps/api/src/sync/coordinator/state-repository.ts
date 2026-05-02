@@ -53,8 +53,8 @@ export class CoordinatorStateRepository {
 		return this.cursorStore.currentCursor();
 	}
 
-	rememberVaultId(vaultId: string): void {
-		this.cursorStore.rememberVaultId(vaultId);
+	ensureVaultState(vaultId: string): void {
+		this.cursorStore.ensureVaultState(vaultId);
 	}
 
 	readVaultId(): string | null {

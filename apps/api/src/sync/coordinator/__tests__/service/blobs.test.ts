@@ -20,7 +20,6 @@ describe("coordinator blob lifecycle", () => {
 			})),
 		} as unknown as SyncTokenService;
 		const stateRepository = createMockCoordinatorStateRepository({
-			rememberVaultId: vi.fn(),
 			readBlob: vi.fn(() => ({
 				blob_id: "blob-1",
 				state: "live",

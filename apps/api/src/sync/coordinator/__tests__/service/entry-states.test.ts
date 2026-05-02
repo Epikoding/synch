@@ -17,7 +17,6 @@ describe("coordinator entry-state sync", () => {
 			sendSocketMessage: vi.fn(),
 		});
 		const stateRepository = createMockCoordinatorStateRepository({
-			rememberVaultId: vi.fn(),
 			currentCursor: vi.fn(() => 10),
 			countEntryStates: vi.fn(() => 1),
 			listEntryStates: vi.fn(() => [

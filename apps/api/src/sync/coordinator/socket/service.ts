@@ -18,7 +18,7 @@ export class CoordinatorSocketService {
 		markHealthSummaryDirty: (now?: number) => Promise<void>,
 	): Promise<Response> {
 		const claims = await syncTokenService.requireSyncToken(request, vaultId);
-		stateRepository.rememberVaultId(claims.vaultId);
+		stateRepository.ensureVaultState(claims.vaultId);
 		const selectedProtocol = selectSyncWebSocketProtocol(request);
 		const socketPair = new WebSocketPair();
 		const client = socketPair[0];

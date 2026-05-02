@@ -27,7 +27,6 @@ export class EntryHistoryService {
 		session: SocketSession,
 		message: ListEntryVersionsMessage,
 	): Promise<EntryVersionsListedMessage> {
-		this.stateRepository.rememberVaultId(session.vaultId);
 		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
 			session.vaultId,
 		);
@@ -74,7 +73,6 @@ export class EntryHistoryService {
 		session: SocketSession,
 		message: RestoreEntryVersionMessage,
 	): Promise<RestoreEntryVersionResult> {
-		this.stateRepository.rememberVaultId(session.vaultId);
 		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
 			session.vaultId,
 		);

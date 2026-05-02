@@ -25,7 +25,6 @@ export class EntrySyncService {
 		session: SocketSession,
 		message: ListEntryStatesMessage,
 	): EntryStatesListedMessage {
-		this.stateRepository.rememberVaultId(session.vaultId);
 		const effectiveLimit = Math.min(message.limit, MAX_ENTRY_STATE_BATCH);
 		const targetCursor =
 			message.targetCursor === null
@@ -71,7 +70,6 @@ export class EntrySyncService {
 	}
 
 	async ackCursor(session: SocketSession, cursor: number): Promise<{ cursor: number }> {
-		this.stateRepository.rememberVaultId(session.vaultId);
 		this.stateRepository.recordLocalVaultCursor(
 			session.userId,
 			session.localVaultId,

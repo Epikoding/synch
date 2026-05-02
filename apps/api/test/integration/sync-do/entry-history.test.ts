@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	apiRequest,
+	initializeCoordinatorState,
 	issueSyncToken,
 	signUpAndCreateVault,
 	uniqueId,
@@ -430,6 +431,7 @@ describe("sync durable object entry history integration", () => {
 		const now = Date.now();
 		const oldTimestamp = now - 25 * 60 * 60 * 1000;
 
+		await initializeCoordinatorState(primary.vaultId);
 		await runInDurableObject(stub, async (_instance, state) => {
 			state.storage.sql.exec(
 				`

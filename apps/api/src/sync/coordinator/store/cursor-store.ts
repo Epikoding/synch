@@ -24,8 +24,8 @@ export class CoordinatorCursorStore {
 		return currentCursor(this.getDb());
 	}
 
-	rememberVaultId(vaultId: string): void {
-		initializeVaultState(this.getDb(), vaultId);
+	ensureVaultState(vaultId: string): void {
+		ensureVaultState(this.getDb(), vaultId);
 	}
 
 	readVaultId(): string | null {
@@ -95,10 +95,6 @@ export class CoordinatorCursorStore {
 		);
 	}
 
-	rememberVaultIdInTransaction(db: CursorDb, vaultId: string): void {
-		initializeVaultState(db, vaultId);
-	}
-
 	currentCursorInTransaction(db: CursorDb): number {
 		return currentCursor(db);
 	}
@@ -148,7 +144,22 @@ export class CoordinatorCursorStore {
 	}
 }
 
-function initializeVaultState(db: CursorDb, vaultId: string): void {
+function ensureVaultState(db: CursorDb, vaultId: string): void {
+	const existing = db
+		.select({
+			vaultId: doSchema.coordinatorState.vaultId,
+		})
+		.from(doSchema.coordinatorState)
+		.where(eq(doSchema.coordinatorState.id, 1))
+		.limit(1)
+		.get();
+	if (existing) {
+		if (existing.vaultId !== vaultId) {
+			throw new Error("durable object vault id mismatch");
+		}
+		return;
+	}
+
 	db.insert(doSchema.coordinatorState)
 		.values({
 			id: 1,
@@ -157,12 +168,6 @@ function initializeVaultState(db: CursorDb, vaultId: string): void {
 			storageLimitBytes: BETA_STORAGE_LIMIT_BYTES,
 			maxFileSizeBytes: BETA_MAX_FILE_SIZE_BYTES,
 			versionHistoryRetentionDays: BETA_VERSION_HISTORY_RETENTION_DAYS,
-		})
-		.onConflictDoUpdate({
-			target: doSchema.coordinatorState.id,
-			set: {
-				vaultId,
-			},
 		})
 		.run();
 }

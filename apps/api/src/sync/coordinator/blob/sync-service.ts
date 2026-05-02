@@ -67,16 +67,14 @@ export class BlobSyncService {
 		vaultId: string,
 		blobId: string,
 	): Promise<void> {
-		const claims = await this.syncTokenService.requireSyncToken(request, vaultId);
-		this.stateRepository.rememberVaultId(claims.vaultId);
+		await this.syncTokenService.requireSyncToken(request, vaultId);
 		this.stateRepository.abortStagedBlob(blobId, Date.now());
 		await this.markHealthSummaryDirty();
 		this.broadcastStorageStatus();
 	}
 
 	async deleteBlob(request: Request, vaultId: string, blobId: string): Promise<void> {
-		const claims = await this.syncTokenService.requireSyncToken(request, vaultId);
-		this.stateRepository.rememberVaultId(claims.vaultId);
+		await this.syncTokenService.requireSyncToken(request, vaultId);
 		const blob = this.stateRepository.readBlob(blobId);
 		if (blob && this.stateRepository.isBlobPinned(blobId, false)) {
 			return;

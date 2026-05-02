@@ -17,7 +17,6 @@ describe("coordinator entry version history", () => {
 			sendSocketMessage: vi.fn(),
 		});
 		const stateRepository = createMockCoordinatorStateRepository({
-			rememberVaultId: vi.fn(),
 			listEntryVersions: vi.fn(() => [
 				{
 					version_id: "version-1",
@@ -67,7 +66,6 @@ describe("coordinator entry version history", () => {
 	it("restores entry history with client-reencrypted metadata", async () => {
 		const session = testSocketSession();
 		const stateRepository = createMockCoordinatorStateRepository({
-			rememberVaultId: vi.fn(),
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 2,
@@ -145,7 +143,6 @@ describe("coordinator entry version history", () => {
 	it("rejects stale client-assisted restores", async () => {
 		const session = testSocketSession();
 		const stateRepository = createMockCoordinatorStateRepository({
-			rememberVaultId: vi.fn(),
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 3,
@@ -189,7 +186,6 @@ describe("coordinator entry version history", () => {
 	it("rejects restores when the client payload does not match the version", async () => {
 		const session = testSocketSession();
 		const stateRepository = createMockCoordinatorStateRepository({
-			rememberVaultId: vi.fn(),
 			readEntry: vi.fn(() => ({
 				entry_id: "entry-1",
 				revision: 2,
