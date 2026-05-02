@@ -3,7 +3,7 @@ import type { CoordinatorStateRepository } from "../state-repository";
 import type { VaultSyncStatusRepository } from "../../health/status-repository";
 
 const HEALTH_SUMMARY_DIRTY_WRITE_INTERVAL_MS = 60 * 1000;
-const DEFAULT_HEALTH_SUMMARY_FLUSH_DELAY_MS = 60 * 1000;
+const DEFAULT_HEALTH_SUMMARY_FLUSH_DELAY_MS = 10 * 60 * 1000;
 
 export class HealthSyncService {
 	private lastDirtyWriteAt: number | null = null;

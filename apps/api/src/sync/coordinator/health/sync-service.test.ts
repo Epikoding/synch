@@ -5,7 +5,7 @@ import type { CoordinatorStateRepository } from "../state-repository";
 import type { VaultSyncStatusRepository } from "../../health/status-repository";
 
 describe("HealthSyncService", () => {
-	it("debounces dirty writes and flush scheduling for one minute", async () => {
+	it("debounces dirty writes and schedules a delayed health summary flush", async () => {
 		const stateRepository = createStateRepository();
 		const deferMaintenance = vi.fn(async () => {});
 		const service = new HealthSyncService(
@@ -24,7 +24,7 @@ describe("HealthSyncService", () => {
 		expect(deferMaintenance).toHaveBeenCalledTimes(1);
 		expect(deferMaintenance).toHaveBeenCalledWith(
 			"health_summary_flush",
-			61_000,
+			601_000,
 			1_000,
 		);
 	});
