@@ -16,7 +16,7 @@ describe("SubscriptionPolicyService", () => {
 
 		expect(policy.id).toBe("free");
 		expect(policy.limits.syncedVaults).toBe(1);
-		expect(policy.limits.storageLimitBytes).toBe(100_000_000);
+		expect(policy.limits.storageLimitBytes).toBe(50_000_000);
 		expect(policy.limits.maxFileSizeBytes).toBe(3_000_000);
 	});
 
@@ -52,7 +52,7 @@ describe("SubscriptionPolicyService", () => {
 
 		expect(policy.id).toBe("free");
 		expect(policy.limits.syncedVaults).toBe(3);
-		expect(policy.limits.storageLimitBytes).toBe(100_000_000);
+		expect(policy.limits.storageLimitBytes).toBe(50_000_000);
 		expect(policy.limits.maxFileSizeBytes).toBe(3_000_000);
 		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});
@@ -63,7 +63,7 @@ describe("SubscriptionPolicyService", () => {
 		});
 
 		expect(policy.limits.syncedVaults).toBe(1);
-		expect(policy.limits.storageLimitBytes).toBe(100_000_000);
+		expect(policy.limits.storageLimitBytes).toBe(50_000_000);
 		expect(policy.limits.maxFileSizeBytes).toBe(3_000_000);
 		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});
@@ -74,7 +74,7 @@ describe("SubscriptionPolicyService", () => {
 		});
 
 		expect(policy.limits.syncedVaults).toBe(0);
-		expect(policy.limits.storageLimitBytes).toBe(100_000_000);
+		expect(policy.limits.storageLimitBytes).toBe(50_000_000);
 		expect(policy.limits.maxFileSizeBytes).toBe(3_000_000);
 		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});

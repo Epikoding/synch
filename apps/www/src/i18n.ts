@@ -109,7 +109,7 @@ export const ui = {
 			comingSoon: "Coming Soon",
 			features: {
 				oneVault: "1 synced vault",
-				freeStorage: "100 MB storage",
+				freeStorage: "50 MB storage",
 				starterStorage: "1 GB storage",
 				freeFileSize: "3 MB max file size",
 				starterFileSize: "5 MB max file size",
@@ -204,7 +204,7 @@ export const ui = {
 			comingSoon: "준비 중",
 			features: {
 				oneVault: "vault 1개 동기화",
-				freeStorage: "저장 공간 100 MB",
+				freeStorage: "저장 공간 50 MB",
 				starterStorage: "저장 공간 1 GB",
 				freeFileSize: "파일당 최대 3 MB",
 				starterFileSize: "파일당 최대 5 MB",
