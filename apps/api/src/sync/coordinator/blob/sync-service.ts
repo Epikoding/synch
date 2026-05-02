@@ -40,7 +40,6 @@ export class BlobSyncService {
 				now + this.blobGracePeriodMs,
 			);
 			await this.deferMaintenance("blob_gc", now + this.blobGracePeriodMs, now);
-			await this.scheduleHealthSummaryFlush(now);
 			this.broadcastStorageStatus();
 		} catch (error) {
 			if (error instanceof Error && error.message.includes("not initialized")) {

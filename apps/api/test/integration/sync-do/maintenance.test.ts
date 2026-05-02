@@ -36,7 +36,7 @@ describe("sync durable object maintenance integration", () => {
 			};
 		});
 
-		expect(scheduled.keys).toEqual(["blob_gc", "health_summary_flush"]);
+		expect(scheduled.keys).toEqual(["blob_gc"]);
 		expect(scheduled.alarm).toEqual(expect.any(Number));
 
 		await runInDurableObject(stub, async (instance, state) => {
