@@ -24,14 +24,13 @@ export class VaultSyncStatusRepository {
 					oldest_pending_delete_age_ms,
 					last_commit_at,
 					last_gc_at,
-					last_activity_at,
 					last_flushed_at,
 					last_flush_error,
 					last_flush_error_at,
 					created_at,
 					updated_at
 				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
 				ON CONFLICT(vault_id) DO UPDATE SET
 					health_status = excluded.health_status,
 					health_reasons_json = excluded.health_reasons_json,
@@ -48,7 +47,6 @@ export class VaultSyncStatusRepository {
 					oldest_pending_delete_age_ms = excluded.oldest_pending_delete_age_ms,
 					last_commit_at = excluded.last_commit_at,
 					last_gc_at = excluded.last_gc_at,
-					last_activity_at = excluded.last_activity_at,
 					last_flushed_at = excluded.last_flushed_at,
 					last_flush_error = NULL,
 					last_flush_error_at = NULL,
@@ -72,7 +70,6 @@ export class VaultSyncStatusRepository {
 				summary.oldestPendingDeleteAgeMs,
 				summary.lastCommitAt,
 				summary.lastGcAt,
-				summary.lastActivityAt,
 				flushedAt,
 				flushedAt,
 				flushedAt,

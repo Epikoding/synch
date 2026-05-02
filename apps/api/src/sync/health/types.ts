@@ -17,5 +17,4 @@ export type VaultSyncStatusSummary = {
 	oldestPendingDeleteAgeMs: number | null;
 	lastCommitAt: number | null;
 	lastGcAt: number | null;
-	lastActivityAt: number | null;
 };

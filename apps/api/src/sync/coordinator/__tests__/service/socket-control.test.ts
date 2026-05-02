@@ -218,7 +218,6 @@ describe("coordinator websocket control messages", () => {
 			session.userId,
 			session.localVaultId,
 		);
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenCalled();
 		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
 			type: "local_vault_detached",
 			requestId: "request-detach",
@@ -390,7 +389,6 @@ describe("coordinator websocket control messages", () => {
 		let service: ReturnType<typeof createCoordinatorService>;
 		const stateRepository = createMockCoordinatorStateRepository({
 			purgeVaultState: vi.fn(async () => {}),
-			markHealthSummaryDirty: vi.fn(),
 		});
 		const socketService = socketServiceMock();
 		vi.mocked(socketService.closeAllSockets).mockImplementation(() => {
@@ -411,7 +409,6 @@ describe("coordinator websocket control messages", () => {
 		expect(socketService.closeAllSockets).toHaveBeenCalledWith(4403, "vault deleted");
 		expect(blobRepository.deleteByPrefix).toHaveBeenCalledWith("vault-1/");
 		expect(stateRepository.purgeVaultState).toHaveBeenCalled();
-		expect(stateRepository.markHealthSummaryDirty).not.toHaveBeenCalled();
 	});
 
 	it("ignores maintenance alarms after a vault purge deletes storage", async () => {

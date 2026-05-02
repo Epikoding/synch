@@ -10,7 +10,7 @@ const MAX_ENTRY_STATE_BATCH = 500;
 export class EntrySyncService {
 	constructor(
 		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly markHealthSummaryDirty: (now?: number) => Promise<void>,
+		private readonly scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
 	) {}
 
 	listEntryStates(
@@ -67,7 +67,7 @@ export class EntrySyncService {
 			session.localVaultId,
 			cursor,
 		);
-		await this.markHealthSummaryDirty();
+		await this.scheduleHealthSummaryFlush();
 		return { cursor };
 	}
 }

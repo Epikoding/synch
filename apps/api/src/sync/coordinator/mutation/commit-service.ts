@@ -21,7 +21,7 @@ export class MutationCommitService {
 			timestamp: number,
 			now?: number,
 		) => Promise<void>,
-		private readonly markHealthSummaryDirty: (now?: number) => Promise<void>,
+		private readonly scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
 	) {}
 
 	async commitMutations(
@@ -61,7 +61,7 @@ export class MutationCommitService {
 			if (nextGcAt !== null) {
 				await this.deferMaintenance("blob_gc", nextGcAt);
 			}
-			await this.markHealthSummaryDirty();
+			await this.scheduleHealthSummaryFlush();
 		}
 		return result;
 	}

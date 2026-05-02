@@ -42,7 +42,7 @@ export class CoordinatorControlMessageHandler {
 		private readonly socketService: CoordinatorSocketService,
 		private readonly stateRepository: CoordinatorStateRepository,
 		private readonly useCases: CoordinatorControlMessageUseCases,
-		private readonly markHealthSummaryDirty: () => Promise<void>,
+		private readonly scheduleHealthSummaryFlush: () => Promise<void>,
 	) {}
 
 	async handle(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -97,7 +97,7 @@ export class CoordinatorControlMessageHandler {
 					parsed.lastKnownCursor,
 				);
 				const limits = this.stateRepository.readVaultLimits();
-				await this.markHealthSummaryDirty();
+				await this.scheduleHealthSummaryFlush();
 				this.socketService.sendSocketMessage(ws, {
 					type: "hello_ack",
 					requestId: parsed.requestId,

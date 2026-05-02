@@ -73,16 +73,8 @@ export class CoordinatorStateRepository {
 		this.cursorStore.deleteLocalVaultCursor(userId, localVaultId);
 	}
 
-	markHealthSummaryDirty(now = Date.now()): void {
-		this.healthStore.markHealthSummaryDirty(now);
-	}
-
 	recordGcCompleted(now = Date.now()): void {
 		this.healthStore.recordGcCompleted(now);
-	}
-
-	isHealthSummaryDirty(): boolean {
-		return this.healthStore.isHealthSummaryDirty();
 	}
 
 	recordHealthSummaryFlushed(now = Date.now()): void {

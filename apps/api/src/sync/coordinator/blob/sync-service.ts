@@ -20,7 +20,7 @@ export class BlobSyncService {
 			timestamp: number,
 			now?: number,
 		) => Promise<void>,
-		private readonly markHealthSummaryDirty: (now?: number) => Promise<void>,
+		private readonly scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
 	) {}
 
 	async stageBlob(
@@ -40,7 +40,7 @@ export class BlobSyncService {
 				now + this.blobGracePeriodMs,
 			);
 			await this.deferMaintenance("blob_gc", now + this.blobGracePeriodMs, now);
-			await this.markHealthSummaryDirty(now);
+			await this.scheduleHealthSummaryFlush(now);
 			this.broadcastStorageStatus();
 		} catch (error) {
 			if (error instanceof Error && error.message.includes("not initialized")) {
@@ -69,7 +69,7 @@ export class BlobSyncService {
 	): Promise<void> {
 		await this.syncTokenService.requireSyncToken(request, vaultId);
 		this.stateRepository.abortStagedBlob(blobId, Date.now());
-		await this.markHealthSummaryDirty();
+		await this.scheduleHealthSummaryFlush();
 		this.broadcastStorageStatus();
 	}
 
@@ -83,7 +83,7 @@ export class BlobSyncService {
 		await this.blobRepository.delete(blobObjectKey(vaultId, blobId));
 		if (blob) {
 			this.stateRepository.deleteBlobRecord(blobId);
-			await this.markHealthSummaryDirty();
+			await this.scheduleHealthSummaryFlush();
 			this.broadcastStorageStatus();
 		}
 	}

@@ -2,11 +2,9 @@ import type { MaintenanceJobKey } from "../maintenance-scheduler";
 import type { CoordinatorStateRepository } from "../state-repository";
 import type { VaultSyncStatusRepository } from "../../health/status-repository";
 
-const HEALTH_SUMMARY_DIRTY_WRITE_INTERVAL_MS = 60 * 1000;
 const DEFAULT_HEALTH_SUMMARY_FLUSH_DELAY_MS = 10 * 60 * 1000;
 
 export class HealthSyncService {
-	private lastDirtyWriteAt: number | null = null;
 	private scheduledFlushAt: number | null = null;
 
 	constructor(
@@ -20,15 +18,7 @@ export class HealthSyncService {
 		) => Promise<void>,
 	) {}
 
-	async markSummaryDirty(now = Date.now()): Promise<void> {
-		if (
-			this.lastDirtyWriteAt === null ||
-			now - this.lastDirtyWriteAt >= HEALTH_SUMMARY_DIRTY_WRITE_INTERVAL_MS
-		) {
-			this.stateRepository.markHealthSummaryDirty(now);
-			this.lastDirtyWriteAt = now;
-		}
-
+	async scheduleSummaryFlush(now = Date.now()): Promise<void> {
 		const flushAt = now + DEFAULT_HEALTH_SUMMARY_FLUSH_DELAY_MS;
 		if (this.scheduledFlushAt !== null && this.scheduledFlushAt <= flushAt) {
 			return;
@@ -44,9 +34,6 @@ export class HealthSyncService {
 		if (!this.syncStatusRepository) {
 			return;
 		}
-		if (!options.force && !this.stateRepository.isHealthSummaryDirty()) {
-			return;
-		}
 
 		const now = options.now ?? Date.now();
 		const summary = this.stateRepository.readHealthSummary(now, this.cursorActiveTtlMs);
@@ -57,11 +44,9 @@ export class HealthSyncService {
 		try {
 			await this.syncStatusRepository.upsert(summary, now);
 			this.stateRepository.recordHealthSummaryFlushed(now);
-			this.lastDirtyWriteAt = null;
 			this.scheduledFlushAt = null;
 		} catch (error) {
 			this.stateRepository.recordHealthSummaryFlushFailed(error, now);
-			this.lastDirtyWriteAt = now;
 			this.scheduledFlushAt = null;
 			if (options.throwOnError) {
 				throw error;

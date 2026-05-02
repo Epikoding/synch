@@ -13,45 +13,22 @@ const STORAGE_NEAR_LIMIT_RATIO = 0.8;
 export class CoordinatorHealthStore {
 	constructor(private readonly ctx: DurableObjectState) {}
 
-	markHealthSummaryDirty(now = Date.now()): void {
-		this.ctx.storage.sql.exec(
-			`
-			UPDATE coordinator_state
-			SET health_summary_dirty = 1,
-				last_activity_at = ?
-			WHERE id = 1
-			`,
-			now,
-		);
-	}
-
 	recordGcCompleted(now = Date.now()): void {
 		this.ctx.storage.sql.exec(
 			`
 			UPDATE coordinator_state
-			SET health_summary_dirty = 1,
-				last_gc_at = ?
+			SET last_gc_at = ?
 			WHERE id = 1
 			`,
 			now,
 		);
-	}
-
-	isHealthSummaryDirty(): boolean {
-		const row = this.ctx.storage.sql
-			.exec<{ health_summary_dirty: number }>(
-				"SELECT health_summary_dirty FROM coordinator_state WHERE id = 1",
-			)
-			.toArray()[0];
-		return Number(row?.health_summary_dirty ?? 0) === 1;
 	}
 
 	recordHealthSummaryFlushed(now = Date.now()): void {
 		this.ctx.storage.sql.exec(
 			`
 			UPDATE coordinator_state
-			SET health_summary_dirty = 0,
-				last_health_flushed_at = ?,
+			SET last_health_flushed_at = ?,
 				health_flush_retry_count = 0,
 				last_health_flush_error = NULL,
 				last_health_flush_error_at = NULL
@@ -65,8 +42,7 @@ export class CoordinatorHealthStore {
 		this.ctx.storage.sql.exec(
 			`
 			UPDATE coordinator_state
-			SET health_summary_dirty = 1,
-				health_flush_retry_count = health_flush_retry_count + 1,
+			SET health_flush_retry_count = health_flush_retry_count + 1,
 				last_health_flush_error = ?,
 				last_health_flush_error_at = ?
 			WHERE id = 1
@@ -93,7 +69,6 @@ export class CoordinatorHealthStore {
 				storage_used_bytes: number;
 				storage_limit_bytes: number;
 				last_commit_at: number | null;
-				last_activity_at: number | null;
 				last_gc_at: number | null;
 			}>(
 				`
@@ -103,7 +78,6 @@ export class CoordinatorHealthStore {
 					storage_used_bytes,
 					storage_limit_bytes,
 					last_commit_at,
-					last_activity_at,
 					last_gc_at
 				FROM coordinator_state
 				WHERE id = 1
@@ -159,7 +133,6 @@ export class CoordinatorHealthStore {
 			),
 			lastCommitAt: nullableNumber(state.last_commit_at),
 			lastGcAt: nullableNumber(state.last_gc_at),
-			lastActivityAt: nullableNumber(state.last_activity_at),
 		} satisfies VaultSyncStatusSummary;
 		const evaluated = evaluateHealth(summary, now);
 

@@ -64,7 +64,7 @@ export class CoordinatorService {
 			blobRepository,
 			blobGracePeriodMs,
 			async (key, timestamp, now) => await this.deferMaintenance(key, timestamp, now),
-			async (now) => await this.markHealthSummaryDirty(now),
+			async (now) => await this.scheduleHealthSummaryFlush(now),
 		);
 		this.entryHistoryService = new EntryHistoryService(
 			stateRepository,
@@ -74,7 +74,7 @@ export class CoordinatorService {
 		);
 		this.entrySyncService = new EntrySyncService(
 			stateRepository,
-			async (now) => await this.markHealthSummaryDirty(now),
+			async (now) => await this.scheduleHealthSummaryFlush(now),
 		);
 		this.mutationCommitService = new MutationCommitService(
 			stateRepository,
@@ -82,7 +82,7 @@ export class CoordinatorService {
 			blobGracePeriodMs,
 			async (vaultId) => await this.readVersionHistoryRetentionMs(vaultId),
 			async (key, timestamp, now) => await this.deferMaintenance(key, timestamp, now),
-			async (now) => await this.markHealthSummaryDirty(now),
+			async (now) => await this.scheduleHealthSummaryFlush(now),
 		);
 		this.controlMessageHandler = new CoordinatorControlMessageHandler(
 			socketService,
@@ -99,7 +99,7 @@ export class CoordinatorService {
 				restoreEntryVersion: async (session, message) =>
 					await this.restoreEntryVersion(session, message),
 			},
-			async () => await this.markHealthSummaryDirty(),
+			async () => await this.scheduleHealthSummaryFlush(),
 		);
 	}
 
@@ -113,7 +113,7 @@ export class CoordinatorService {
 			vaultId,
 			this.syncTokenService,
 			this.stateRepository,
-			async (now) => await this.markHealthSummaryDirty(now),
+			async (now) => await this.scheduleHealthSummaryFlush(now),
 		);
 	}
 
@@ -130,7 +130,7 @@ export class CoordinatorService {
 
 	async detachLocalVault(session: SocketSession): Promise<void> {
 		this.stateRepository.deleteLocalVaultCursor(session.userId, session.localVaultId);
-		await this.markHealthSummaryDirty();
+		await this.scheduleHealthSummaryFlush();
 	}
 
 	async listEntryVersions(
@@ -216,7 +216,7 @@ export class CoordinatorService {
 		if (this.vaultPurged) {
 			return;
 		}
-		await this.markHealthSummaryDirty();
+		await this.scheduleHealthSummaryFlush();
 	}
 
 	async flushHealthSummary(
@@ -225,8 +225,8 @@ export class CoordinatorService {
 		await this.healthSyncService.flushSummary(options);
 	}
 
-	private async markHealthSummaryDirty(now = Date.now()): Promise<void> {
-		await this.healthSyncService.markSummaryDirty(now);
+	private async scheduleHealthSummaryFlush(now = Date.now()): Promise<void> {
+		await this.healthSyncService.scheduleSummaryFlush(now);
 	}
 
 	private async deferMaintenance(

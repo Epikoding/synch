@@ -15,7 +15,7 @@ export class CoordinatorSocketService {
 		vaultId: string,
 		syncTokenService: SyncTokenService,
 		stateRepository: CoordinatorStateRepository,
-		markHealthSummaryDirty: (now?: number) => Promise<void>,
+		scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
 	): Promise<Response> {
 		const claims = await syncTokenService.requireSyncToken(request, vaultId);
 		stateRepository.ensureVaultState(claims.vaultId);
@@ -33,7 +33,7 @@ export class CoordinatorSocketService {
 		} satisfies SocketSession;
 		this.attachSocketSession(server, socketSession);
 		this.closeSupersededSockets(server, socketSession);
-		await markHealthSummaryDirty();
+		await scheduleHealthSummaryFlush();
 
 		return new Response(null, {
 			status: 101,

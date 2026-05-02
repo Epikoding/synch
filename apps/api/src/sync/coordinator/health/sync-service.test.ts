@@ -5,7 +5,7 @@ import type { CoordinatorStateRepository } from "../state-repository";
 import type { VaultSyncStatusRepository } from "../../health/status-repository";
 
 describe("HealthSyncService", () => {
-	it("debounces dirty writes and schedules a delayed health summary flush", async () => {
+	it("coalesces delayed health summary flush scheduling", async () => {
 		const stateRepository = createStateRepository();
 		const deferMaintenance = vi.fn(async () => {});
 		const service = new HealthSyncService(
@@ -15,12 +15,10 @@ describe("HealthSyncService", () => {
 			deferMaintenance,
 		);
 
-		await service.markSummaryDirty(1_000);
-		await service.markSummaryDirty(30_000);
-		await service.markSummaryDirty(60_999);
+		await service.scheduleSummaryFlush(1_000);
+		await service.scheduleSummaryFlush(30_000);
+		await service.scheduleSummaryFlush(60_999);
 
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenCalledTimes(1);
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenCalledWith(1_000);
 		expect(deferMaintenance).toHaveBeenCalledTimes(1);
 		expect(deferMaintenance).toHaveBeenCalledWith(
 			"health_summary_flush",
@@ -29,7 +27,7 @@ describe("HealthSyncService", () => {
 		);
 	});
 
-	it("records a new dirty write after the debounce window", async () => {
+	it("keeps the earliest scheduled flush after later activity", async () => {
 		const stateRepository = createStateRepository();
 		const deferMaintenance = vi.fn(async () => {});
 		const service = new HealthSyncService(
@@ -39,17 +37,14 @@ describe("HealthSyncService", () => {
 			deferMaintenance,
 		);
 
-		await service.markSummaryDirty(1_000);
-		await service.markSummaryDirty(61_000);
+		await service.scheduleSummaryFlush(1_000);
+		await service.scheduleSummaryFlush(61_000);
 
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenCalledTimes(2);
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenNthCalledWith(2, 61_000);
 		expect(deferMaintenance).toHaveBeenCalledTimes(1);
 	});
 
-	it("allows the next activity to mark dirty after a successful flush", async () => {
+	it("allows the next activity to schedule after a successful flush", async () => {
 		const stateRepository = createStateRepository({
-			isHealthSummaryDirty: vi.fn(() => true),
 			readHealthSummary: vi.fn(() => ({
 				vaultId: "vault-1",
 				healthStatus: "ok",
@@ -67,7 +62,6 @@ describe("HealthSyncService", () => {
 				oldestPendingDeleteAgeMs: null,
 				lastCommitAt: 1_000,
 				lastGcAt: null,
-				lastActivityAt: 1_000,
 			})),
 			recordHealthSummaryFlushed: vi.fn(),
 		});
@@ -82,12 +76,10 @@ describe("HealthSyncService", () => {
 			deferMaintenance,
 		);
 
-		await service.markSummaryDirty(1_000);
+		await service.scheduleSummaryFlush(1_000);
 		await service.flushSummary({ now: 61_000 });
-		await service.markSummaryDirty(62_000);
+		await service.scheduleSummaryFlush(62_000);
 
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenCalledTimes(2);
-		expect(stateRepository.markHealthSummaryDirty).toHaveBeenNthCalledWith(2, 62_000);
 		expect(deferMaintenance).toHaveBeenCalledTimes(2);
 	});
 });
@@ -96,8 +88,6 @@ function createStateRepository(
 	overrides: Partial<Record<keyof CoordinatorStateRepository, unknown>> = {},
 ): CoordinatorStateRepository {
 	return {
-		markHealthSummaryDirty: vi.fn(),
-		isHealthSummaryDirty: vi.fn(() => false),
 		readHealthSummary: vi.fn(() => null),
 		recordHealthSummaryFlushed: vi.fn(),
 		recordHealthSummaryFlushFailed: vi.fn(() => 1),
