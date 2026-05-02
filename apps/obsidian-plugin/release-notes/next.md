@@ -7,6 +7,7 @@
 
 ## Fixed
 
+- Avoid expensive automatic text merges when large files would exceed the merge budget.
 - Keep the version history pane available after Obsidian restarts.
 - Hide sync progress until a remote vault is connected.
 - Detach the local vault cursor on remote vault disconnect, while still allowing local disconnect when the server cannot be reached.

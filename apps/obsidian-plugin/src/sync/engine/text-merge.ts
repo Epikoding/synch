@@ -13,7 +13,7 @@ type Replacement = {
   lines: string[];
 };
 
-const MAX_AUTO_MERGE_LINES = 10_000;
+const MAX_LCS_CELLS = 2_000_000;
 
 export function mergeText3(base: string, local: string, remote: string): TextMergeResult {
   if (local === remote) {
@@ -30,9 +30,8 @@ export function mergeText3(base: string, local: string, remote: string): TextMer
   const localLines = splitLines(local);
   const remoteLines = splitLines(remote);
   if (
-    baseLines.length > MAX_AUTO_MERGE_LINES ||
-    localLines.length > MAX_AUTO_MERGE_LINES ||
-    remoteLines.length > MAX_AUTO_MERGE_LINES
+    exceedsLcsBudget(baseLines, localLines) ||
+    exceedsLcsBudget(baseLines, remoteLines)
   ) {
     return { status: "conflict" };
   }
@@ -53,6 +52,10 @@ function splitLines(text: string): string[] {
     lines.pop();
   }
   return lines;
+}
+
+function exceedsLcsBudget(left: string[], right: string[]): boolean {
+  return (left.length + 1) * (right.length + 1) > MAX_LCS_CELLS;
 }
 
 function diffReplacements(base: string[], variant: string[]): Replacement[] {

@@ -23,8 +23,8 @@ describe("mergeText3", () => {
     });
   });
 
-  it("does not attempt automatic merge for line-dense inputs", () => {
-    const base = numberedLines(10_001);
+  it("does not attempt automatic merge when the LCS budget would exceed 2M cells", () => {
+    const base = numberedLines(2_000);
     const local = `${base}local\n`;
     const remote = `remote\n${base}`;
 
