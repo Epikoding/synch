@@ -1,6 +1,7 @@
 const MAX_DRAINED_JOBS_PER_ALARM = 16;
 const MAINTENANCE_RETRY_MIN_MS = 30 * 1000;
 const MAINTENANCE_RETRY_MAX_MS = 15 * 60 * 1000;
+const BLOB_GC_ALARM_BUCKET_MS = 30 * 60 * 1000;
 
 export type MaintenanceJobKey = "blob_gc" | "health_summary_flush";
 
@@ -23,6 +24,12 @@ export class CoordinatorMaintenanceScheduler {
 		dueAt: number,
 		now = Date.now(),
 	): Promise<void> {
+		const scheduledDueAt = maintenanceJobDueAt(key, dueAt);
+		const existing = this.readJob(key);
+		if (existing && existing.dueAt <= scheduledDueAt) {
+			return;
+		}
+
 		this.ctx.storage.sql.exec(
 			`
 			INSERT INTO maintenance_jobs (key, due_at, retry_count, updated_at)
@@ -32,7 +39,7 @@ export class CoordinatorMaintenanceScheduler {
 				updated_at = excluded.updated_at
 			`,
 			key,
-			dueAt,
+			scheduledDueAt,
 			now,
 		);
 		await this.rearm();
@@ -68,7 +75,10 @@ export class CoordinatorMaintenanceScheduler {
 			return;
 		}
 
-		await this.ctx.storage.setAlarm(next);
+		const existing = await this.ctx.storage.getAlarm();
+		if (existing !== next) {
+			await this.ctx.storage.setAlarm(next);
+		}
 	}
 
 	async ensureArmed(): Promise<void> {
@@ -125,6 +135,33 @@ export class CoordinatorMaintenanceScheduler {
 		return row ? Number(row.due_at) : null;
 	}
 
+	private readJob(key: MaintenanceJobKey): MaintenanceJob | null {
+		const row = this.ctx.storage.sql
+			.exec<{
+				key: string;
+				due_at: number;
+				retry_count: number;
+			}>(
+				`
+				SELECT key, due_at, retry_count
+				FROM maintenance_jobs
+				WHERE key = ?
+				LIMIT 1
+				`,
+				key,
+			)
+			.toArray()[0];
+		if (!row || !isMaintenanceJobKey(row.key)) {
+			return null;
+		}
+
+		return {
+			key: row.key,
+			dueAt: Number(row.due_at),
+			retryCount: Number(row.retry_count),
+		};
+	}
+
 	private deleteJob(key: MaintenanceJobKey): void {
 		this.ctx.storage.sql.exec("DELETE FROM maintenance_jobs WHERE key = ?", key);
 	}
@@ -134,6 +171,7 @@ export class CoordinatorMaintenanceScheduler {
 		dueAt: number,
 		now: number,
 	): void {
+		const scheduledDueAt = maintenanceJobDueAt(key, dueAt);
 		this.ctx.storage.sql.exec(
 			`
 			INSERT INTO maintenance_jobs (key, due_at, retry_count, updated_at)
@@ -146,7 +184,7 @@ export class CoordinatorMaintenanceScheduler {
 				updated_at = excluded.updated_at
 			`,
 			key,
-			dueAt,
+			scheduledDueAt,
 			now,
 		);
 	}
@@ -188,6 +226,13 @@ function maintenanceRetryDelayMs(retryCount: number): number {
 		MAINTENANCE_RETRY_MAX_MS,
 		MAINTENANCE_RETRY_MIN_MS * 2 ** Math.max(0, retryCount - 1),
 	);
+}
+
+function maintenanceJobDueAt(key: MaintenanceJobKey, dueAt: number): number {
+	if (key !== "blob_gc") {
+		return dueAt;
+	}
+	return Math.ceil(dueAt / BLOB_GC_ALARM_BUCKET_MS) * BLOB_GC_ALARM_BUCKET_MS;
 }
 
 function formatCompactError(error: unknown): string {

@@ -16,6 +16,103 @@ describe("CoordinatorMaintenanceScheduler", () => {
 		vi.restoreAllMocks();
 	});
 
+	it("buckets blob GC alarms to the next 30 minute boundary", async () => {
+		const job: TestJob = {
+			key: "blob_gc",
+			dueAt: 0,
+			retryCount: 0,
+			lastError: null,
+			lastErrorAt: null,
+			updatedAt: 0,
+		};
+		const ctx = createTestDurableObjectState(job);
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
+			blob_gc: vi.fn(async () => null),
+			health_summary_flush: vi.fn(async () => null),
+		});
+
+		await scheduler.defer("blob_gc", 30 * 60 * 1000 + 1, 1_000);
+
+		expect(job).toMatchObject({
+			dueAt: 60 * 60 * 1000,
+			retryCount: 0,
+			updatedAt: 1_000,
+		});
+		expect(ctx.storage.setAlarm).toHaveBeenCalledWith(60 * 60 * 1000);
+	});
+
+	it("does not reset the durable object alarm when it is already scheduled for the next job", async () => {
+		const job: TestJob = {
+			key: "health_summary_flush",
+			dueAt: 10_000,
+			retryCount: 0,
+			lastError: null,
+			lastErrorAt: null,
+			updatedAt: 0,
+		};
+		const ctx = createTestDurableObjectState(job, 10_000);
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
+			blob_gc: vi.fn(async () => null),
+			health_summary_flush: vi.fn(async () => null),
+		});
+
+		await scheduler.rearm();
+
+		expect(ctx.storage.getAlarm).toHaveBeenCalled();
+		expect(ctx.storage.setAlarm).not.toHaveBeenCalled();
+	});
+
+	it("skips deferring a job when an existing schedule is already sooner", async () => {
+		const job: TestJob = {
+			key: "health_summary_flush",
+			dueAt: 10_000,
+			retryCount: 0,
+			lastError: null,
+			lastErrorAt: null,
+			updatedAt: 500,
+		};
+		const ctx = createTestDurableObjectState(job, 10_000);
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
+			blob_gc: vi.fn(async () => null),
+			health_summary_flush: vi.fn(async () => null),
+		});
+
+		await scheduler.defer("health_summary_flush", 12_000, 1_000);
+
+		expect(job).toMatchObject({
+			dueAt: 10_000,
+			updatedAt: 500,
+		});
+		expect(ctx.storage.setAlarm).not.toHaveBeenCalled();
+		expect(ctx.storage.getAlarm).not.toHaveBeenCalled();
+	});
+
+	it("skips repeated blob GC defers within the same alarm bucket", async () => {
+		const bucket = 60 * 60 * 1000;
+		const job: TestJob = {
+			key: "blob_gc",
+			dueAt: bucket,
+			retryCount: 0,
+			lastError: null,
+			lastErrorAt: null,
+			updatedAt: 500,
+		};
+		const ctx = createTestDurableObjectState(job, bucket);
+		const scheduler = new CoordinatorMaintenanceScheduler(ctx, {
+			blob_gc: vi.fn(async () => null),
+			health_summary_flush: vi.fn(async () => null),
+		});
+
+		await scheduler.defer("blob_gc", 45 * 60 * 1000, 1_000);
+
+		expect(job).toMatchObject({
+			dueAt: bucket,
+			updatedAt: 500,
+		});
+		expect(ctx.storage.setAlarm).not.toHaveBeenCalled();
+		expect(ctx.storage.getAlarm).not.toHaveBeenCalled();
+	});
+
 	it("logs failed maintenance jobs while preserving retry scheduling", async () => {
 		const now = 1_000;
 		const job: TestJob = {
@@ -64,10 +161,38 @@ describe("CoordinatorMaintenanceScheduler", () => {
 	});
 });
 
-function createTestDurableObjectState(job: TestJob): DurableObjectState {
+function createTestDurableObjectState(
+	job: TestJob,
+	initialAlarm: number | null = null,
+): DurableObjectState {
+	let alarm = initialAlarm;
 	const storage = {
 		sql: {
 			exec: vi.fn((query: string, ...params: unknown[]) => {
+				if (query.includes("SELECT key, due_at, retry_count") && query.includes("WHERE key = ?")) {
+					return {
+						toArray: () =>
+							job.dueAt === 0 || job.key !== params[0]
+								? []
+								: [
+										{
+											key: job.key,
+											due_at: job.dueAt,
+											retry_count: job.retryCount,
+										},
+									],
+					};
+				}
+
+				if (query.includes("INSERT INTO maintenance_jobs")) {
+					job.key = String(params[0]);
+					job.dueAt =
+						job.dueAt === 0 ? Number(params[1]) : Math.min(job.dueAt, Number(params[1]));
+					job.retryCount = 0;
+					job.updatedAt = Number(params[2]);
+					return { toArray: () => [] };
+				}
+
 				if (query.includes("WHERE due_at <= ?")) {
 					return {
 						toArray: () =>
@@ -101,9 +226,13 @@ function createTestDurableObjectState(job: TestJob): DurableObjectState {
 				throw new Error(`unexpected query: ${query}`);
 			}),
 		},
-		setAlarm: vi.fn(async () => {}),
-		deleteAlarm: vi.fn(async () => {}),
-		getAlarm: vi.fn(async () => null),
+		setAlarm: vi.fn(async (scheduledTime: number) => {
+			alarm = scheduledTime;
+		}),
+		deleteAlarm: vi.fn(async () => {
+			alarm = null;
+		}),
+		getAlarm: vi.fn(async () => alarm),
 	};
 
 	return { storage } as unknown as DurableObjectState;
