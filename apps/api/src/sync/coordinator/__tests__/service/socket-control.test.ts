@@ -87,6 +87,80 @@ describe("coordinator websocket control messages", () => {
 		expect(socketService.broadcastStorageStatus).not.toHaveBeenCalled();
 	});
 
+	it("does not send a commit failure after the commit response when cursor broadcast fails", async () => {
+		const session = testSocketSession();
+		const sender = testWebSocket();
+		const stateRepository = socketStateRepository(session);
+		const socketService = socketServiceMock(session);
+		const service = createCoordinatorService({ stateRepository, socketService });
+		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+		vi.spyOn(service, "commitMutations").mockResolvedValue({
+			message: {
+				type: "commit_mutations_committed",
+				requestId: "request-commit",
+				cursor: 42,
+				results: [
+					{
+						status: "accepted",
+						mutationId: "mutation-1",
+						cursor: 42,
+						entryId: "entry-1",
+						revision: 3,
+					},
+				],
+			},
+			broadcastCursor: 42,
+		});
+		vi.mocked(socketService.broadcastExcept).mockImplementation(() => {
+			throw new Error("broadcast failed");
+		});
+
+		try {
+			await service.handleSocketMessage(
+				sender,
+				JSON.stringify({
+					type: "commit_mutations",
+					requestId: "request-commit",
+					mutations: [
+						{
+							mutationId: "mutation-1",
+							entryId: "entry-1",
+							op: "delete",
+							baseRevision: 2,
+							blobId: null,
+							encryptedMetadata: "metadata",
+						},
+					],
+				}),
+			);
+		} finally {
+			consoleError.mockRestore();
+		}
+
+		expect(socketService.sendSocketMessage).toHaveBeenCalledTimes(1);
+		expect(socketService.sendSocketMessage).toHaveBeenCalledWith(sender, {
+			type: "commit_mutations_committed",
+			requestId: "request-commit",
+			cursor: 42,
+			results: [
+				{
+					status: "accepted",
+					mutationId: "mutation-1",
+					cursor: 42,
+					entryId: "entry-1",
+					revision: 3,
+				},
+			],
+		});
+		expect(socketService.sendSocketMessage).not.toHaveBeenCalledWith(
+			sender,
+			expect.objectContaining({
+				type: "commit_mutations_failed",
+				requestId: "request-commit",
+			}),
+		);
+	});
+
 	it("restores entry history over the websocket control channel and broadcasts the cursor", async () => {
 		const session = testSocketSession();
 		const sender = testWebSocket();

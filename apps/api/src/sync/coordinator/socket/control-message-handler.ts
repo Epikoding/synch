@@ -118,15 +118,9 @@ export class CoordinatorControlMessageHandler {
 		}
 
 		if (parsed.type === "commit_mutations") {
+			let result: CommitMutationsResult;
 			try {
-				const result = await this.useCases.commitMutations(session, parsed);
-				this.socketService.sendSocketMessage(ws, result.message);
-				if (result.broadcastCursor !== null) {
-					this.socketService.broadcastExcept(ws, {
-						type: "cursor_advanced",
-						cursor: result.broadcastCursor,
-					});
-				}
+				result = await this.useCases.commitMutations(session, parsed);
 			} catch (error) {
 				this.socketService.sendSocketMessage(ws, {
 					type: "commit_mutations_failed",
@@ -134,6 +128,12 @@ export class CoordinatorControlMessageHandler {
 					code: "commit_failed",
 					message: error instanceof Error ? error.message : "commit failed",
 				});
+				return;
+			}
+
+			this.socketService.sendSocketMessage(ws, result.message);
+			if (result.broadcastCursor !== null) {
+				this.broadcastCursorExcept(ws, result.broadcastCursor);
 			}
 			return;
 		}
@@ -183,15 +183,9 @@ export class CoordinatorControlMessageHandler {
 		}
 
 		if (parsed.type === "restore_entry_version") {
+			let result: RestoreEntryVersionResult;
 			try {
-				const result = await this.useCases.restoreEntryVersion(session, parsed);
-				this.socketService.sendSocketMessage(ws, result.message);
-				if (result.broadcastCursor !== null) {
-					this.socketService.broadcastExcept(ws, {
-						type: "cursor_advanced",
-						cursor: result.broadcastCursor,
-					});
-				}
+				result = await this.useCases.restoreEntryVersion(session, parsed);
 			} catch (error) {
 				const details = websocketRequestError(
 					error,
@@ -204,6 +198,12 @@ export class CoordinatorControlMessageHandler {
 					code: details.code,
 					message: details.message,
 				});
+				return;
+			}
+
+			this.socketService.sendSocketMessage(ws, result.message);
+			if (result.broadcastCursor !== null) {
+				this.broadcastCursorExcept(ws, result.broadcastCursor);
 			}
 			return;
 		}
@@ -277,6 +277,19 @@ export class CoordinatorControlMessageHandler {
 			code: "unsupported_message",
 			message: "unsupported websocket message type",
 		});
+	}
+
+	private broadcastCursorExcept(ws: WebSocket, cursor: number): void {
+		try {
+			this.socketService.broadcastExcept(ws, {
+				type: "cursor_advanced",
+				cursor,
+			});
+		} catch (error) {
+			console.error("[sync-coordinator] cursor broadcast failed", {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 }
 
