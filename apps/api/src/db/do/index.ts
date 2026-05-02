@@ -118,13 +118,12 @@ export const maintenanceJobs = sqliteTable(
 	}),
 );
 
-export const localVaultCursors = sqliteTable(
-	"local_vault_cursors",
+export const localVaultConnections = sqliteTable(
+	"local_vault_connections",
 	{
 		userId: text("user_id").notNull(),
 		localVaultId: text("local_vault_id").notNull(),
-		cursor: integer("cursor").notNull().default(0),
-		updatedAt: integer("updated_at").notNull(),
+		lastConnectedAt: integer("last_connected_at").notNull(),
 	},
 	(table) => ({
 		pk: primaryKey({ columns: [table.userId, table.localVaultId] }),

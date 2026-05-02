@@ -62,7 +62,7 @@ describe("sync durable object health integration", () => {
 				health_reasons_json: "[]",
 				current_cursor: 1,
 				entry_count: 1,
-				active_local_vault_count: 1,
+				active_local_vault_count: 0,
 			}),
 		);
 		expect(row?.last_commit_at).toEqual(expect.any(Number));

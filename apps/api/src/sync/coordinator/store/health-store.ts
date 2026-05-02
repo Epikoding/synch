@@ -107,7 +107,7 @@ export class CoordinatorHealthStore {
 					(SELECT count(*) FROM blobs WHERE state = 'pending_delete') AS pending_delete_blob_count,
 					(SELECT min(created_at) FROM blobs WHERE state = 'staged') AS oldest_staged_blob_at,
 					(SELECT min(delete_after) FROM blobs WHERE state = 'pending_delete') AS oldest_pending_delete_at,
-					(SELECT count(*) FROM local_vault_cursors WHERE updated_at >= ?) AS active_local_vault_count
+					(SELECT count(*) FROM local_vault_connections WHERE last_connected_at >= ?) AS active_local_vault_count
 				`,
 				activeSince,
 			)

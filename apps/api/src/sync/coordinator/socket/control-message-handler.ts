@@ -91,10 +91,9 @@ export class CoordinatorControlMessageHandler {
 
 		if (parsed.type === "hello") {
 			try {
-				this.stateRepository.recordLocalVaultCursor(
+				this.stateRepository.recordLocalVaultConnection(
 					session.userId,
 					session.localVaultId,
-					parsed.lastKnownCursor,
 				);
 				const limits = this.stateRepository.readVaultLimits();
 				await this.scheduleHealthSummaryFlush();

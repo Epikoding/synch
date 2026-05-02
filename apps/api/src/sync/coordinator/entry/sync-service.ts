@@ -8,10 +8,7 @@ import type { CoordinatorStateRepository } from "../state-repository";
 const MAX_ENTRY_STATE_BATCH = 500;
 
 export class EntrySyncService {
-	constructor(
-		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly scheduleHealthSummaryFlush: (now?: number) => Promise<void>,
-	) {}
+	constructor(private readonly stateRepository: CoordinatorStateRepository) {}
 
 	listEntryStates(
 		session: SocketSession,
@@ -61,13 +58,10 @@ export class EntrySyncService {
 		};
 	}
 
-	async ackCursor(session: SocketSession, cursor: number): Promise<{ cursor: number }> {
-		this.stateRepository.recordLocalVaultCursor(
-			session.userId,
-			session.localVaultId,
-			cursor,
-		);
-		await this.scheduleHealthSummaryFlush();
+	async ackCursor(
+		_session: SocketSession,
+		cursor: number,
+	): Promise<{ cursor: number }> {
 		return { cursor };
 	}
 }

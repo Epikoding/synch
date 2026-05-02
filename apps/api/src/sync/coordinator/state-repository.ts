@@ -65,12 +65,12 @@ export class CoordinatorStateRepository {
 		await this.ctx.storage.deleteAll();
 	}
 
-	recordLocalVaultCursor(userId: string, localVaultId: string, cursor: number): void {
-		this.cursorStore.recordLocalVaultCursor(userId, localVaultId, cursor);
+	recordLocalVaultConnection(userId: string, localVaultId: string): void {
+		this.cursorStore.recordLocalVaultConnection(userId, localVaultId);
 	}
 
-	deleteLocalVaultCursor(userId: string, localVaultId: string): void {
-		this.cursorStore.deleteLocalVaultCursor(userId, localVaultId);
+	deleteLocalVaultConnection(userId: string, localVaultId: string): void {
+		this.cursorStore.deleteLocalVaultConnection(userId, localVaultId);
 	}
 
 	recordGcCompleted(now = Date.now()): void {

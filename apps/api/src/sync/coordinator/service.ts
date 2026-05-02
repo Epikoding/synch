@@ -72,10 +72,7 @@ export class CoordinatorService {
 			async (session, message, options) =>
 				await this.commitMutation(session, message, options),
 		);
-		this.entrySyncService = new EntrySyncService(
-			stateRepository,
-			async (now) => await this.scheduleHealthSummaryFlush(now),
-		);
+		this.entrySyncService = new EntrySyncService(stateRepository);
 		this.mutationCommitService = new MutationCommitService(
 			stateRepository,
 			blobRepository,
@@ -129,7 +126,10 @@ export class CoordinatorService {
 	}
 
 	async detachLocalVault(session: SocketSession): Promise<void> {
-		this.stateRepository.deleteLocalVaultCursor(session.userId, session.localVaultId);
+		this.stateRepository.deleteLocalVaultConnection(
+			session.userId,
+			session.localVaultId,
+		);
 		await this.scheduleHealthSummaryFlush();
 	}
 

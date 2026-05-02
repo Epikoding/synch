@@ -72,8 +72,8 @@ export function socketServiceMock(session = testSocketSession()) {
 export function socketStateRepository(_session = testSocketSession()) {
 	return createMockCoordinatorStateRepository({
 		ensureVaultState: vi.fn(),
-		recordLocalVaultCursor: vi.fn(),
-		deleteLocalVaultCursor: vi.fn(),
+		recordLocalVaultConnection: vi.fn(),
+		deleteLocalVaultConnection: vi.fn(),
 		currentCursor: vi.fn(() => 11),
 		stageBlob: vi.fn(async () => {}),
 		readStorageStatus: vi.fn(() => ({

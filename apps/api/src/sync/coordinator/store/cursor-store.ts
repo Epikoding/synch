@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 
 import * as doSchema from "../../../db/do";
@@ -35,38 +35,20 @@ export class CoordinatorCursorStore {
 		return row?.vaultId ?? null;
 	}
 
-	recordLocalVaultCursor(userId: string, localVaultId: string, cursor: number): void {
-		recordLocalVaultCursor(this.getDb(), userId, localVaultId, cursor, Date.now());
+	recordLocalVaultConnection(userId: string, localVaultId: string): void {
+		recordLocalVaultConnection(this.getDb(), userId, localVaultId, Date.now());
 	}
 
-	deleteLocalVaultCursor(userId: string, localVaultId: string): void {
+	deleteLocalVaultConnection(userId: string, localVaultId: string): void {
 		this.getDb()
-			.delete(doSchema.localVaultCursors)
+			.delete(doSchema.localVaultConnections)
 			.where(
 				and(
-					eq(doSchema.localVaultCursors.userId, userId),
-					eq(doSchema.localVaultCursors.localVaultId, localVaultId),
+					eq(doSchema.localVaultConnections.userId, userId),
+					eq(doSchema.localVaultConnections.localVaultId, localVaultId),
 				),
 			)
 			.run();
-	}
-
-	recordCommittedLocalVaultCursor(
-		db: CursorDb,
-		input: {
-			userId: string;
-			localVaultId: string;
-			cursor: number;
-			now: number;
-		},
-	): void {
-		recordLocalVaultCursor(
-			db,
-			input.userId,
-			input.localVaultId,
-			input.cursor,
-			input.now,
-		);
 	}
 
 	currentCursorInTransaction(db: CursorDb): number {
@@ -122,28 +104,25 @@ function currentCursor(db: CursorDb): number {
 	throw new Error("vault sync state is not initialized");
 }
 
-function recordLocalVaultCursor(
+function recordLocalVaultConnection(
 	db: CursorDb,
 	userId: string,
 	localVaultId: string,
-	cursor: number,
-	updatedAt: number,
+	lastConnectedAt: number,
 ): void {
-	db.insert(doSchema.localVaultCursors)
+	db.insert(doSchema.localVaultConnections)
 		.values({
 			userId,
 			localVaultId,
-			cursor,
-			updatedAt,
+			lastConnectedAt,
 		})
 		.onConflictDoUpdate({
 			target: [
-				doSchema.localVaultCursors.userId,
-				doSchema.localVaultCursors.localVaultId,
+				doSchema.localVaultConnections.userId,
+				doSchema.localVaultConnections.localVaultId,
 			],
 			set: {
-				cursor: sql`max(${doSchema.localVaultCursors.cursor}, ${cursor})`,
-				updatedAt,
+				lastConnectedAt,
 			},
 		})
 		.run();

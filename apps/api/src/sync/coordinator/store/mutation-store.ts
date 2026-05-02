@@ -383,15 +383,6 @@ export class CoordinatorMutationStore {
 
 			const responseCursor =
 				highestResponseCursor ?? this.cursorStore.currentCursorInTransaction(tx);
-			if (highestBroadcastCursor !== null) {
-				this.cursorStore.recordCommittedLocalVaultCursor(tx, {
-					userId: session.userId,
-					localVaultId: session.localVaultId,
-					cursor: highestBroadcastCursor,
-					now,
-				});
-			}
-
 			return {
 				message: {
 					type: "commit_mutations_committed",

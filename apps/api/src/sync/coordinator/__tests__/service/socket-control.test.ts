@@ -177,6 +177,10 @@ describe("coordinator websocket control messages", () => {
 				storageLimitBytes: 100_000_000,
 			},
 		});
+		expect(stateRepository.recordLocalVaultConnection).toHaveBeenCalledWith(
+			"user-1",
+			"local-vault-1",
+		);
 	});
 
 	it("acknowledges heartbeat messages", async () => {
@@ -214,7 +218,7 @@ describe("coordinator websocket control messages", () => {
 			}),
 		);
 
-		expect(stateRepository.deleteLocalVaultCursor).toHaveBeenCalledWith(
+		expect(stateRepository.deleteLocalVaultConnection).toHaveBeenCalledWith(
 			session.userId,
 			session.localVaultId,
 		);
