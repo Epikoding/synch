@@ -103,7 +103,7 @@ describe("SyncPushService drain: basic queue", () => {
       filesCreatedOrUpdated: 1,
       filesDeleted: 1,
       conflictsCreated: 0,
-      shouldPullAfterPush: false,
+      shouldPullAfterPush: true,
       hasMore: false,
     });
     expect(progressUpdates).toEqual([{ completedEntries: 1, totalEntries: 1 }]);
@@ -139,7 +139,7 @@ describe("SyncPushService drain: basic queue", () => {
       hash: upsertHash,
     });
     expect(uploaded[0]?.blobId).toBe(upsertBlobId);
-    expect(await store.getCursor()).toBe(12);
+    expect(await store.getCursor()).toBe(0);
     expect(await store.listDirtyEntries()).toEqual([]);
     expect(await store.getEntryByPath("Folder/new.md")).toEqual({
       entryId: "entry-upsert",

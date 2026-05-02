@@ -443,7 +443,7 @@ describe("SyncPushService stale revisions", () => {
       filesCreatedOrUpdated: 1,
       filesDeleted: 0,
       conflictsCreated: 0,
-      shouldPullAfterPush: false,
+      shouldPullAfterPush: true,
       hasMore: false,
     });
     expect(committed).toHaveLength(1);

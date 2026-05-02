@@ -178,12 +178,10 @@ export class SyncPushService {
             continue;
           }
           cursor = Math.max(cursor, result.accepted.cursor);
+          shouldPullAfterPush = true;
           filesCreatedOrUpdated += result.filesCreatedOrUpdated;
           filesDeleted += result.filesDeleted;
           mutationsPushed += 1;
-        }
-        if (!stopAfterCurrentBatch) {
-          await store.setCursor(cursor);
         }
         await this.reportProgress(store);
         if (stopAfterCurrentBatch) {

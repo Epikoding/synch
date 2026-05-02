@@ -272,7 +272,7 @@ describe("SyncPushService requeue and batches", () => {
       filesCreatedOrUpdated: 1,
       filesDeleted: 0,
       conflictsCreated: 0,
-      shouldPullAfterPush: false,
+      shouldPullAfterPush: true,
       hasMore: false,
     });
     expect(committed).toHaveLength(1);
@@ -369,7 +369,7 @@ describe("SyncPushService requeue and batches", () => {
       filesCreatedOrUpdated: 0,
       filesDeleted: 125,
       conflictsCreated: 0,
-      shouldPullAfterPush: false,
+      shouldPullAfterPush: true,
       hasMore: false,
     });
     expect(batchRequests.map((batch) => batch.length)).toEqual([100, 25]);
@@ -377,7 +377,7 @@ describe("SyncPushService requeue and batches", () => {
     expect(committed[0]?.entryId).toBe("entry-delete-0");
     expect(committed[committed.length - 1]?.entryId).toBe("entry-delete-124");
     expect(await store.listDirtyEntries()).toEqual([]);
-    expect(await store.getCursor()).toBe(125);
+    expect(await store.getCursor()).toBe(0);
 
     await store.close();
   });
