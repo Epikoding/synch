@@ -90,6 +90,7 @@ export class CoordinatorMutationStore {
 			const results: CommitMutationBatchResult[] = [];
 			let highestResponseCursor: number | null = null;
 			let highestBroadcastCursor: number | null = null;
+			const seenMutationIds = new Set<string>();
 			const insertEntryVersion = (input: {
 				versionId: string;
 				entryId: string;
@@ -151,29 +152,17 @@ export class CoordinatorMutationStore {
 
 			for (const mutation of message.mutations) {
 				const mutationId = mutation.mutationId.trim();
-				const existingCommit = tx
-					.select({
-						seq: doSchema.commits.seq,
-						entryId: doSchema.commits.entryId,
-						revision: doSchema.commits.revision,
-					})
-					.from(doSchema.commits)
-					.where(eq(doSchema.commits.mutationId, mutationId))
-					.limit(1)
-					.get();
-
-				if (existingCommit) {
-					const cursor = Number(existingCommit.seq);
-					highestResponseCursor = Math.max(highestResponseCursor ?? 0, cursor);
+				if (seenMutationIds.has(mutationId)) {
 					results.push({
-						status: "accepted",
+						status: "rejected",
 						mutationId,
-						cursor,
-						entryId: existingCommit.entryId,
-						revision: Number(existingCommit.revision),
+						entryId: mutation.entryId,
+						code: "duplicate_mutation_id",
+						message: `duplicate mutation id ${mutationId} in batch`,
 					});
 					continue;
 				}
+				seenMutationIds.add(mutationId);
 
 				const current = tx
 					.select({
@@ -183,11 +172,25 @@ export class CoordinatorMutationStore {
 						encryptedMetadata: doSchema.entries.encryptedMetadata,
 						deleted: doSchema.entries.deleted,
 						updatedSeq: doSchema.entries.updatedSeq,
+						lastMutationId: doSchema.entries.lastMutationId,
 					})
 					.from(doSchema.entries)
 					.where(eq(doSchema.entries.entryId, mutation.entryId))
 					.limit(1)
 					.get();
+
+				if (current?.lastMutationId === mutationId) {
+					const cursor = Number(current.updatedSeq);
+					highestResponseCursor = Math.max(highestResponseCursor ?? 0, cursor);
+					results.push({
+						status: "accepted",
+						mutationId,
+						cursor,
+						entryId: current.entryId,
+						revision: Number(current.revision),
+					});
+					continue;
+				}
 
 				const currentRevision = Number(current?.revision ?? 0);
 				const expectedBaseRevision = Number(mutation.baseRevision);
@@ -263,23 +266,29 @@ export class CoordinatorMutationStore {
 					});
 				}
 
-				tx.insert(doSchema.commits)
-					.values({
-						mutationId,
-						entryId: mutation.entryId,
-						revision,
-					})
-					.run();
-
-				const committed = tx
+				const state = tx
 					.select({
-						seq: doSchema.commits.seq,
+						vaultId: doSchema.coordinatorState.vaultId,
+						currentCursor: doSchema.coordinatorState.currentCursor,
 					})
-					.from(doSchema.commits)
-					.where(eq(doSchema.commits.mutationId, mutationId))
+					.from(doSchema.coordinatorState)
+					.where(eq(doSchema.coordinatorState.id, 1))
 					.limit(1)
 					.get();
-				const cursor = Number(committed?.seq ?? 0);
+				if (!state) {
+					throw new Error("vault sync state is not initialized");
+				}
+				if (state.vaultId !== session.vaultId) {
+					throw new Error("durable object vault id mismatch");
+				}
+				const cursor = Number(state.currentCursor) + 1;
+				tx.update(doSchema.coordinatorState)
+					.set({
+						currentCursor: cursor,
+						lastCommitAt: now,
+					})
+					.where(eq(doSchema.coordinatorState.id, 1))
+					.run();
 
 				tx.insert(doSchema.entries)
 					.values({
@@ -292,6 +301,7 @@ export class CoordinatorMutationStore {
 						updatedAt: now,
 						updatedByUserId: session.userId,
 						updatedByLocalVaultId: session.localVaultId,
+						lastMutationId: mutationId,
 					})
 					.onConflictDoUpdate({
 						target: doSchema.entries.entryId,
@@ -304,6 +314,7 @@ export class CoordinatorMutationStore {
 							updatedAt: now,
 							updatedByUserId: session.userId,
 							updatedByLocalVaultId: session.localVaultId,
+							lastMutationId: mutationId,
 						},
 					})
 					.run();
@@ -355,8 +366,7 @@ export class CoordinatorMutationStore {
 			const responseCursor =
 				highestResponseCursor ?? this.cursorStore.currentCursorInTransaction(tx);
 			if (highestBroadcastCursor !== null) {
-				this.cursorStore.recordCommittedCursor(tx, {
-					vaultId: session.vaultId,
+				this.cursorStore.recordCommittedLocalVaultCursor(tx, {
 					userId: session.userId,
 					localVaultId: session.localVaultId,
 					cursor: highestBroadcastCursor,

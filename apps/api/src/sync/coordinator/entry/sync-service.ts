@@ -3,21 +3,13 @@ import type {
 	ListEntryStatesMessage,
 	SocketSession,
 } from "../types";
-import type { MaintenanceJobKey } from "../maintenance-scheduler";
 import type { CoordinatorStateRepository } from "../state-repository";
 
 const MAX_ENTRY_STATE_BATCH = 500;
-const COMPACTION_BATCH_SIZE = 500;
 
 export class EntrySyncService {
 	constructor(
 		private readonly stateRepository: CoordinatorStateRepository,
-		private readonly cursorActiveTtlMs: number,
-		private readonly deferMaintenance: (
-			key: MaintenanceJobKey,
-			timestamp: number,
-			now?: number,
-		) => Promise<void>,
 		private readonly markHealthSummaryDirty: (now?: number) => Promise<void>,
 	) {}
 
@@ -75,19 +67,7 @@ export class EntrySyncService {
 			session.localVaultId,
 			cursor,
 		);
-		await this.compactSyncedCommits();
 		await this.markHealthSummaryDirty();
 		return { cursor };
-	}
-
-	private async compactSyncedCommits(): Promise<void> {
-		const compacted = this.stateRepository.compactSyncedCommits(
-			Date.now(),
-			this.cursorActiveTtlMs,
-			COMPACTION_BATCH_SIZE,
-		);
-		if (compacted > 0) {
-			await this.deferMaintenance("blob_gc", Date.now());
-		}
 	}
 }

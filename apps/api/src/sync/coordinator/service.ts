@@ -74,8 +74,6 @@ export class CoordinatorService {
 		);
 		this.entrySyncService = new EntrySyncService(
 			stateRepository,
-			cursorActiveTtlMs,
-			async (key, timestamp, now) => await this.deferMaintenance(key, timestamp, now),
 			async (now) => await this.markHealthSummaryDirty(now),
 		);
 		this.mutationCommitService = new MutationCommitService(

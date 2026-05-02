@@ -328,7 +328,7 @@ describe("sync durable object entry history integration", () => {
 		expect(deleted.status).toBe(404);
 	});
 
-	it("compacts acked sync commits while retaining sampled entry versions", async () => {
+	it("retains sampled entry versions after older blobs are collected", async () => {
 		const primary = await signUpAndCreateVault();
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "local-vault-checkpoints");
 		const stub = env.SYNC_COORDINATOR.getByName(primary.vaultId);
@@ -356,11 +356,8 @@ describe("sync durable object entry history integration", () => {
 
 		await ackCursor(stub, session, 31);
 
-		const compacted = await runInDurableObject(stub, async (instance, state) => {
+		const collected = await runInDurableObject(stub, async (instance, state) => {
 			await (instance as unknown as { runGc: () => Promise<void> }).runGc();
-			const commits = state.storage.sql
-				.exec<{ count: number }>("SELECT count(*) AS count FROM commits")
-				.toArray()[0];
 			const version = state.storage.sql
 				.exec<{ source_revision: number; blob_id: string | null; encrypted_metadata: string }>(
 					"SELECT source_revision, blob_id, encrypted_metadata FROM entry_versions WHERE entry_id = ?",
@@ -377,7 +374,6 @@ describe("sync durable object entry history integration", () => {
 				.exec<{ blob_id: string }>("SELECT blob_id FROM blobs WHERE blob_id = ?", blobIds[30])
 				.toArray()[0];
 			return {
-				commitCount: Number(commits?.count ?? 0),
 				version,
 				hasBlob1: !!blob1,
 				hasBlob30: !!blob30,
@@ -385,15 +381,14 @@ describe("sync durable object entry history integration", () => {
 			};
 		});
 
-		expect(compacted.commitCount).toBe(0);
-		expect(compacted.version).toEqual({
+		expect(collected.version).toEqual({
 			source_revision: 2,
 			blob_id: blobIds[1],
 			encrypted_metadata: "meta-2",
 		});
-		expect(compacted.hasBlob1).toBe(false);
-		expect(compacted.hasBlob30).toBe(false);
-		expect(compacted.hasBlob31).toBe(true);
+		expect(collected.hasBlob1).toBe(false);
+		expect(collected.hasBlob30).toBe(false);
+		expect(collected.hasBlob31).toBe(true);
 
 		const history = await listEntryVersions(stub, session, {
 			entryId,

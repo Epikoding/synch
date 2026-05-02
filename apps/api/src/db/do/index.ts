@@ -1,4 +1,11 @@
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+	index,
+	integer,
+	primaryKey,
+	sqliteTable,
+	text,
+	uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const entries = sqliteTable(
 	"entries",
@@ -12,6 +19,7 @@ export const entries = sqliteTable(
 		updatedAt: integer("updated_at").notNull(),
 		updatedByUserId: text("updated_by_user_id").notNull(),
 		updatedByLocalVaultId: text("updated_by_local_vault_id").notNull(),
+		lastMutationId: text("last_mutation_id"),
 	},
 	(table) => ({
 		updatedSeqEntryIdIndex: index("idx_entries_updated_seq_entry_id").on(
@@ -19,19 +27,6 @@ export const entries = sqliteTable(
 			table.entryId,
 		),
 		blobIdIndex: index("idx_entries_blob_id").on(table.blobId),
-	}),
-);
-
-export const commits = sqliteTable(
-	"commits",
-	{
-		seq: integer("seq").primaryKey({ autoIncrement: true }),
-		mutationId: text("mutation_id").notNull(),
-		entryId: text("entry_id").notNull(),
-		revision: integer("revision").notNull(),
-	},
-	(table) => ({
-		mutationIdUnique: uniqueIndex("idx_commits_mutation_id").on(table.mutationId),
 	}),
 );
 

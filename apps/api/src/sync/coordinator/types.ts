@@ -85,7 +85,12 @@ export type CommitMutationRejectedBatchResult = {
 	status: "rejected";
 	mutationId: string;
 	entryId: string;
-	code: "blob_not_found" | "blob_not_staged" | "stale_revision" | "commit_failed";
+	code:
+		| "blob_not_found"
+		| "blob_not_staged"
+		| "stale_revision"
+		| "commit_failed"
+		| "duplicate_mutation_id";
 	message: string;
 	expectedBaseRevision?: number;
 	receivedBaseRevision?: number;

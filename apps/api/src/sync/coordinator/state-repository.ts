@@ -139,10 +139,6 @@ export class CoordinatorStateRepository {
 		return this.readVaultLimits().versionHistoryRetentionDays;
 	}
 
-	compactSyncedCommits(now: number, activeCursorTtlMs: number, limit: number): number {
-		return this.cursorStore.compactSyncedCommits(now, activeCursorTtlMs, limit);
-	}
-
 	listEntryStates(
 		sinceCursor: number,
 		targetCursor: number,
