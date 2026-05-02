@@ -139,17 +139,6 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     };
   }
 
-  async ackCursor(cursor: number): Promise<void> {
-    const message = await this.transport.request({
-      type: "ack_cursor",
-      cursor,
-    });
-
-    if (message.type !== "cursor_acked") {
-      throw new Error("cursor ack did not produce a cursor_acked response");
-    }
-  }
-
   async detachLocalVault(): Promise<void> {
     const message = await this.transport.request({
       type: "detach_local_vault",
@@ -202,4 +191,3 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     this.transport.close();
   }
 }
-

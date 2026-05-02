@@ -45,11 +45,6 @@ type ClientMessage =
       encryptedMetadata: string;
     }
 	  | {
-	      type: "ack_cursor";
-	      requestId: string;
-	      cursor: number;
-	    }
-	  | {
 	      type: "detach_local_vault";
 	      requestId: string;
 	    }

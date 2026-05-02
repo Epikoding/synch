@@ -243,7 +243,6 @@ describe("SyncPullService failure rollback: preparation", () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);
     const adapter = createVaultAdapter();
-    const ackedCursors: number[] = [];
     const bodies = {
       "blob-a": "new a",
       "blob-b": "new b",
@@ -303,9 +302,6 @@ describe("SyncPullService failure rollback: preparation", () => {
           ],
         },
       ],
-      onAckCursor(cursor) {
-        ackedCursors.push(cursor);
-      },
     });
     const service = new SyncPullService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",
@@ -328,7 +324,6 @@ describe("SyncPullService failure rollback: preparation", () => {
     expect(adapter.text("Folder/b.md")).toBe("new b");
     expect(adapter.text("Folder/c.md")).toBeNull();
     expect(await store.getCursor()).toBe(2);
-    expect(ackedCursors).toEqual([2]);
 
     await store.close();
   });
@@ -340,7 +335,6 @@ describe("SyncPullService failure rollback: preparation", () => {
       "Folder/a.md": "old a",
       "Folder/b.md": "old b",
     });
-    const ackedCursors: number[] = [];
     await store.upsertEntry({
       entryId: "entry-a",
       path: "Folder/a.md",
@@ -418,9 +412,6 @@ describe("SyncPullService failure rollback: preparation", () => {
           ],
         },
       ],
-      onAckCursor(cursor) {
-        ackedCursors.push(cursor);
-      },
     });
     const service = new SyncPullService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",
@@ -443,7 +434,6 @@ describe("SyncPullService failure rollback: preparation", () => {
     expect(adapter.text("Folder/b.md")).toBe("old b");
     expect(adapter.text("Folder/filler.md")).toBeNull();
     expect(await store.getCursor()).toBe(0);
-    expect(ackedCursors).toEqual([]);
 
     await store.close();
   });

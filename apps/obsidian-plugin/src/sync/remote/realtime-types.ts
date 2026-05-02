@@ -77,7 +77,6 @@ export interface SyncRealtimeSession {
     blobId: string | null;
     encryptedMetadata: string;
 	  }): Promise<EntryVersionRestoredResponse>;
-	  ackCursor(cursor: number): Promise<void>;
 	  detachLocalVault(): Promise<void>;
 	  commitMutation(mutation: CommitMutationPayload): Promise<CommitAcceptedResult>;
   commitMutations(mutations: CommitMutationPayload[]): Promise<CommitMutationsResult>;
@@ -224,11 +223,6 @@ export type ServerMessage =
       code: string;
       message: string;
     }
-	  | {
-	      type: "cursor_acked";
-	      requestId: string;
-	      cursor: number;
-	    }
 	  | {
 	      type: "local_vault_detached";
 	      requestId: string;

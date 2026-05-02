@@ -583,7 +583,6 @@ function createRealtimeSession(
     })),
     listEntryVersions: vi.fn(),
     restoreEntryVersion: vi.fn(),
-    ackCursor: vi.fn(),
     commitMutation: vi.fn(),
     commitMutations: vi.fn(),
     close: vi.fn(),

@@ -220,7 +220,6 @@ export function createPullClient(input: {
 
 export function createRealtimeSession(input: {
   pages: Array<TestChangePage | Error>;
-  onAckCursor?: (cursor: number) => void | Promise<void>;
 }): SyncRealtimeSession {
   let pageIndex = 0;
 
@@ -281,9 +280,6 @@ export function createRealtimeSession(input: {
     async restoreEntryVersion() {
       throw new Error("pull tests should not restore entry versions");
     },
-	    async ackCursor(cursor: number) {
-	      await input.onAckCursor?.(cursor);
-	    },
 	    async detachLocalVault() {},
 	    async commitMutation() {
       throw new Error("pull tests should not commit mutations");

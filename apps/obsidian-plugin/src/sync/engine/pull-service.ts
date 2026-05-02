@@ -169,7 +169,6 @@ export class SyncPullService {
     if (cursor > await store.getCursor()) {
       await store.setCursor(cursor);
       await store.flush();
-      await session.ackCursor(cursor);
     }
 
     return {
@@ -201,7 +200,6 @@ export class SyncPullService {
 
     await store.setCursor(safeCursor);
     await store.flush();
-    await session.ackCursor(safeCursor);
     return safeCursor;
   }
 }
