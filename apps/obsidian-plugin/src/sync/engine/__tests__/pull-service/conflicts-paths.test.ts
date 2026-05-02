@@ -39,6 +39,8 @@ describe("SyncPullService path conflicts", () => {
       hash,
       deleted: false,
       updatedAt: 1,
+      localMtime: 123,
+      localSize: body.length,
     });
     await store.markEntryDirty({
       mutationId: "mutation-local",
@@ -110,7 +112,7 @@ describe("SyncPullService path conflicts", () => {
     await expect(service.pullOnce(session)).resolves.toEqual({
       cursor: 2,
       entriesApplied: 1,
-      filesWritten: 1,
+      filesWritten: 0,
       filesDeleted: 0,
       conflictsCreated: 0,
     });
@@ -122,9 +124,147 @@ describe("SyncPullService path conflicts", () => {
       path: "Folder/shared.md",
       revision: 1,
       hash,
+      localMtime: 123,
+      localSize: body.length,
+    });
+    expect(await store.getBlob("blob-remote")).toMatchObject({
+      blobId: "blob-remote",
+      hash,
     });
     expect(await store.listDirtyEntries()).toEqual([]);
     expect(conflicts).toEqual([]);
+
+    await store.close();
+  });
+
+  it("writes duplicate adopted remote paths to conflict copies", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    const body = "same body";
+    const hash = await hashText(body);
+    const adapter = createVaultAdapter({
+      "Folder/shared.md": body,
+    });
+    await store.upsertEntry({
+      entryId: "entry-local",
+      path: "Folder/shared.md",
+      revision: 0,
+      blobId: "blob-local",
+      hash,
+      deleted: false,
+      updatedAt: 1,
+      localMtime: 123,
+      localSize: body.length,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-local",
+      entryId: "entry-local",
+      op: "upsert",
+      baseRevision: 0,
+      blobId: "blob-local",
+      hash,
+      encryptedMetadata: await encryptPendingMetadata({
+        entryId: "entry-local",
+        baseRevision: 0,
+        op: "upsert",
+        blobId: "blob-local",
+        path: "Folder/shared.md",
+        hash,
+      }),
+      createdAt: 2,
+    });
+
+    const conflicts: PullConflictSummary[] = [];
+    const session = createRealtimeSession({
+      pages: [
+        {
+          cursor: 3,
+          hasMore: false,
+          commits: [
+            createCommit({
+              cursor: 2,
+              entryId: "entry-remote-a",
+              revision: 1,
+              blobId: "blob-remote-a",
+              encryptedMetadata: await encryptRemoteMetadata({
+                entryId: "entry-remote-a",
+                revision: 1,
+                blobId: "blob-remote-a",
+                path: "Folder/shared.md",
+                hash,
+              }),
+            }),
+            createCommit({
+              cursor: 3,
+              entryId: "entry-remote-b",
+              revision: 1,
+              blobId: "blob-remote-b",
+              encryptedMetadata: await encryptRemoteMetadata({
+                entryId: "entry-remote-b",
+                revision: 1,
+                blobId: "blob-remote-b",
+                path: "Folder/shared.md",
+                hash,
+              }),
+            }),
+          ],
+        },
+      ],
+    });
+    const client = createPullClient({
+      blobs: {
+        "blob-remote-a": await encryptTestBlob(
+          "blob-remote-a",
+          new TextEncoder().encode(body),
+        ),
+        "blob-remote-b": await encryptTestBlob(
+          "blob-remote-b",
+          new TextEncoder().encode(body),
+        ),
+      },
+    });
+
+    const service = new SyncPullService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      vaultAdapter: adapter,
+      pullClient: client,
+      onProgress: ignoreProgress,
+      onConflict(event) {
+        conflicts.push({
+          entryId: event.entryId,
+          reason: event.reason,
+          originalPath: event.originalPath,
+          conflictPath: event.conflictPath,
+        });
+      },
+      now: conflictTimestamp,
+    });
+
+    await expect(service.pullOnce(session)).resolves.toEqual({
+      cursor: 3,
+      entriesApplied: 2,
+      filesWritten: 1,
+      filesDeleted: 0,
+      conflictsCreated: 1,
+    });
+    expect(adapter.text("Folder/shared.md")).toBe(body);
+    expect(adapter.text("Folder/shared.sync-conflict-20260422-101112.md")).toBe(body);
+    expect((await store.getEntryById("entry-remote-a"))?.path).toBe("Folder/shared.md");
+    expect((await store.getEntryById("entry-remote-b"))?.path).toBe(
+      "Folder/shared.sync-conflict-20260422-101112.md",
+    );
+    expect(await store.listDirtyEntries()).toEqual([]);
+    expect(conflicts).toEqual([
+      {
+        entryId: "entry-remote-b",
+        reason: "remote_path_collision",
+        originalPath: "Folder/shared.md",
+        conflictPath: "Folder/shared.sync-conflict-20260422-101112.md",
+      },
+    ]);
 
     await store.close();
   });

@@ -273,7 +273,13 @@ export class PullEntryStateApplier {
     plans: PlannedEntryState[],
   ): Promise<void> {
     for (const plan of plans) {
-      if (await this.isAlreadyAppliedToVault(store, plan)) {
+      // Only adopted files already at the target path can skip the vault write.
+      // Path-collision plans still need their conflict copy materialized.
+      if (
+        (plan.adoptedLocalEntry?.hashMatches &&
+          plan.adoptedLocalEntry.entry.path === plan.finalPath) ||
+        (await this.isAlreadyAppliedToVault(store, plan))
+      ) {
         plan.skipVaultWrite = true;
       }
     }
@@ -360,7 +366,7 @@ export class PullEntryStateApplier {
             }
 
             for (const { plan, bytes } of batch.blobs) {
-              if (!plan.finalPath) {
+              if (!plan.finalPath || plan.skipVaultWrite) {
                 continue;
               }
               await writeVaultBytes(this.deps.vaultAdapter, plan.finalPath, bytes);
@@ -377,8 +383,8 @@ export class PullEntryStateApplier {
                 hash: plan.hash,
                 deleted: plan.state.deleted,
                 updatedAt: plan.state.updatedAt,
-                localMtime: plan.skipVaultWrite ? (plan.existing?.localMtime ?? null) : null,
-                localSize: plan.skipVaultWrite ? (plan.existing?.localSize ?? null) : null,
+                localMtime: this.localMtimeForAppliedPlan(plan),
+                localSize: this.localSizeForAppliedPlan(plan),
               });
             }
             for (const pendingConflict of batchPendingConflicts) {
@@ -402,6 +408,30 @@ export class PullEntryStateApplier {
       await this.restoreDirtyEntries(store, originalDirtyEntries);
       throw error;
     }
+  }
+
+  private localMtimeForAppliedPlan(plan: PlannedEntryState): number | null {
+    if (!plan.skipVaultWrite) {
+      return null;
+    }
+
+    return (
+      plan.adoptedLocalEntry?.entry.localMtime ??
+      plan.existing?.localMtime ??
+      null
+    );
+  }
+
+  private localSizeForAppliedPlan(plan: PlannedEntryState): number | null {
+    if (!plan.skipVaultWrite) {
+      return null;
+    }
+
+    return (
+      plan.adoptedLocalEntry?.entry.localSize ??
+      plan.existing?.localSize ??
+      null
+    );
   }
 
   private async applyAdoptedLocalEntries(

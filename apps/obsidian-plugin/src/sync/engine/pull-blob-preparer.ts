@@ -28,9 +28,21 @@ export class PullBlobPreparer {
     token: SyncTokenResponse,
     plans: PlannedEntryState[],
   ): Promise<PreparedEntryBlob[]> {
-    const blobPlans = plans.filter(
-      (plan) => plan.finalPath && !plan.state.deleted && !plan.skipVaultWrite,
-    );
+    const blobPlans = plans.filter((plan) => {
+      if (!plan.finalPath || plan.state.deleted) {
+        return false;
+      }
+      if (!plan.skipVaultWrite) {
+        return true;
+      }
+
+      // Same-path adopted entries already have matching local bytes. For non-text
+      // files, accepted remote metadata relies on the server's staged/live blob
+      // invariant, so a broken invariant would not be caught by client-side
+      // download/decrypt/hash verification here. Text files still download so
+      // merge bases stay cached locally.
+      return plan.adoptedLocalEntry?.hashMatches && isAutoMergeTextPath(plan.finalPath);
+    });
 
     return await mapWithConcurrency(
       blobPlans,
