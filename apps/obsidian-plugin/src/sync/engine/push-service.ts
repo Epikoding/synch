@@ -22,7 +22,7 @@ import {
 
 const DEFAULT_PUSH_BATCH = 100;
 const DEFAULT_PUSH_DRAIN_LIMIT = 1_000;
-const DEFAULT_PUSH_PREPARE_CONCURRENCY = 36;
+const DEFAULT_PUSH_PREPARE_CONCURRENCY = 12;
 
 export interface SyncPushServiceDeps {
   getApiBaseUrl: () => string;

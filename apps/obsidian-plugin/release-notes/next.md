@@ -7,5 +7,6 @@
 ## Changed
 
 - Show plugin update availability as a compact badge in settings and refresh the check periodically while settings are open.
+- Reduce concurrent push preparation work to keep sync uploads steadier on constrained devices and networks.
 
 ## Fixed
