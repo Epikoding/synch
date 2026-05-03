@@ -8,24 +8,32 @@ export function shouldShowSyncSpinner(state: SynchSyncState): boolean {
 export function formatSyncDescription(
   statusLabel: string,
   syncProgress: SynchSyncProgress,
-  storageStatus: ReturnType<SynchSettingsController["getStorageStatus"]>,
 ): string {
-  const parts = [
-    `${statusLabel} - ${syncProgress.completedEntries} / ${syncProgress.totalEntries}`,
-  ];
-  if (storageStatus) {
-    const storageLabel =
-      storageStatus.storageLimitBytes > 0
-        ? `${formatBytes(storageStatus.storageUsedBytes)} / ${formatBytes(storageStatus.storageLimitBytes)}`
-        : formatBytes(storageStatus.storageUsedBytes);
-    const percent =
-      storageStatus.storageLimitBytes > 0
-        ? ` (${Math.round((storageStatus.storageUsedBytes / storageStatus.storageLimitBytes) * 100)}%)`
-        : "";
-    parts.push(`Storage: ${storageLabel}${percent}`);
+  return `${statusLabel} - ${syncProgress.completedEntries} / ${syncProgress.totalEntries}`;
+}
+
+export function formatStorageDescription(
+  storageStatus: NonNullable<ReturnType<SynchSettingsController["getStorageStatus"]>>,
+): string {
+  if (storageStatus.storageLimitBytes <= 0) {
+    return formatBytes(storageStatus.storageUsedBytes);
   }
 
-  return parts.join(" - ");
+  return [
+    `${formatBytes(storageStatus.storageUsedBytes)} / ${formatBytes(storageStatus.storageLimitBytes)}`,
+    `(${Math.round((storageStatus.storageUsedBytes / storageStatus.storageLimitBytes) * 100)}%)`,
+  ].join(" ");
+}
+
+export function getStoragePercent(
+  storageStatus: NonNullable<ReturnType<SynchSettingsController["getStorageStatus"]>>,
+): number {
+  if (storageStatus.storageLimitBytes <= 0) {
+    return 0;
+  }
+
+  const percent = (storageStatus.storageUsedBytes / storageStatus.storageLimitBytes) * 100;
+  return Math.min(100, Math.max(0, Math.round(percent)));
 }
 
 export function formatDeletedFileTimestamp(value: number): string {

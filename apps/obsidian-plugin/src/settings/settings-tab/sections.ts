@@ -3,7 +3,12 @@ import { App, Notice, Setting } from "obsidian";
 import { getDefaultApiBaseUrl } from "../../config";
 import type { SynchFileRules } from "../../plugin/view-models";
 import type { SynchSettingsController } from "../controller";
-import { formatSyncDescription, shouldShowSyncSpinner } from "./format";
+import {
+  formatStorageDescription,
+  formatSyncDescription,
+  getStoragePercent,
+  shouldShowSyncSpinner,
+} from "./format";
 import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
 
 type RefreshSettings = () => void;
@@ -107,12 +112,12 @@ export function renderSyncStatusSetting(
   }
 
   const syncProgress = controller.getSyncProgress();
+  const storageStatus = controller.getStorageStatus();
   const syncSetting = new Setting(containerEl)
     .setName("Sync")
     .setDesc(formatSyncDescription(
       controller.getSyncStatusLabel(),
       syncProgress,
-      controller.getStorageStatus(),
     ));
   if (shouldShowSyncSpinner(controller.getSyncState())) {
     syncSetting.addExtraButton((button) => {
@@ -126,6 +131,13 @@ export function renderSyncStatusSetting(
   syncSetting.addProgressBar((progressBar) => {
     progressBar.setValue(controller.getSyncPercent());
   });
+
+  new Setting(containerEl)
+    .setName("Storage")
+    .setDesc(storageStatus ? formatStorageDescription(storageStatus) : "Checking storage usage...")
+    .addProgressBar((progressBar) => {
+      progressBar.setValue(storageStatus ? getStoragePercent(storageStatus) : 0);
+    });
 }
 
 export function renderAuthenticationSetting(

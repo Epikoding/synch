@@ -51,6 +51,7 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
 
     expect(getSettingNames()).toContain("Sync");
+    expect(getSettingNames()).not.toContain("Storage");
     expect(getSettingDescriptions()[1]).toBe(
       "Connect a remote vault to start syncing.",
     );
@@ -152,11 +153,12 @@ describe("SynchSettingTab sync status", () => {
     expect(getExtraButtonComponents()).toEqual([]);
   });
 
-  it("shows remote storage usage in the sync status when available", () => {
+  it("shows remote storage usage below the sync status when available", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
       getSyncStatusLabel: () => "Sync: synced 100%",
+      getSyncPercent: () => 100,
       getSyncProgress: () => ({
         completedEntries: 12,
         totalEntries: 12,
@@ -169,9 +171,15 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
+    expect(getSettingNames().slice(2, 4)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[1]).toBe(
-      "Sync: synced 100% - 12 / 12 - Storage: 24.3 MB / 50 MB (49%)",
+      "Sync: synced 100% - 12 / 12",
     );
+    expect(getSettingDescriptions()[2]).toBe("24.3 MB / 50 MB (49%)");
+    expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
+      100,
+      49,
+    ]);
   });
 
   it("shows unlimited remote storage usage without a zero-byte limit", () => {
@@ -191,12 +199,15 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
+    expect(getSettingNames().slice(2, 4)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[1]).toBe(
-      "Sync: synced 100% - 12 / 12 - Storage: 24.3 MB",
+      "Sync: synced 100% - 12 / 12",
     );
+    expect(getSettingDescriptions()[2]).toBe("24.3 MB");
+    expect(getProgressBarComponents()[1]?.value).toBe(0);
   });
 
-  it("omits remote storage usage in the sync status before the websocket reports it", () => {
+  it("reserves the storage row before the websocket reports usage", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
@@ -210,6 +221,12 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
+    expect(getSettingNames().slice(2, 4)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[1]).toBe("Sync: synced 100% - 12 / 12");
+    expect(getSettingDescriptions()[2]).toBe("Checking storage usage...");
+    expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
+      0,
+      0,
+    ]);
   });
 });
