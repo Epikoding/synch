@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getButtonComponents,
   getCreatedElementTexts,
+  getMarkdownRenderCalls,
   getSettingDescriptions,
   getSettingNames,
   getToggleComponents,
@@ -170,6 +171,48 @@ describe("SynchSettingTab remote vault settings", () => {
     await nextTask();
 
     expect(previewDeletedFile).toHaveBeenCalledWith("entry-ready");
+    expect(getMarkdownRenderCalls()).toEqual([
+      expect.objectContaining({
+        markdown: "previous content",
+        sourcePath: "Notes/ready.md",
+      }),
+    ]);
+  });
+
+  it("previews deleted non-markdown text files as raw text", async () => {
+    const previewDeletedFile = vi.fn(async () => ({
+      status: "text" as const,
+      path: "Notes/ready.txt",
+      reason: "before_delete" as const,
+      capturedAt: 1,
+      text: "previous content",
+    }));
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      listDeletedFiles: vi.fn(async () => [
+        {
+          entryId: "entry-ready",
+          path: "Notes/ready.txt",
+          revision: 3,
+          deletedAt: 1,
+          dirty: false,
+        },
+      ]),
+      previewDeletedFile,
+    });
+
+    tab.display();
+    await getButtonComponents()
+      .find((button) => button.text === "View deleted files")
+      ?.click();
+    await nextTask();
+    await getButtonComponents()
+      .find((button) => button.text === "Preview")
+      ?.click();
+    await nextTask();
+
+    expect(getMarkdownRenderCalls()).toEqual([]);
     expect(getCreatedElementTexts()).toContain("previous content");
   });
 

@@ -7,9 +7,17 @@ const toggleComponents: MockToggleComponent[] = [];
 const progressBarComponents: MockProgressBarComponent[] = [];
 const extraButtonComponents: MockExtraButtonComponent[] = [];
 const createdElementTexts: string[] = [];
+const markdownRenderCalls: MarkdownRenderCall[] = [];
 const settingNames: string[] = [];
 const settingDescriptions: string[] = [];
 const settingClasses: string[][] = [];
+
+interface MarkdownRenderCall {
+  app: unknown;
+  markdown: string;
+  sourcePath: string;
+  component: unknown;
+}
 
 class MockElement {
   text = "";
@@ -244,6 +252,29 @@ export class Modal {
   onClose(): void {}
 }
 
+export class Component {
+  load(): void {}
+
+  unload(): void {}
+}
+
+export class MarkdownRenderer {
+  static async render(
+    app: unknown,
+    markdown: string,
+    _el: unknown,
+    sourcePath: string,
+    component: unknown,
+  ): Promise<void> {
+    markdownRenderCalls.push({
+      app,
+      markdown,
+      sourcePath,
+      component,
+    });
+  }
+}
+
 export class PluginSettingTab {
   containerEl = new MockElement();
 
@@ -368,6 +399,10 @@ export function getCreatedElementTexts(): string[] {
   return [...createdElementTexts];
 }
 
+export function getMarkdownRenderCalls(): MarkdownRenderCall[] {
+  return [...markdownRenderCalls];
+}
+
 export function getSettingNames(): string[] {
   return [...settingNames];
 }
@@ -388,6 +423,7 @@ export function resetObsidianMocks(): void {
   progressBarComponents.length = 0;
   extraButtonComponents.length = 0;
   createdElementTexts.length = 0;
+  markdownRenderCalls.length = 0;
   settingNames.length = 0;
   settingDescriptions.length = 0;
   settingClasses.length = 0;

@@ -1,8 +1,10 @@
-import { Modal, Setting, type App } from "obsidian";
+import { Component, MarkdownRenderer, Modal, Setting, type App } from "obsidian";
 
 import type { SynchVersionPreview } from "./view-models";
 
 export class VersionPreviewModal extends Modal {
+  private readonly renderComponent = new Component();
+
   constructor(
     app: App,
     private readonly preview: SynchVersionPreview,
@@ -11,6 +13,7 @@ export class VersionPreviewModal extends Modal {
   }
 
   onOpen(): void {
+    this.renderComponent.load();
     const { contentEl } = this;
     contentEl.empty();
     new Setting(contentEl).setName("Version preview").setHeading();
@@ -35,11 +38,42 @@ export class VersionPreviewModal extends Modal {
       return;
     }
 
-    contentEl.createEl("pre", {
+    const previewText = this.preview.text;
+    if (isMarkdownPath(this.preview.path)) {
+      const previewEl = contentEl.createEl("div", {
+        cls: "synch-preview-content",
+      });
+      previewEl.addClass("synch-preview-rendered");
+      previewEl.addClass("markdown-rendered");
+      void MarkdownRenderer.render(
+        this.app,
+        previewText,
+        previewEl,
+        this.preview.path,
+        this.renderComponent,
+      ).catch(() => {
+        previewEl.empty();
+        previewEl.addClass("synch-preview-raw");
+        previewEl.setText(previewText);
+      });
+      return;
+    }
+
+    const previewEl = contentEl.createEl("pre", {
       cls: "synch-preview-content",
-      text: this.preview.text,
+      text: previewText,
     });
+    previewEl.addClass("synch-preview-raw");
   }
+
+  onClose(): void {
+    this.renderComponent.unload();
+  }
+}
+
+function isMarkdownPath(path: string): boolean {
+  const lowerPath = path.toLowerCase();
+  return lowerPath.endsWith(".md") || lowerPath.endsWith(".markdown");
 }
 
 function formatPreviewMeta(preview: SynchVersionPreview): string {
