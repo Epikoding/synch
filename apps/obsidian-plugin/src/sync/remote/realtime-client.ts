@@ -24,6 +24,7 @@ export type {
   EntryVersionPageCursor,
   EntryVersionRestoredResponse,
   EntryVersionsResponse,
+  SyncPolicy,
   SyncRealtimeCallbacks,
   SyncRealtimeClientOptions,
   SyncRealtimeSession,
@@ -69,16 +70,33 @@ export class SyncRealtimeClient {
         storageUsedBytes: 0,
         storageLimitBytes: 0,
       },
-      storageLimitBytes: 0,
+      policy: {
+        storageLimitBytes: 0,
+        maxFileSizeBytes: 0,
+      },
     };
+    let apiSession: SyncRealtimeApiSession | null = null;
     const transport = new SyncRealtimeSocketSession(
       socket,
       {
         ...callbacks,
         onStorageStatusUpdated(status) {
-          const nextStatus = applySessionStorageLimit(status, state.storageLimitBytes);
+          const nextStatus = applySessionStorageLimit(
+            status,
+            state.policy.storageLimitBytes,
+          );
           state.storageStatus = nextStatus;
           callbacks.onStorageStatusUpdated(nextStatus);
+        },
+        onPolicyUpdated(policy, storageStatus) {
+          const nextStatus = apiSession
+            ? apiSession.applyPolicyUpdate(policy, storageStatus)
+            : applySessionStorageLimit(storageStatus, policy.storageLimitBytes);
+          if (!apiSession) {
+            state.policy = policy;
+            state.storageStatus = nextStatus;
+          }
+          callbacks.onPolicyUpdated(policy, nextStatus);
         },
       },
       this.options,
@@ -96,13 +114,14 @@ export class SyncRealtimeClient {
         storageUsedBytes: hello.storageStatus.storageUsedBytes,
         storageLimitBytes: hello.policy.storageLimitBytes,
       };
-      state.storageLimitBytes = hello.policy.storageLimitBytes;
+      state.policy = hello.policy;
       transport.startHeartbeat();
     } catch (error) {
       transport.close();
       throw error;
     }
 
-    return new SyncRealtimeApiSession(transport, hello, state);
+    apiSession = new SyncRealtimeApiSession(transport, hello, state);
+    return apiSession;
   }
 }

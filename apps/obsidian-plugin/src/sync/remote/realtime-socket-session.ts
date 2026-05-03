@@ -217,6 +217,11 @@ export class SyncRealtimeSocketSession {
       return;
     }
 
+    if (parsed.type === "policy_updated") {
+      this.callbacks.onPolicyUpdated(parsed.policy, parsed.storageStatus);
+      return;
+    }
+
     if (parsed.type === "session_error") {
       const error = new SyncRealtimeError(parsed.code, parsed.message);
       this.rejectPending(error);

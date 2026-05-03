@@ -181,8 +181,12 @@ export class CoordinatorService {
 		const applied = this.stateRepository.applyVaultPolicy(vaultId, limits);
 		if (applied) {
 			await this.scheduleHealthSummaryFlush();
-			this.socketService.broadcastStorageStatus({
-				type: "storage_status_updated",
+			this.socketService.broadcastPolicyUpdated({
+				type: "policy_updated",
+				policy: {
+					storageLimitBytes: limits.storageLimitBytes,
+					maxFileSizeBytes: limits.maxFileSizeBytes,
+				},
 				storageStatus: this.stateRepository.readStorageStatus(),
 			});
 		}

@@ -524,8 +524,12 @@ describe("coordinator websocket control messages", () => {
 		};
 		expect(stateRepository.ensureVaultState).not.toHaveBeenCalled();
 		expect(stateRepository.applyVaultPolicy).toHaveBeenCalledWith("vault-1", limits);
-		expect(socketService.broadcastStorageStatus).toHaveBeenCalledWith({
-			type: "storage_status_updated",
+		expect(socketService.broadcastPolicyUpdated).toHaveBeenCalledWith({
+			type: "policy_updated",
+			policy: {
+				storageLimitBytes: 50_000_000,
+				maxFileSizeBytes: 3_000_000,
+			},
 			storageStatus: {
 				storageUsedBytes: 24_300_000,
 				storageLimitBytes: 100_000_000,

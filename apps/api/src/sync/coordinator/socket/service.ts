@@ -1,6 +1,7 @@
 import { selectSyncWebSocketProtocol } from "../../access/token";
 import type { SyncTokenService } from "../../access/token-service";
 import type {
+	PolicyUpdatedMessage,
 	ServerControlMessage,
 	SocketSession,
 	StorageStatusUpdatedMessage,
@@ -89,6 +90,13 @@ export class CoordinatorSocketService {
 			if (!session?.wantsStorageStatus) {
 				continue;
 			}
+			socket.send(encoded);
+		}
+	}
+
+	broadcastPolicyUpdated(message: PolicyUpdatedMessage): void {
+		const encoded = JSON.stringify(message);
+		for (const socket of this.ctx.getWebSockets()) {
 			socket.send(encoded);
 		}
 	}

@@ -18,11 +18,13 @@ export type HelloAckMessage = {
 	type: "hello_ack";
 	requestId: string;
 	cursor: number;
-	policy: {
-		storageLimitBytes: number;
-		maxFileSizeBytes: number;
-	};
+	policy: VaultPolicySnapshot;
 	storageStatus: StorageStatusSnapshot;
+};
+
+export type VaultPolicySnapshot = {
+	storageLimitBytes: number;
+	maxFileSizeBytes: number;
 };
 
 export type CursorAdvancedMessage = {
@@ -37,6 +39,12 @@ export type StorageStatusSnapshot = {
 
 export type StorageStatusUpdatedMessage = {
 	type: "storage_status_updated";
+	storageStatus: StorageStatusSnapshot;
+};
+
+export type PolicyUpdatedMessage = {
+	type: "policy_updated";
+	policy: VaultPolicySnapshot;
 	storageStatus: StorageStatusSnapshot;
 };
 
@@ -200,6 +208,7 @@ export type ServerControlMessage =
 	| HelloAckMessage
 	| CursorAdvancedMessage
 	| StorageStatusUpdatedMessage
+	| PolicyUpdatedMessage
 	| CommitAcceptedMessage
 	| CursorAckedMessage
 	| LocalVaultDetachedMessage

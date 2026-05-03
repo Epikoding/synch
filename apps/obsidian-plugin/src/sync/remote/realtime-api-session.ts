@@ -7,6 +7,7 @@ import type {
   EntryVersionsResponse,
   HelloAckMessage,
   RealtimeSessionState,
+  SyncPolicy,
   SyncRealtimeSession,
   SyncStorageStatus,
 } from "./realtime-types";
@@ -26,7 +27,6 @@ export function applySessionStorageLimit(
 
 export class SyncRealtimeApiSession implements SyncRealtimeSession {
   readonly serverCursor: number;
-  readonly maxFileSizeBytes: number;
 
   constructor(
     private readonly transport: SyncRealtimeSocketSession,
@@ -34,7 +34,6 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     private readonly state: RealtimeSessionState,
   ) {
     this.serverCursor = hello.cursor;
-    this.maxFileSizeBytes = hello.policy.maxFileSizeBytes;
   }
 
   get storageUsedBytes(): number {
@@ -43,6 +42,20 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
 
   get storageLimitBytes(): number {
     return this.state.storageStatus.storageLimitBytes;
+  }
+
+  get maxFileSizeBytes(): number {
+    return this.state.policy.maxFileSizeBytes;
+  }
+
+  applyPolicyUpdate(policy: SyncPolicy, storageStatus: SyncStorageStatus): SyncStorageStatus {
+    this.state.policy = policy;
+    const nextStatus = applySessionStorageLimit(
+      storageStatus,
+      policy.storageLimitBytes,
+    );
+    this.state.storageStatus = nextStatus;
+    return nextStatus;
   }
 
   watchStorageStatus(): void {

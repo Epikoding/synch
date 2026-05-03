@@ -70,6 +70,7 @@ export function socketServiceMock(session = testSocketSession()) {
 		attachSocketSession: vi.fn(),
 		sendSocketMessage: vi.fn(),
 		broadcastStorageStatus: vi.fn(),
+		broadcastPolicyUpdated: vi.fn(),
 		broadcastExcept: vi.fn(),
 		closeAllSockets: vi.fn(),
 	});

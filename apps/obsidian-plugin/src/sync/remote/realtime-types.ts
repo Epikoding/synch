@@ -7,6 +7,7 @@ import type {
 export interface SyncRealtimeCallbacks {
   onCursorAdvanced(cursor: number): void;
   onStorageStatusUpdated(status: SyncStorageStatus): void;
+  onPolicyUpdated(policy: SyncPolicy, storageStatus: SyncStorageStatus): void;
   onClose(): void;
   onError(error: Error): void;
 }
@@ -14,6 +15,11 @@ export interface SyncRealtimeCallbacks {
 export interface SyncStorageStatus {
   storageUsedBytes: number;
   storageLimitBytes: number;
+}
+
+export interface SyncPolicy {
+  storageLimitBytes: number;
+  maxFileSizeBytes: number;
 }
 
 export interface CommitMutationPayload {
@@ -152,10 +158,7 @@ export type ServerMessage =
       type: "hello_ack";
       requestId: string;
       cursor: number;
-      policy: {
-        storageLimitBytes: number;
-        maxFileSizeBytes: number;
-      };
+      policy: SyncPolicy;
       storageStatus: SyncStorageStatus;
     }
   | {
@@ -164,6 +167,11 @@ export type ServerMessage =
     }
   | {
       type: "storage_status_updated";
+      storageStatus: SyncStorageStatus;
+    }
+  | {
+      type: "policy_updated";
+      policy: SyncPolicy;
       storageStatus: SyncStorageStatus;
     }
   | {
@@ -240,7 +248,7 @@ export type ServerMessage =
 export type HelloAckMessage = Extract<ServerMessage, { type: "hello_ack" }>;
 export type RealtimeSessionState = {
   storageStatus: SyncStorageStatus;
-  storageLimitBytes: number;
+  policy: SyncPolicy;
 };
 
 export type { EntryStatePageCursor, ListEntryStatesResponse, SyncTokenResponse };

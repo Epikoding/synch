@@ -13,3 +13,4 @@
 ## Fixed
 
 - Reuse the existing version history pane instead of opening duplicate panes.
+- Retry files that were blocked by the file-size limit after the vault policy is updated.

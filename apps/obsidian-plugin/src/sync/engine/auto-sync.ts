@@ -183,6 +183,9 @@ export class SyncAutoLoop {
           onStorageStatusUpdated: (status) => {
             this.deps.onStorageStatusChange?.(status);
           },
+          onPolicyUpdated: (_policy, storageStatus) => {
+            void this.handlePolicyUpdated(storageStatus);
+          },
           onClose: () => {
             this.markRealtimeDisconnected();
           },
@@ -261,6 +264,35 @@ export class SyncAutoLoop {
     session?.close();
     if (scheduleReconnect) {
       this.scheduleReconnect();
+    }
+  }
+
+  private async handlePolicyUpdated(storageStatus: SyncStorageStatus): Promise<void> {
+    if (!this.isActive()) {
+      return;
+    }
+
+    if (this.storageStatusWatching) {
+      this.deps.onStorageStatusChange?.(storageStatus);
+    }
+
+    const session = this.realtimeSession;
+    if (!session) {
+      return;
+    }
+
+    try {
+      const unblockedFileSizeMutations =
+        (await this.deps.unblockFileSizeBlockedMutations?.(session)) ?? 0;
+      if (unblockedFileSizeMutations > 0) {
+        this.deps.onSyncScheduled?.();
+        this.requestPush();
+        void this.drain();
+      }
+    } catch (error) {
+      if (!isRealtimeConnectionError(error)) {
+        this.handleError(error);
+      }
     }
   }
 

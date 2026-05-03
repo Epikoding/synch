@@ -56,6 +56,7 @@ export async function openRealtimeSession(input: {
     {
       onCursorAdvanced: input.callbacks?.onCursorAdvanced ?? (() => {}),
       onStorageStatusUpdated: input.callbacks?.onStorageStatusUpdated ?? (() => {}),
+      onPolicyUpdated: input.callbacks?.onPolicyUpdated ?? (() => {}),
       onClose: input.callbacks?.onClose ?? (() => {}),
       onError:
         input.callbacks?.onError ??

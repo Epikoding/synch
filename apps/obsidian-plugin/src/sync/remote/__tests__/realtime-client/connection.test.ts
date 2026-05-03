@@ -33,6 +33,48 @@ describe("SyncRealtimeClient connection health", () => {
     session.close();
   });
 
+  it("updates the active session policy from realtime policy updates", async () => {
+    const policies: unknown[] = [];
+    const storageStatuses: unknown[] = [];
+    const { socket, session } = await openRealtimeSession({
+      callbacks: {
+        onPolicyUpdated(policy, storageStatus) {
+          policies.push(policy);
+          storageStatuses.push(storageStatus);
+        },
+      },
+    });
+
+    socket.emitMessage({
+      type: "policy_updated",
+      policy: {
+        storageLimitBytes: 1_000_000_000,
+        maxFileSizeBytes: 5_000_000,
+      },
+      storageStatus: {
+        storageUsedBytes: 25_000_000,
+        storageLimitBytes: 50_000_000,
+      },
+    });
+
+    expect(session.maxFileSizeBytes).toBe(5_000_000);
+    expect(session.storageUsedBytes).toBe(25_000_000);
+    expect(session.storageLimitBytes).toBe(1_000_000_000);
+    expect(policies).toEqual([
+      {
+        storageLimitBytes: 1_000_000_000,
+        maxFileSizeBytes: 5_000_000,
+      },
+    ]);
+    expect(storageStatuses).toEqual([
+      {
+        storageUsedBytes: 25_000_000,
+        storageLimitBytes: 1_000_000_000,
+      },
+    ]);
+    session.close();
+  });
+
   it("rejects pending requests and closes the session when a request times out", async () => {
     vi.useFakeTimers();
 

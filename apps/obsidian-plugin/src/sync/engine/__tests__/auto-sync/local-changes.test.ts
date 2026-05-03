@@ -7,7 +7,10 @@ import {
   createRealtimeClient,
   createToken,
 } from "./helpers";
-import type { SyncRealtimeSession } from "../../../remote/realtime-client";
+import type {
+  SyncRealtimeCallbacks,
+  SyncRealtimeSession,
+} from "../../../remote/realtime-client";
 
 describe("SyncAutoLoop local changes", () => {
   it("runs ad-hoc realtime work on the active session", async () => {
@@ -100,6 +103,55 @@ describe("SyncAutoLoop local changes", () => {
 
     expect(unblockFileSizeBlockedMutations).toHaveBeenCalledWith(session);
     expect(pushPendingMutations).toHaveBeenCalledWith(session);
+    expect(pullOnce).toHaveBeenCalledTimes(0);
+    autoLoop.stop();
+    await store.close();
+  });
+
+  it("retries file-size blocked mutations after policy updates", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const pushPendingMutations = vi.fn(async () => createPushResult());
+    const unblockFileSizeBlockedMutations = vi
+      .fn()
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1);
+    const pullOnce = vi.fn(async () => {});
+    let callbacks: SyncRealtimeCallbacks | null = null;
+    let session: SyncRealtimeSession | null = null;
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations,
+      unblockFileSizeBlockedMutations,
+      pullOnce,
+      realtimeClient: createRealtimeClient(
+        (nextCallbacks) => {
+          callbacks = nextCallbacks;
+        },
+        (nextSession) => {
+          session = nextSession;
+        },
+      ),
+    });
+
+    await autoLoop.start();
+    callbacks?.onPolicyUpdated(
+      {
+        storageLimitBytes: 1_000_000_000,
+        maxFileSizeBytes: 5_000_000,
+      },
+      {
+        storageUsedBytes: 24_300_000,
+        storageLimitBytes: 1_000_000_000,
+      },
+    );
+    await vi.waitFor(() => {
+      expect(pushPendingMutations).toHaveBeenCalledWith(session);
+    });
+
+    expect(unblockFileSizeBlockedMutations).toHaveBeenCalledTimes(2);
+    expect(unblockFileSizeBlockedMutations).toHaveBeenLastCalledWith(session);
     expect(pullOnce).toHaveBeenCalledTimes(0);
     autoLoop.stop();
     await store.close();
