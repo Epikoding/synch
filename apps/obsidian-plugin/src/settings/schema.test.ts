@@ -7,14 +7,15 @@ describe("normalizeSynchPluginSettings", () => {
   const defaultApiBaseUrl = "https://api.synch.test";
 
   it("defaults the API base URL when existing settings do not include it", () => {
-    expect(
-      normalizeSynchPluginSettings(
-        {
-          fileRules: DEFAULT_SYNC_FILE_RULES,
-        },
-        defaultApiBaseUrl,
-      ).apiBaseUrl,
-    ).toBe(defaultApiBaseUrl);
+    const settings = normalizeSynchPluginSettings(
+      {
+        fileRules: DEFAULT_SYNC_FILE_RULES,
+      },
+      defaultApiBaseUrl,
+    );
+
+    expect(settings.apiBaseUrl).toBe(defaultApiBaseUrl);
+    expect(settings.syncEnabled).toBe(true);
   });
 
   it("trims whitespace and trailing slashes from the API base URL", () => {
@@ -71,5 +72,29 @@ describe("normalizeSynchPluginSettings", () => {
         defaultApiBaseUrl,
       ).apiBaseUrl,
     ).toBe(defaultApiBaseUrl);
+  });
+
+  it("normalizes the persisted sync enabled flag", () => {
+    expect(
+      normalizeSynchPluginSettings(
+        {
+          apiBaseUrl: defaultApiBaseUrl,
+          fileRules: DEFAULT_SYNC_FILE_RULES,
+          syncEnabled: false,
+        },
+        defaultApiBaseUrl,
+      ).syncEnabled,
+    ).toBe(false);
+
+    expect(
+      normalizeSynchPluginSettings(
+        {
+          apiBaseUrl: defaultApiBaseUrl,
+          fileRules: DEFAULT_SYNC_FILE_RULES,
+          syncEnabled: "false",
+        },
+        defaultApiBaseUrl,
+      ).syncEnabled,
+    ).toBe(true);
   });
 });

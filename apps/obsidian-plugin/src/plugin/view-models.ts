@@ -9,6 +9,7 @@ export interface SynchFileRules {
 
 export type SynchSyncState =
   | "not_ready"
+  | "paused"
   | "syncing"
   | "offline"
   | "reconnecting"

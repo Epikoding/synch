@@ -10,11 +10,13 @@ export const SYNCH_SETTINGS_KEY = "settings";
 export interface SynchPluginSettings {
   apiBaseUrl: string;
   fileRules: SyncFileRules;
+  syncEnabled: boolean;
 }
 
 export const DEFAULT_SYNCH_PLUGIN_SETTINGS: SynchPluginSettings = {
   apiBaseUrl: getDefaultApiBaseUrl(),
   fileRules: DEFAULT_SYNC_FILE_RULES,
+  syncEnabled: true,
 };
 
 export function normalizeSynchPluginSettings(
@@ -25,6 +27,7 @@ export function normalizeSynchPluginSettings(
     return {
       apiBaseUrl: defaultApiBaseUrl,
       fileRules: DEFAULT_SYNC_FILE_RULES,
+      syncEnabled: true,
     };
   }
 
@@ -32,5 +35,6 @@ export function normalizeSynchPluginSettings(
   return {
     apiBaseUrl: normalizeApiBaseUrl(record.apiBaseUrl, defaultApiBaseUrl),
     fileRules: normalizeSyncFileRules(record.fileRules),
+    syncEnabled: typeof record.syncEnabled === "boolean" ? record.syncEnabled : true,
   };
 }

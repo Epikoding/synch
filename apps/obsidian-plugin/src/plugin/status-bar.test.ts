@@ -175,6 +175,7 @@ describe("SynchStatusBar", () => {
 
   it.each([
     ["not_ready", 0, false],
+    ["paused", 0, false],
     ["syncing", 37, true],
     ["offline", 0, false],
     ["reconnecting", 0, true],

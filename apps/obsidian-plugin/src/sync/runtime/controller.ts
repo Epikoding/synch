@@ -117,6 +117,11 @@ export class SyncController {
     this.setSyncStatus("not_ready");
   }
 
+  stopAutoSyncAndMarkPaused(): void {
+    this.syncEngine.stopAutoSync();
+    this.setSyncStatus("paused");
+  }
+
   async resetLocalSyncState(): Promise<void> {
     this.syncEngine.stopAutoSync();
     this.setStorageStatus(null);

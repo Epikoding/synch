@@ -101,6 +101,19 @@ describe("SyncController", () => {
     expect(resumeAutoSyncConnection).not.toHaveBeenCalled();
   });
 
+  it("stops auto sync and reports paused", () => {
+    const stopAutoSync = vi
+      .spyOn(SyncEngine.prototype, "stopAutoSync")
+      .mockImplementation(() => {});
+    const controller = new SyncController(createDeps());
+
+    controller.stopAutoSyncAndMarkPaused();
+
+    expect(stopAutoSync).toHaveBeenCalledTimes(1);
+    expect(controller.getSyncState()).toBe("paused");
+    expect(controller.getSyncStatusLabel()).toBe("Sync: paused 0%");
+  });
+
   it("shows offline instead of not ready when a stored vault cannot activate offline", async () => {
     const notifyError = vi.fn();
     const controller = new SyncController(

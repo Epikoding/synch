@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getButtonComponents,
   getExtraButtonComponents,
   getProgressBarComponents,
   getSettingDescriptions,
@@ -14,7 +15,7 @@ describe("SynchSettingTab sync status", () => {
     resetObsidianMocks();
   });
 
-  it("shows sync progress percent after sign-in", () => {
+  it("does not show a sync progress bar after sign-in", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
@@ -28,7 +29,7 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getProgressBarComponents()[0]?.value).toBe(0);
+    expect(getProgressBarComponents().map(({ value }) => value)).toEqual([0]);
   });
 
   it("prompts users to connect a remote vault before showing sync progress", () => {
@@ -91,40 +92,50 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getProgressBarComponents()[0]?.value).toBe(37);
+    expect(getSettingDescriptions()[0]).toBe("syncing 37% - 42 / 113");
+    expect(getProgressBarComponents().map(({ value }) => value)).toEqual([0]);
   });
 
-  it("shows a spinner while sync is active", () => {
+  it("shows a stop button while sync is enabled", async () => {
+    const setSyncEnabled = vi.fn(async () => {});
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
       getSyncState: () => "syncing",
       getSyncStatusLabel: () => "Sync: syncing 37%",
+      setSyncEnabled,
     });
 
     tab.display();
 
-    expect(getExtraButtonComponents()[0]).toMatchObject({
-      disabled: true,
-      icon: "loader-circle",
-      tooltip: "Sync in progress",
-    });
-    expect(getExtraButtonComponents()[0]?.extraSettingsEl.classes).toContain(
-      "synch-sync-spinner",
-    );
+    expect(getButtonComponents()[0]?.text).toBe("Stop sync");
+    await getButtonComponents()[0]?.click();
+    expect(setSyncEnabled).toHaveBeenCalledWith(false);
+    expect(getExtraButtonComponents()).toEqual([]);
   });
 
-  it("shows a spinner while sync is reconnecting", () => {
+  it("shows a start button while sync is disabled", async () => {
+    const setSyncEnabled = vi.fn(async () => {});
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
-      getSyncState: () => "reconnecting",
-      getSyncStatusLabel: () => "Sync: reconnecting 0%",
+      getSyncState: () => "paused",
+      getSyncStatusLabel: () => "Sync: paused 37%",
+      getSyncProgress: () => ({
+        completedEntries: 12,
+        totalEntries: 12,
+      }),
+      isSyncEnabled: () => false,
+      setSyncEnabled,
     });
 
     tab.display();
 
-    expect(getExtraButtonComponents()).toHaveLength(1);
+    expect(getButtonComponents()[0]?.text).toBe("Start sync");
+    expect(getSettingDescriptions()[0]).toBe("paused - 12 / 12");
+    await getButtonComponents()[0]?.click();
+    expect(setSyncEnabled).toHaveBeenCalledWith(true);
+    expect(getExtraButtonComponents()).toEqual([]);
   });
 
   it("does not show a spinner while sync is offline", () => {
@@ -133,19 +144,6 @@ describe("SynchSettingTab sync status", () => {
       hasConnectedRemoteVault: () => true,
       getSyncState: () => "offline",
       getSyncStatusLabel: () => "Sync: offline 0%",
-    });
-
-    tab.display();
-
-    expect(getExtraButtonComponents()).toEqual([]);
-  });
-
-  it("hides the sync spinner when sync is idle", () => {
-    const tab = createSettingsTab({
-      hasAuthenticatedSession: () => true,
-      hasConnectedRemoteVault: () => true,
-      getSyncState: () => "up_to_date",
-      getSyncStatusLabel: () => "Sync: up to date 100%",
     });
 
     tab.display();
@@ -173,11 +171,10 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[0]).toBe(
-      "Sync: synced 100% - 12 / 12",
+      "synced 100% - 12 / 12",
     );
     expect(getSettingDescriptions()[1]).toBe("24.3 MB / 50 MB (49%)");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
-      100,
       49,
     ]);
   });
@@ -201,10 +198,10 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
     expect(getSettingDescriptions()[0]).toBe(
-      "Sync: synced 100% - 12 / 12",
+      "synced 100% - 12 / 12",
     );
     expect(getSettingDescriptions()[1]).toBe("24.3 MB");
-    expect(getProgressBarComponents()[1]?.value).toBe(0);
+    expect(getProgressBarComponents()[0]?.value).toBe(0);
   });
 
   it("reserves the storage row before the websocket reports usage", () => {
@@ -222,10 +219,9 @@ describe("SynchSettingTab sync status", () => {
     tab.display();
 
     expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
-    expect(getSettingDescriptions()[0]).toBe("Sync: synced 100% - 12 / 12");
+    expect(getSettingDescriptions()[0]).toBe("synced 100% - 12 / 12");
     expect(getSettingDescriptions()[1]).toBe("Checking storage usage...");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
-      0,
       0,
     ]);
   });

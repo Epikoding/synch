@@ -18,6 +18,7 @@ export interface SynchStatusBarState {
 
 const STATUS_BAR_STATE_CLASSES = [
   "synch-status-not-ready",
+  "synch-status-paused",
   "synch-status-syncing",
   "synch-status-offline",
   "synch-status-reconnecting",
@@ -29,6 +30,8 @@ export function getStatusBarStateClass(state: SynchSyncState): string {
   switch (state) {
     case "not_ready":
       return "synch-status-not-ready";
+    case "paused":
+      return "synch-status-paused";
     case "syncing":
       return "synch-status-syncing";
     case "offline":
@@ -46,6 +49,8 @@ export function getStatusBarIcon(state: SynchSyncState): string {
   switch (state) {
     case "not_ready":
       return "circle";
+    case "paused":
+      return "pause";
     case "syncing":
     case "reconnecting":
       return "loader-circle";

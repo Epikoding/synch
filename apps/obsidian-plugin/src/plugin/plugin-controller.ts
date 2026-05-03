@@ -121,6 +121,9 @@ export class SynchPluginController implements SynchSettingsController {
     initializeSyncStoreForActiveRemoteVault: async () => {
       await this.initializeSyncStoreForActiveRemoteVault();
     },
+    ensureAutoSyncState: async () => {
+      await this.ensureAutoSyncState();
+    },
     resetSyncConnection: async () => {
       await this.resetSyncConnection();
     },
@@ -149,6 +152,13 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   ensureAutoSyncState(): Promise<void> {
+    if (!this.isSyncEnabled()) {
+      this.syncController.stopAutoSyncAndMarkPaused();
+      return Promise.resolve();
+    }
+
+    // If sync is paused while startup is in flight, this can still finish and
+    // restart auto sync; gate or cancel the startup before relying on pause.
     return this.syncController.ensureAutoSyncState();
   }
 
@@ -217,6 +227,26 @@ export class SynchPluginController implements SynchSettingsController {
 
   getSyncProgress(): SynchSyncProgress {
     return this.syncController.getSyncProgress();
+  }
+
+  isSyncEnabled(): boolean {
+    return this.settingsStore.getSnapshot().syncEnabled;
+  }
+
+  async setSyncEnabled(enabled: boolean): Promise<void> {
+    const changed = await this.settingsStore.updateSyncEnabled(enabled);
+    if (!enabled) {
+      this.syncController.stopAutoSyncAndMarkPaused();
+      if (changed) {
+        this.refreshUi();
+      }
+      return;
+    }
+
+    if (changed) {
+      this.refreshUi();
+    }
+    await this.syncController.ensureAutoSyncState();
   }
 
   getStorageStatus(): SynchStorageStatus | null {
@@ -298,7 +328,7 @@ export class SynchPluginController implements SynchSettingsController {
     } finally {
       if (loginStarted) {
         this.syncTokenManager.clear();
-        await this.syncController.ensureAutoSyncState();
+        await this.ensureAutoSyncState();
       }
     }
   }
@@ -425,6 +455,11 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   private async resumeAutoSyncWhenPossible(): Promise<void> {
+    if (!this.isSyncEnabled()) {
+      this.syncController.stopAutoSyncAndMarkPaused();
+      return;
+    }
+
     await this.restoreOfflineSessionBeforeResume();
     await this.syncController.resumeAutoSync();
   }
@@ -500,6 +535,11 @@ export class SynchPluginController implements SynchSettingsController {
     }
 
     this.refreshUi();
+    if (!this.isSyncEnabled()) {
+      this.syncController.stopAutoSyncAndMarkPaused();
+      return;
+    }
+
     await this.syncController.reconcileAfterFileRuleChange();
   }
 

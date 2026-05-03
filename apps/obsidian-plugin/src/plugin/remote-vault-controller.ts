@@ -20,6 +20,7 @@ export interface SynchRemoteVaultControllerDeps {
   getStoredRemoteVaultId: () => string | null;
   hasConnectedRemoteVault: () => boolean;
   initializeSyncStoreForActiveRemoteVault: () => Promise<void>;
+  ensureAutoSyncState: () => Promise<void>;
   resetSyncConnection: () => Promise<void>;
   notifyError: (error: unknown, prefix: string) => void;
 }
@@ -40,7 +41,7 @@ export class SynchRemoteVaultController {
 
       await this.deps.remoteVaultManager.createRemoteVault(input);
       await this.deps.initializeSyncStoreForActiveRemoteVault();
-      await this.deps.syncController.ensureAutoSyncState();
+      await this.deps.ensureAutoSyncState();
     } catch (error) {
       this.deps.notifyError(error, "Vault creation failed");
     }
@@ -73,7 +74,7 @@ export class SynchRemoteVaultController {
 
       await this.deps.remoteVaultManager.bootstrapRemoteVault(input);
       await this.deps.initializeSyncStoreForActiveRemoteVault();
-      await this.deps.syncController.ensureAutoSyncState();
+      await this.deps.ensureAutoSyncState();
     } catch (error) {
       this.deps.notifyError(error, "Vault connection failed");
     }

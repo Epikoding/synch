@@ -9,7 +9,8 @@ export function formatSyncDescription(
   statusLabel: string,
   syncProgress: SynchSyncProgress,
 ): string {
-  return `${statusLabel} - ${syncProgress.completedEntries} / ${syncProgress.totalEntries}`;
+  const label = statusLabel.replace(/^Sync:\s*/, "").replace(/^paused \d+%$/, "paused");
+  return `${label} - ${syncProgress.completedEntries} / ${syncProgress.totalEntries}`;
 }
 
 export function formatStorageDescription(

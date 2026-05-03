@@ -10,6 +10,7 @@ describe("SynchSettingsStore", () => {
   it("preserves file rules when updating the API base URL", async () => {
     const pluginDataStore = new MemoryPluginDataStore({
       apiBaseUrl: "https://api.synch.test",
+      syncEnabled: false,
       fileRules: {
         ...DEFAULT_SYNC_FILE_RULES,
         includeImages: false,
@@ -23,6 +24,7 @@ describe("SynchSettingsStore", () => {
 
     expect(pluginDataStore.read<SynchPluginSettings>(SYNCH_SETTINGS_KEY)).toEqual({
       apiBaseUrl: "https://custom.synch.test",
+      syncEnabled: false,
       fileRules: {
         ...DEFAULT_SYNC_FILE_RULES,
         includeImages: false,
@@ -34,6 +36,7 @@ describe("SynchSettingsStore", () => {
   it("preserves the API base URL when updating file rules", async () => {
     const pluginDataStore = new MemoryPluginDataStore({
       apiBaseUrl: "https://custom.synch.test",
+      syncEnabled: false,
       fileRules: DEFAULT_SYNC_FILE_RULES,
     });
     const store = new SynchSettingsStore(pluginDataStore, "https://default.synch.test");
@@ -46,6 +49,7 @@ describe("SynchSettingsStore", () => {
 
     expect(pluginDataStore.read<SynchPluginSettings>(SYNCH_SETTINGS_KEY)).toEqual({
       apiBaseUrl: "https://custom.synch.test",
+      syncEnabled: false,
       fileRules: {
         ...DEFAULT_SYNC_FILE_RULES,
         includeAudio: false,
@@ -56,6 +60,7 @@ describe("SynchSettingsStore", () => {
   it("rejects invalid API base URL updates without saving", async () => {
     const pluginDataStore = new MemoryPluginDataStore({
       apiBaseUrl: "https://api.synch.test",
+      syncEnabled: true,
       fileRules: DEFAULT_SYNC_FILE_RULES,
     });
     const store = new SynchSettingsStore(pluginDataStore, "https://default.synch.test");
@@ -72,6 +77,7 @@ describe("SynchSettingsStore", () => {
   it("rejects API base URL updates with query strings or fragments", async () => {
     const pluginDataStore = new MemoryPluginDataStore({
       apiBaseUrl: "https://api.synch.test",
+      syncEnabled: true,
       fileRules: DEFAULT_SYNC_FILE_RULES,
     });
     const store = new SynchSettingsStore(pluginDataStore, "https://default.synch.test");
@@ -86,6 +92,44 @@ describe("SynchSettingsStore", () => {
 
     expect(pluginDataStore.saveCount).toBe(0);
     expect(store.getSnapshot().apiBaseUrl).toBe("https://api.synch.test");
+  });
+
+  it("preserves other settings when updating sync enabled", async () => {
+    const pluginDataStore = new MemoryPluginDataStore({
+      apiBaseUrl: "https://custom.synch.test",
+      syncEnabled: true,
+      fileRules: {
+        ...DEFAULT_SYNC_FILE_RULES,
+        includeAudio: false,
+      },
+    });
+    const store = new SynchSettingsStore(pluginDataStore, "https://default.synch.test");
+    store.initialize();
+
+    await store.updateSyncEnabled(false);
+
+    expect(pluginDataStore.read<SynchPluginSettings>(SYNCH_SETTINGS_KEY)).toEqual({
+      apiBaseUrl: "https://custom.synch.test",
+      syncEnabled: false,
+      fileRules: {
+        ...DEFAULT_SYNC_FILE_RULES,
+        includeAudio: false,
+      },
+    });
+  });
+
+  it("does not save unchanged sync enabled state", async () => {
+    const pluginDataStore = new MemoryPluginDataStore({
+      apiBaseUrl: "https://custom.synch.test",
+      syncEnabled: false,
+      fileRules: DEFAULT_SYNC_FILE_RULES,
+    });
+    const store = new SynchSettingsStore(pluginDataStore, "https://default.synch.test");
+    store.initialize();
+
+    await store.updateSyncEnabled(false);
+
+    expect(pluginDataStore.saveCount).toBe(0);
   });
 });
 

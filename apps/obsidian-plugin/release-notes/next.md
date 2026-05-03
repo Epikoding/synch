@@ -2,6 +2,8 @@
 
 ## Added
 
+- Add a settings control to pause and resume automatic sync.
+
 ## Changed
 
 - Show available plugin updates beside the settings heading instead of as a separate settings row.

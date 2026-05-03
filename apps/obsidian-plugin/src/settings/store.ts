@@ -66,4 +66,18 @@ export class SynchSettingsStore {
     await this.pluginDataStore.save();
     return true;
   }
+
+  async updateSyncEnabled(enabled: boolean): Promise<boolean> {
+    if (enabled === this.settings.syncEnabled) {
+      return false;
+    }
+
+    this.settings = {
+      ...this.settings,
+      syncEnabled: enabled,
+    };
+    this.pluginDataStore.write(SYNCH_SETTINGS_KEY, this.settings);
+    await this.pluginDataStore.save();
+    return true;
+  }
 }

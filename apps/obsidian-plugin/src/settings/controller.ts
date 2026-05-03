@@ -17,6 +17,8 @@ export interface SynchSettingsController {
   getSyncStatusLabel(): string;
   getSyncPercent(): number;
   getSyncProgress(): SynchSyncProgress;
+  isSyncEnabled(): boolean;
+  setSyncEnabled(enabled: boolean): Promise<void>;
   getStorageStatus(): SynchStorageStatus | null;
   watchStorageStatus(): void;
   unwatchStorageStatus(): void;

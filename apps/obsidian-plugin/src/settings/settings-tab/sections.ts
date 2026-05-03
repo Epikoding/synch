@@ -7,7 +7,6 @@ import {
   formatStorageDescription,
   formatSyncDescription,
   getStoragePercent,
-  shouldShowSyncSpinner,
 } from "./format";
 import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
 
@@ -98,18 +97,13 @@ export function renderSyncStatusSetting(
       controller.getSyncStatusLabel(),
       syncProgress,
     ));
-  if (shouldShowSyncSpinner(controller.getSyncState())) {
-    syncSetting.addExtraButton((button) => {
-      button
-        .setIcon("loader-circle")
-        .setTooltip("Sync in progress")
-        .setDisabled(true);
-      button.extraSettingsEl.addClass("synch-sync-spinner");
-    });
-  }
-  syncSetting.addProgressBar((progressBar) => {
-    progressBar.setValue(controller.getSyncPercent());
-  });
+  syncSetting.addButton((button) =>
+    button
+      .setButtonText(controller.isSyncEnabled() ? "Stop sync" : "Start sync")
+      .onClick(async () => {
+        await controller.setSyncEnabled(!controller.isSyncEnabled());
+      }),
+  );
 
   new Setting(containerEl)
     .setName("Storage")
