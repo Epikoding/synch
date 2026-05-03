@@ -76,5 +76,6 @@ describe("RemoteVaultManager bootstrap", () => {
     expect(summary.vaultName).toBe("Remote");
     expect(savedVaults[savedVaults.length - 1]?.remoteVaultKey).toBeInstanceOf(Uint8Array);
     expect(manager.getRemoteVaultStatusLabel()).toContain("loaded on this device");
+    expect(manager.getRemoteVaultStatusLabel()).not.toContain("vault-remote");
   });
 });

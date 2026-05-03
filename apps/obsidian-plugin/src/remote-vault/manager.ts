@@ -53,7 +53,7 @@ export class RemoteVaultManager {
 
     const storedVaultId = this.deps.getStoredRemoteVaultId();
     if (storedVaultId && this.deps.getStoredRemoteVaultKeySecret()) {
-      return `Vault ${storedVaultId} is stored on this device but not active.`;
+      return "A vault is stored on this device but not active.";
     }
 
     return "No vault is configured on this device.";
@@ -264,7 +264,7 @@ function findPasswordWrapper(
 }
 
 function formatVaultLabel(vault: Pick<RemoteVaultSessionSummary, "vaultId" | "vaultName">): string {
-  return `${vault.vaultName} (${vault.vaultId})`;
+  return vault.vaultName;
 }
 
 function formatStoredVaultLabel(

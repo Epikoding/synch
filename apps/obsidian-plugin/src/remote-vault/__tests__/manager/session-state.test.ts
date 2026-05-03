@@ -22,6 +22,10 @@ describe("RemoteVaultManager session state", () => {
     });
 
     expect(manager.hasConnectedRemoteVault()).toBe(true);
+    expect(manager.getRemoteVaultStatusLabel()).toBe(
+      "A vault is stored on this device but not active.",
+    );
+    expect(manager.getRemoteVaultStatusLabel()).not.toContain("vault-connected");
 
     await manager.disconnectRemoteVault();
 
