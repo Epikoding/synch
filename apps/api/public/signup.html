@@ -43,11 +43,16 @@
 					Create Account
 				</button>
 
-				<div id="resend-container" class="hidden mt-4 text-center flex-col items-center">
-					<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline disabled:opacity-50 disabled:no-underline transition-colors hidden">
-						Resend verification email
-					</button>
-					<div id="resend-message" class="text-xs mt-2 text-zinc-400 hidden"></div>
+				<div id="success-container" class="hidden mt-6 p-4 bg-zinc-900/50 border border-zinc-800/80 rounded-lg text-center flex-col items-center">
+					<div class="text-zinc-200 text-sm mb-1">Check your email</div>
+					<div class="text-zinc-400 text-xs mb-4">We've sent a verification link to <span id="sent-email-display" class="font-medium text-zinc-300"></span>.</div>
+					
+					<div id="resend-container" class="text-center flex-col items-center w-full">
+						<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
+							Resend verification email
+						</button>
+						<div id="resend-message" class="text-xs mt-2 text-zinc-400 hidden"></div>
+					</div>
 				</div>
 			</form>
 
@@ -60,11 +65,13 @@
 			const form = document.querySelector("#sign-up-form");
 			const status = document.querySelector("#status");
 			const signinLink = document.querySelector("#signin-link");
-			const resendContainer = document.querySelector("#resend-container");
+			const successContainer = document.querySelector("#success-container");
+			const sentEmailDisplay = document.querySelector("#sent-email-display");
 			const resendButton = document.querySelector("#resend-button");
 			const resendMessage = document.querySelector("#resend-message");
 			let returnTo = "";
 			
+			let isSuccessState = false;
 			let resendCooldown = 0;
 			let resendInterval;
 			let currentEmail = "";
@@ -73,7 +80,6 @@
 
 			function startResendCooldown() {
 				if (!resendButton) return;
-				resendButton.classList.remove("hidden");
 				resendCooldown = 30;
 				resendButton.disabled = true;
 				
@@ -192,13 +198,31 @@
 
 					const result = await readJson(response);
 					if (result && result.token === null) {
-						setStatus("Check your email to verify your account.");
-						currentEmail = body.email;
-						if (resendContainer) {
-							resendContainer.classList.remove("hidden");
-							resendContainer.classList.add("flex");
-							startResendCooldown();
+						isSuccessState = true;
+						setStatus("");
+						
+						for (const element of form.elements) {
+							if (element.id === "resend-button") continue;
+							if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
+								element.disabled = true;
+							}
 						}
+						
+						const submitBtn = form.querySelector('button[type="submit"]');
+						if (submitBtn) {
+							submitBtn.textContent = "Email Sent";
+							submitBtn.classList.remove("bg-zinc-200", "text-[#0a0a0a]", "hover:bg-white");
+							submitBtn.classList.add("bg-zinc-800", "text-zinc-400");
+						}
+
+						currentEmail = body.email;
+						if (sentEmailDisplay) sentEmailDisplay.textContent = currentEmail;
+						
+						if (successContainer) {
+							successContainer.classList.remove("hidden");
+							successContainer.classList.add("flex");
+						}
+						startResendCooldown();
 						return;
 					}
 
@@ -224,7 +248,9 @@
 			}
 
 			function setSubmitting(submitting) {
+				if (isSuccessState) return;
 				for (const element of form.elements) {
+					if (element.id === "resend-button") continue;
 					if (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) {
 						element.disabled = submitting;
 					}
