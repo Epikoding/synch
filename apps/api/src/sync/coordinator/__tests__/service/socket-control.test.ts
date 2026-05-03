@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
 	createCoordinatorService,
+	createMockCoordinatorSocketService,
 	createMockCoordinatorStateRepository,
 	socketServiceMock,
 	socketStateRepository,
@@ -10,6 +11,82 @@ import {
 } from "./helpers";
 
 describe("coordinator websocket control messages", () => {
+	it("uses subscription policy limits when initializing a websocket vault state", async () => {
+		const limits = {
+			storageLimitBytes: 50_000_000,
+			maxFileSizeBytes: 3_000_000,
+			versionHistoryRetentionDays: 1,
+		};
+		const stateRepository = socketStateRepository();
+		const socketService = createMockCoordinatorSocketService({
+			openSocket: vi.fn(
+				async (
+					_request,
+					_vaultId,
+					_syncTokenService,
+					ensureVaultState,
+				) => {
+					await ensureVaultState("vault-1");
+					return new Response(null, { status: 200 });
+				},
+			),
+		});
+		const initialVaultLimitReader = {
+			readInitialVaultLimits: vi.fn(async () => limits),
+		};
+		const service = createCoordinatorService({
+			stateRepository,
+			socketService,
+			initialVaultLimitReader,
+		});
+
+		await service.openSocket(new Request("http://example.com"), "vault-1");
+
+		expect(initialVaultLimitReader.readInitialVaultLimits).toHaveBeenCalledWith(
+			"vault-1",
+		);
+		expect(stateRepository.ensureVaultState).toHaveBeenCalledWith(
+			"vault-1",
+			limits,
+		);
+	});
+
+	it("skips subscription policy lookup when websocket vault state exists", async () => {
+		const stateRepository = socketStateRepository();
+		vi.mocked(stateRepository.vaultStateExistsFor).mockReturnValue(true);
+		const socketService = createMockCoordinatorSocketService({
+			openSocket: vi.fn(
+				async (
+					_request,
+					_vaultId,
+					_syncTokenService,
+					ensureVaultState,
+				) => {
+					await ensureVaultState("vault-1");
+					return new Response(null, { status: 200 });
+				},
+			),
+		});
+		const initialVaultLimitReader = {
+			readInitialVaultLimits: vi.fn(async () => ({
+				storageLimitBytes: 50_000_000,
+				maxFileSizeBytes: 3_000_000,
+				versionHistoryRetentionDays: 1,
+			})),
+		};
+		const service = createCoordinatorService({
+			stateRepository,
+			socketService,
+			initialVaultLimitReader,
+		});
+
+		await service.openSocket(new Request("http://example.com"), "vault-1");
+
+		expect(stateRepository.vaultStateExistsFor).toHaveBeenCalledWith("vault-1");
+		expect(initialVaultLimitReader.readInitialVaultLimits).not.toHaveBeenCalled();
+		expect(stateRepository.ensureVaultState).not.toHaveBeenCalled();
+	});
+
 	it("does not broadcast cursor advancement back to the socket that committed", async () => {
 		const session = testSocketSession();
 		const sender = testWebSocket();
@@ -414,6 +491,39 @@ describe("coordinator websocket control messages", () => {
 			expect.any(Number),
 			expect.any(Number),
 		);
+		expect(socketService.broadcastStorageStatus).toHaveBeenCalledWith({
+			type: "storage_status_updated",
+			storageStatus: {
+				storageUsedBytes: 24_300_000,
+				storageLimitBytes: 100_000_000,
+			},
+		});
+	});
+
+	it("applies refreshed vault policy limits to the coordinator state", async () => {
+		const stateRepository = socketStateRepository();
+		const socketService = socketServiceMock();
+		const service = createCoordinatorService({
+			stateRepository,
+			socketService,
+		});
+
+		await service.applyVaultPolicy(
+			"vault-1",
+			{
+				storageLimitBytes: 50_000_000,
+				maxFileSizeBytes: 3_000_000,
+				versionHistoryRetentionDays: 1,
+			},
+		);
+
+		const limits = {
+			storageLimitBytes: 50_000_000,
+			maxFileSizeBytes: 3_000_000,
+			versionHistoryRetentionDays: 1,
+		};
+		expect(stateRepository.ensureVaultState).not.toHaveBeenCalled();
+		expect(stateRepository.applyVaultPolicy).toHaveBeenCalledWith("vault-1", limits);
 		expect(socketService.broadcastStorageStatus).toHaveBeenCalledWith({
 			type: "storage_status_updated",
 			storageStatus: {

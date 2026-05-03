@@ -39,6 +39,44 @@ describe("SubscriptionPolicyService", () => {
 		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
 	});
 
+	it("uses the starter policy for a matching active product subscription", async () => {
+		const policy = await new SubscriptionPolicyService(
+			false,
+			fakePolicyDb({
+				organization: null,
+				subscriptions: [
+					{
+						productId: "starter-product",
+						status: "active",
+						periodEnd: new Date(Date.now() + 60_000),
+					},
+				],
+			}),
+			{ starterProductId: "starter-product" },
+		).readOrganizationPolicy("org-1");
+
+		expect(policy.id).toBe("starter");
+	});
+
+	it("ignores active subscriptions for unknown products", async () => {
+		const policy = await new SubscriptionPolicyService(
+			false,
+			fakePolicyDb({
+				organization: null,
+				subscriptions: [
+					{
+						productId: "other-product",
+						status: "active",
+						periodEnd: new Date(Date.now() + 60_000),
+					},
+				],
+			}),
+			{ starterProductId: "starter-product" },
+		).readOrganizationPolicy("org-1");
+
+		expect(policy.id).toBe("free");
+	});
+
 	it("applies organization synced vault overrides on top of the plan policy", async () => {
 		const policy = await new SubscriptionPolicyService(
 			false,
@@ -105,7 +143,11 @@ function fakePolicyDb(input: {
 	organization: {
 		syncedVaultsOverride: number | null;
 	} | null;
-	subscriptions: Array<{ status: string; periodEnd: Date | null }>;
+	subscriptions: Array<{
+		productId?: string;
+		status: string;
+		periodEnd: Date | null;
+	}>;
 }): D1Db {
 	return {
 		select(_fields: Record<string, unknown>) {

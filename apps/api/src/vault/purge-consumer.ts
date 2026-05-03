@@ -23,20 +23,24 @@ export class VaultPurgeConsumer {
 		}
 	}
 
+	async handleMessage(message: Message<VaultPurgeMessage>): Promise<void> {
+		const body = message.body;
+		if (body?.type !== "vault_purge" || !body.vaultId.trim()) {
+			message.ack();
+			return;
+		}
+
+		try {
+			await this.purgeVault(body.vaultId);
+			message.ack();
+		} catch {
+			message.retry();
+		}
+	}
+
 	async handleBatch(batch: MessageBatch<VaultPurgeMessage>): Promise<void> {
 		for (const message of batch.messages) {
-			const body = message.body;
-			if (body?.type !== "vault_purge" || !body.vaultId.trim()) {
-				message.ack();
-				continue;
-			}
-
-			try {
-				await this.purgeVault(body.vaultId);
-				message.ack();
-			} catch {
-				message.retry();
-			}
+			await this.handleMessage(message);
 		}
 	}
 }

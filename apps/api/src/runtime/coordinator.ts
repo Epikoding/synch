@@ -1,3 +1,6 @@
+import { apiError } from "../errors";
+import { createDb } from "../db/client";
+import { SubscriptionPolicyService } from "../subscription/policy-service";
 import { SyncTokenService } from "../sync/access/token-service";
 import { BlobRepository } from "../sync/blob/repository";
 import { CoordinatorMaintenanceScheduler } from "../sync/coordinator/maintenance-scheduler";
@@ -6,11 +9,17 @@ import { CoordinatorService } from "../sync/coordinator/service";
 import { CoordinatorSocketService } from "../sync/coordinator/socket/service";
 import { CoordinatorStateRepository } from "../sync/coordinator/state-repository";
 import { VaultSyncStatusRepository } from "../sync/health/status-repository";
+import { VaultRepository } from "../vault/repository";
 
 export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
+	const db = createDb(env.DB);
 	const stateRepository = new CoordinatorStateRepository(ctx);
 	const socketService = new CoordinatorSocketService(ctx);
 	const blobRepository = new BlobRepository(env.SYNC_BLOBS);
+	const vaultRepository = new VaultRepository(db);
+	const subscriptionPolicyService = new SubscriptionPolicyService(env.SELF_HOSTED, db, {
+		starterProductId: env.POLAR_STARTER_PRODUCT_ID,
+	});
 	const syncStatusRepository = new VaultSyncStatusRepository(env.DB);
 	const syncTokenService = new SyncTokenService(env.SYNC_TOKEN_SECRET);
 	const coordinatorService = new CoordinatorService(
@@ -19,6 +28,18 @@ export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
 		socketService,
 		blobRepository,
 		syncStatusRepository,
+		{
+			readInitialVaultLimits: async (vaultId) => {
+				const organizationId = await vaultRepository.readVaultOrganizationId(vaultId);
+				if (!organizationId) {
+					throw apiError(404, "not_found", "vault not found");
+				}
+
+				const policy =
+					await subscriptionPolicyService.readOrganizationPolicy(organizationId);
+				return policy.limits;
+			},
+		},
 	);
 	const maintenanceScheduler = new CoordinatorMaintenanceScheduler(ctx, {
 		blob_gc: async (now) => {

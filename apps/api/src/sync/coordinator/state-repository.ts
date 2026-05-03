@@ -22,6 +22,7 @@ import type { VaultSyncStatusSummary } from "../health/types";
 import doMigrations from "../../../drizzle-do/migrations";
 import { CoordinatorBlobStore } from "./store/blob-store";
 import { CoordinatorCursorStore } from "./store/cursor-store";
+import type { VaultStateLimits } from "./store/cursor-store";
 import { CoordinatorEntryStore } from "./store/entry-store";
 import { CoordinatorHealthStore } from "./store/health-store";
 import { CoordinatorHistoryStore } from "./store/history-store";
@@ -53,12 +54,23 @@ export class CoordinatorStateRepository {
 		return this.cursorStore.currentCursor();
 	}
 
-	ensureVaultState(vaultId: string): void {
-		this.cursorStore.ensureVaultState(vaultId);
+	ensureVaultState(vaultId: string, initialLimits: VaultStateLimits): void {
+		this.cursorStore.ensureVaultState(vaultId, initialLimits);
 	}
 
 	readVaultId(): string | null {
 		return this.cursorStore.readVaultId();
+	}
+
+	vaultStateExistsFor(vaultId: string): boolean {
+		const existingVaultId = this.readVaultId();
+		if (!existingVaultId) {
+			return false;
+		}
+		if (existingVaultId !== vaultId) {
+			throw new Error("durable object vault id mismatch");
+		}
+		return true;
 	}
 
 	async purgeVaultState(): Promise<void> {
@@ -125,6 +137,38 @@ export class CoordinatorStateRepository {
 			maxFileSizeBytes: Number(row.max_file_size_bytes),
 			versionHistoryRetentionDays: Number(row.version_history_retention_days),
 		};
+	}
+
+	applyVaultPolicy(
+		vaultId: string,
+		limits: {
+			storageLimitBytes: number;
+			maxFileSizeBytes: number;
+			versionHistoryRetentionDays: number;
+		},
+	): boolean {
+		const existingVaultId = this.readVaultId();
+		if (!existingVaultId) {
+			return false;
+		}
+		if (existingVaultId !== vaultId) {
+			throw new Error("durable object vault id mismatch");
+		}
+
+		this.ctx.storage.sql.exec(
+			`
+			UPDATE coordinator_state
+			SET
+				storage_limit_bytes = ?,
+				max_file_size_bytes = ?,
+				version_history_retention_days = ?
+			WHERE id = 1
+			`,
+			limits.storageLimitBytes,
+			limits.maxFileSizeBytes,
+			limits.versionHistoryRetentionDays,
+		);
+		return true;
 	}
 
 	readVersionHistoryRetentionDays(): number {

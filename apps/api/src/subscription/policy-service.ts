@@ -5,6 +5,7 @@ import * as schema from "../db/d1";
 import {
 	applySubscriptionPlanLimitOverrides,
 	getSubscriptionPlanPolicy,
+	type SubscriptionPlanId,
 	type SubscriptionPlanPolicy,
 } from "./policy";
 
@@ -15,10 +16,15 @@ export type SubscriptionPolicyReader = {
 const ACTIVE_ACCESS_STATUSES = new Set(["active", "trialing"]);
 const PERIOD_ACCESS_STATUSES = new Set(["canceled", "past_due", "unpaid"]);
 
+export type SubscriptionPolicyServiceConfig = {
+	starterProductId?: string;
+};
+
 export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 	constructor(
 		private readonly selfHosted = false,
 		private readonly db: D1Db | null = null,
+		private readonly config: SubscriptionPolicyServiceConfig = {},
 	) {}
 
 	async readOrganizationPolicy(organizationId: string): Promise<SubscriptionPlanPolicy> {
@@ -31,6 +37,7 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 
 		const subscriptions = await this.db
 			.select({
+				productId: schema.polarSubscription.productId,
 				status: schema.polarSubscription.status,
 				periodEnd: schema.polarSubscription.periodEnd,
 			})
@@ -39,9 +46,14 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 			.orderBy(desc(schema.polarSubscription.periodEnd))
 			.limit(10);
 
-		const basePolicy = subscriptions.some(subscriptionGrantsAccess)
-			? getSubscriptionPlanPolicy("starter")
-			: getSubscriptionPlanPolicy("free");
+		const activePlanId = subscriptions
+			.map((subscription) =>
+				subscriptionAccessPlanId(subscription, {
+					starterProductId: this.config.starterProductId,
+				}),
+			)
+			.find((planId) => planId !== null);
+		const basePolicy = getSubscriptionPlanPolicy(activePlanId ?? "free");
 
 		const organizations = await this.db
 			.select({
@@ -66,6 +78,7 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 export function subscriptionGrantsAccess(
 	subscription:
 		| {
+				productId?: string;
 				status: string;
 				periodEnd: Date | null;
 		  }
@@ -82,4 +95,28 @@ export function subscriptionGrantsAccess(
 	}
 
 	return !!subscription.periodEnd && subscription.periodEnd.getTime() > Date.now();
+}
+
+export function subscriptionAccessPlanId(
+	subscription:
+		| {
+				productId?: string;
+				status: string;
+				periodEnd: Date | null;
+		  }
+		| undefined,
+	config: SubscriptionPolicyServiceConfig = {},
+): SubscriptionPlanId | null {
+	if (!subscription) {
+		return null;
+	}
+	if (!subscriptionGrantsAccess(subscription)) {
+		return null;
+	}
+
+	if (!config.starterProductId) {
+		return "starter";
+	}
+
+	return subscription.productId === config.starterProductId ? "starter" : null;
 }

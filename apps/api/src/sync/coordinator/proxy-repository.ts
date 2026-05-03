@@ -1,3 +1,5 @@
+import type { SubscriptionPlanPolicy } from "../../subscription/policy";
+
 type CoordinatorNamespace = {
 	getByName(name: string): DurableObjectStub;
 };
@@ -51,6 +53,32 @@ export class CoordinatorProxyRepository {
 				{
 					method: "DELETE",
 					headers,
+				},
+			),
+		);
+	}
+
+	async applyVaultPolicy(
+		vaultId: string,
+		limits: SubscriptionPlanPolicy["limits"],
+	): Promise<Response> {
+		const stub = this.namespace.getByName(vaultId);
+		return await stub.fetch(
+			new Request(
+				`https://internal/internal/v1/vaults/${encodeURIComponent(vaultId)}/policy`,
+				{
+					method: "PUT",
+					headers: {
+						"content-type": "application/json",
+					},
+					body: JSON.stringify({
+						limits: {
+							storageLimitBytes: limits.storageLimitBytes,
+							maxFileSizeBytes: limits.maxFileSizeBytes,
+							versionHistoryRetentionDays:
+								limits.versionHistoryRetentionDays,
+						},
+					}),
 				},
 			),
 		);

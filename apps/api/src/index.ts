@@ -1,5 +1,5 @@
-import { createRuntimeApp, createVaultPurgeConsumer } from "./runtime";
-import type { VaultPurgeMessage } from "./runtime";
+import { createQueueConsumer, createRuntimeApp } from "./runtime";
+import type { QueueMessage } from "./runtime";
 export { SyncCoordinator } from "./sync-coordinator";
 
 export default {
@@ -7,6 +7,6 @@ export default {
 		return await createRuntimeApp(env, request).fetch(request);
 	},
 	async queue(batch, env): Promise<void> {
-		await createVaultPurgeConsumer(env).handleBatch(batch);
+		await createQueueConsumer(env).handleBatch(batch);
 	},
-} satisfies ExportedHandler<Env, VaultPurgeMessage>;
+} satisfies ExportedHandler<Env, QueueMessage>;

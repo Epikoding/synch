@@ -64,6 +64,10 @@
 					{
 						"binding": "VAULT_PURGE_QUEUE",
 						"queue": "synch-vault-purge"
+					},
+					{
+						"binding": "POLICY_REFRESH_QUEUE",
+						"queue": "synch-policy-refresh"
 					}
 				],
 				"consumers": [
@@ -72,6 +76,12 @@
 						"max_batch_size": 5,
 						"max_batch_timeout": 30,
 						"max_retries": 3
+					},
+					{
+						"queue": "synch-policy-refresh",
+						"max_batch_size": 10,
+						"max_batch_timeout": 30,
+						"max_retries": 5
 					}
 				]
 			},
@@ -108,6 +118,10 @@
 					{
 						"binding": "VAULT_PURGE_QUEUE",
 						"queue": "synch-vault-purge"
+					},
+					{
+						"binding": "POLICY_REFRESH_QUEUE",
+						"queue": "synch-policy-refresh"
 					}
 				],
 				"consumers": [
@@ -116,6 +130,12 @@
 						"max_batch_size": 5,
 						"max_batch_timeout": 30,
 						"max_retries": 3
+					},
+					{
+						"queue": "synch-policy-refresh",
+						"max_batch_size": 10,
+						"max_batch_timeout": 30,
+						"max_retries": 5
 					}
 				]
 			},

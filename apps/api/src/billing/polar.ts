@@ -18,6 +18,9 @@ export type PolarClientConfig = {
 export function createPolarAuthPlugin(
 	config: PolarClientConfig & { publicBaseUrl: string },
 	repository: BillingRepository,
+	options: {
+		onSubscriptionUpsert?: (organizationId: string) => Promise<void>;
+	} = {},
 ) {
 	if (!config.accessToken || !config.productId || !config.webhookSecret) {
 		return null;
@@ -30,6 +33,7 @@ export function createPolarAuthPlugin(
 		const subscription = parsePolarSubscription(payload.data);
 		if (subscription) {
 			await repository.upsertPolarSubscription(subscription);
+			await options.onSubscriptionUpsert?.(subscription.organizationId);
 		}
 	};
 

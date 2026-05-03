@@ -6,6 +6,12 @@ import { onError } from "../../errors";
 import { BLOB_SIZE_HEADER, parseBlobSizeHeader } from "../blob/size";
 import type { CoordinatorService } from "./service";
 
+const policyLimitsSchema = z.object({
+	storageLimitBytes: z.number().int().nonnegative(),
+	maxFileSizeBytes: z.number().int().nonnegative(),
+	versionHistoryRetentionDays: z.number().int().nonnegative(),
+});
+
 export function createCoordinatorApp(
 	deps: { coordinatorService: CoordinatorService },
 ) {
@@ -50,6 +56,31 @@ export function createCoordinatorApp(
 			const { vaultId, blobId } = c.req.valid("param");
 			await deps.coordinatorService.abortStagedBlob(c.req.raw, vaultId, blobId);
 			return new Response(null, { status: 204 });
+		},
+	);
+
+	app.put(
+		"/internal/v1/vaults/:vaultId/policy",
+		zValidator(
+			"param",
+			z.object({
+				vaultId: z.string().trim().min(1),
+			}),
+		),
+		zValidator(
+			"json",
+			z.object({
+				limits: policyLimitsSchema,
+			}),
+		),
+		async (c) => {
+			const { vaultId } = c.req.valid("param");
+			const body = c.req.valid("json");
+			const result = await deps.coordinatorService.applyVaultPolicy(
+				vaultId,
+				body.limits,
+			);
+			return c.json(result);
 		},
 	);
 

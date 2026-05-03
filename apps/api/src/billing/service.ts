@@ -5,7 +5,7 @@ import {
 } from "./polar";
 import type { BillingRepository } from "./repository";
 import type { SubscriptionPlanId } from "../subscription/policy";
-import { subscriptionGrantsAccess } from "../subscription/policy-service";
+import { subscriptionAccessPlanId } from "../subscription/policy-service";
 
 export type BillingServiceConfig = PolarClientConfig & {
 	publicBaseUrl: string;
@@ -56,9 +56,17 @@ export class BillingService {
 	}> {
 		const subscriptions =
 			await this.repository.readOrganizationSubscriptionStatuses(organizationId);
-		const activeSubscription = subscriptions.find(subscriptionGrantsAccess);
-		const active = !!activeSubscription;
-		const planId: SubscriptionPlanId = active ? "starter" : "free";
+		const activeSubscription = subscriptions.find(
+			(subscription) =>
+				subscriptionAccessPlanId(subscription, {
+					starterProductId: this.config.productId,
+				}) !== null,
+		);
+		const activePlanId = subscriptionAccessPlanId(activeSubscription, {
+			starterProductId: this.config.productId,
+		});
+		const active = activePlanId !== null;
+		const planId: SubscriptionPlanId = activePlanId ?? "free";
 		return {
 			planId,
 			active,

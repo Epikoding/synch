@@ -8,9 +8,11 @@ type CursorDb = Pick<
 	"insert" | "select"
 >;
 
-const BETA_STORAGE_LIMIT_BYTES = 1_000_000_000;
-const BETA_MAX_FILE_SIZE_BYTES = 10_000_000;
-const BETA_VERSION_HISTORY_RETENTION_DAYS = 1;
+export type VaultStateLimits = {
+	storageLimitBytes: number;
+	maxFileSizeBytes: number;
+	versionHistoryRetentionDays: number;
+};
 
 export class CoordinatorCursorStore {
 	constructor(private readonly storage: DurableObjectStorage) {}
@@ -19,8 +21,8 @@ export class CoordinatorCursorStore {
 		return currentCursor(this.getDb());
 	}
 
-	ensureVaultState(vaultId: string): void {
-		ensureVaultState(this.getDb(), vaultId);
+	ensureVaultState(vaultId: string, initialLimits: VaultStateLimits): void {
+		ensureVaultState(this.getDb(), vaultId, initialLimits);
 	}
 
 	readVaultId(): string | null {
@@ -60,7 +62,11 @@ export class CoordinatorCursorStore {
 	}
 }
 
-function ensureVaultState(db: CursorDb, vaultId: string): void {
+function ensureVaultState(
+	db: CursorDb,
+	vaultId: string,
+	initialLimits: VaultStateLimits,
+): void {
 	const existing = db
 		.select({
 			vaultId: doSchema.coordinatorState.vaultId,
@@ -81,9 +87,9 @@ function ensureVaultState(db: CursorDb, vaultId: string): void {
 			id: 1,
 			vaultId,
 			currentCursor: 0,
-			storageLimitBytes: BETA_STORAGE_LIMIT_BYTES,
-			maxFileSizeBytes: BETA_MAX_FILE_SIZE_BYTES,
-			versionHistoryRetentionDays: BETA_VERSION_HISTORY_RETENTION_DAYS,
+			storageLimitBytes: initialLimits.storageLimitBytes,
+			maxFileSizeBytes: initialLimits.maxFileSizeBytes,
+			versionHistoryRetentionDays: initialLimits.versionHistoryRetentionDays,
 		})
 		.run();
 }

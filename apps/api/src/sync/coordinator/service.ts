@@ -26,11 +26,16 @@ import type {
 import { MutationCommitService } from "./mutation/commit-service";
 import { CoordinatorSocketService } from "./socket/service";
 import { CoordinatorStateRepository } from "./state-repository";
+import type { VaultStateLimits } from "./store/cursor-store";
 import type { VaultSyncStatusRepository } from "../health/status-repository";
 
 const DEFAULT_BLOB_GRACE_PERIOD_MS = 30 * 60 * 1000;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CURSOR_ACTIVE_TTL_MS = 30 * DAY_IN_MS;
+
+export type InitialVaultLimitReader = {
+	readInitialVaultLimits(vaultId: string): Promise<VaultStateLimits>;
+};
 
 export class CoordinatorService {
 	private vaultPurged = false;
@@ -47,6 +52,7 @@ export class CoordinatorService {
 		private readonly socketService: CoordinatorSocketService,
 		private readonly blobRepository: BlobRepository,
 		syncStatusRepository: VaultSyncStatusRepository | null = null,
+		private readonly initialVaultLimitReader: InitialVaultLimitReader | null = null,
 		blobGracePeriodMs = DEFAULT_BLOB_GRACE_PERIOD_MS,
 		cursorActiveTtlMs = DEFAULT_CURSOR_ACTIVE_TTL_MS,
 		private maintenanceScheduler: CoordinatorMaintenanceScheduler | null = null,
@@ -109,7 +115,7 @@ export class CoordinatorService {
 			request,
 			vaultId,
 			this.syncTokenService,
-			this.stateRepository,
+			async (vaultId) => await this.ensureVaultState(vaultId),
 			async (now) => await this.scheduleHealthSummaryFlush(now),
 		);
 	}
@@ -162,6 +168,25 @@ export class CoordinatorService {
 
 	async deleteBlob(request: Request, vaultId: string, blobId: string): Promise<void> {
 		await this.blobSyncService.deleteBlob(request, vaultId, blobId);
+	}
+
+	async applyVaultPolicy(
+		vaultId: string,
+		limits: {
+			storageLimitBytes: number;
+			maxFileSizeBytes: number;
+			versionHistoryRetentionDays: number;
+		},
+	): Promise<{ applied: boolean }> {
+		const applied = this.stateRepository.applyVaultPolicy(vaultId, limits);
+		if (applied) {
+			await this.scheduleHealthSummaryFlush();
+			this.socketService.broadcastStorageStatus({
+				type: "storage_status_updated",
+				storageStatus: this.stateRepository.readStorageStatus(),
+			});
+		}
+		return { applied };
 	}
 
 	async purgeVault(vaultId: string): Promise<void> {
@@ -227,6 +252,23 @@ export class CoordinatorService {
 
 	private async scheduleHealthSummaryFlush(now = Date.now()): Promise<void> {
 		await this.healthSyncService.scheduleSummaryFlush(now);
+	}
+
+	private async ensureVaultState(vaultId: string): Promise<void> {
+		if (this.stateRepository.vaultStateExistsFor(vaultId)) {
+			return;
+		}
+
+		const initialLimits = await this.readInitialVaultLimits(vaultId);
+		this.stateRepository.ensureVaultState(vaultId, initialLimits);
+	}
+
+	private async readInitialVaultLimits(vaultId: string): Promise<VaultStateLimits> {
+		if (!this.initialVaultLimitReader) {
+			throw new Error("initial vault limit reader is not configured");
+		}
+
+		return await this.initialVaultLimitReader.readInitialVaultLimits(vaultId);
 	}
 
 	private async deferMaintenance(

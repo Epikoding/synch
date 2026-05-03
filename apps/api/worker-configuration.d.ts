@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 		DB: D1Database;
 		EMAIL: SendEmail;
 		VAULT_PURGE_QUEUE: Queue;
+		POLICY_REFRESH_QUEUE: Queue;
 		SYNC_TOKEN_TTL_SECONDS: 120;
 		SELF_HOSTED: false;
 		WWW_BASE_URL: "https://synch.run";
@@ -28,6 +29,7 @@ declare namespace Cloudflare {
 		SYNC_BLOBS: R2Bucket;
 		DB: D1Database;
 		VAULT_PURGE_QUEUE: Queue;
+		POLICY_REFRESH_QUEUE: Queue;
 		SYNC_TOKEN_TTL_SECONDS: 120;
 		SELF_HOSTED: true;
 		BETTER_AUTH_URL: string;
@@ -45,6 +47,7 @@ declare namespace Cloudflare {
 		DB: D1Database;
 		EMAIL?: SendEmail;
 		VAULT_PURGE_QUEUE: Queue;
+		POLICY_REFRESH_QUEUE: Queue;
 		SYNC_TOKEN_TTL_SECONDS: 120;
 		SELF_HOSTED: false | true;
 		WWW_BASE_URL?: "https://synch.run";

@@ -2,7 +2,10 @@ import { vi } from "vitest";
 
 import type { SyncTokenService } from "../../../access/token-service";
 import type { BlobRepository } from "../../../blob/repository";
-import { CoordinatorService } from "../../service";
+import {
+	CoordinatorService,
+	type InitialVaultLimitReader,
+} from "../../service";
 import type { CoordinatorSocketService } from "../../socket/service";
 import type { CoordinatorStateRepository } from "../../state-repository";
 import type { SocketSession } from "../../types";
@@ -43,11 +46,13 @@ export function createCoordinatorService({
 	stateRepository = createMockCoordinatorStateRepository(),
 	socketService = createMockCoordinatorSocketService(),
 	blobRepository = {} as BlobRepository,
+	initialVaultLimitReader = null,
 }: {
 	syncTokenService?: SyncTokenService;
 	stateRepository?: CoordinatorStateRepository;
 	socketService?: CoordinatorSocketService;
 	blobRepository?: BlobRepository;
+	initialVaultLimitReader?: InitialVaultLimitReader | null;
 } = {}): CoordinatorService {
 	return new CoordinatorService(
 		syncTokenService,
@@ -55,6 +60,7 @@ export function createCoordinatorService({
 		socketService,
 		blobRepository,
 		null,
+		initialVaultLimitReader,
 	);
 }
 
@@ -71,7 +77,9 @@ export function socketServiceMock(session = testSocketSession()) {
 
 export function socketStateRepository(_session = testSocketSession()) {
 	return createMockCoordinatorStateRepository({
+		vaultStateExistsFor: vi.fn(() => false),
 		ensureVaultState: vi.fn(),
+		applyVaultPolicy: vi.fn(() => true),
 		recordLocalVaultConnection: vi.fn(),
 		deleteLocalVaultConnection: vi.fn(),
 		currentCursor: vi.fn(() => 11),

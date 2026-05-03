@@ -17,6 +17,7 @@ export type PolarSubscriptionUpsertInput = {
 };
 
 export type OrganizationSubscriptionStatus = {
+	productId: string;
 	status: string;
 	periodEnd: Date | null;
 	updatedAt: Date;
@@ -43,6 +44,7 @@ export class BillingRepository {
 	): Promise<OrganizationSubscriptionStatus[]> {
 		return await this.db
 			.select({
+				productId: schema.polarSubscription.productId,
 				status: schema.polarSubscription.status,
 				periodEnd: schema.polarSubscription.periodEnd,
 				updatedAt: schema.polarSubscription.updatedAt,

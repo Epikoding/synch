@@ -113,6 +113,23 @@ export class VaultRepository {
 		return rows.length;
 	}
 
+	async listActiveVaultIdsForOrganization(organizationId: string): Promise<string[]> {
+		const rows = await this.db
+			.select({
+				id: schema.vault.id,
+			})
+			.from(schema.vault)
+			.where(
+				and(
+					eq(schema.vault.organizationId, organizationId),
+					isNull(schema.vault.deletedAt),
+				),
+			)
+			.orderBy(asc(schema.vault.createdAt));
+
+		return rows.map((row) => row.id);
+	}
+
 	async vaultNameExistsForOrganization(
 		organizationId: string,
 		name: string,
