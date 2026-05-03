@@ -415,10 +415,123 @@ describe("SyncPushService drain: limits", () => {
       }),
       createdAt: 1,
     });
+    await store.upsertEntry({
+      entryId: "entry-after-quota",
+      path: "Folder/after-quota.md",
+      revision: 0,
+      blobId: "blob-after-quota",
+      hash,
+      deleted: false,
+      updatedAt: 1,
+      localMtime: null,
+      localSize: bytes.byteLength,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-after-quota",
+      entryId: "entry-after-quota",
+      op: "upsert",
+      baseRevision: 0,
+      blobId: "blob-after-quota",
+      hash,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-after-quota",
+        baseRevision: 0,
+        op: "upsert",
+        blobId: "blob-after-quota",
+        path: "Folder/after-quota.md",
+        hash,
+      }),
+      createdAt: 2,
+    });
 
     const session = createPushSession(async () => {
       throw new Error("quota-blocked mutation should not be committed");
     });
+    const uploadAttempts: string[] = [];
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes(path) {
+          if (
+            path === "Folder/server-quota.md" ||
+            path === "Folder/after-quota.md"
+          ) {
+            return bytes;
+          }
+
+          throw new Error(`unexpected read for ${path}`);
+        },
+      },
+      blobClient: {
+        async uploadBlob(_apiBaseUrl, _syncToken, _vaultId, blobId) {
+          uploadAttempts.push(blobId);
+          throw new SyncBlobUploadError(413, "quota_exceeded", "quota exceeded");
+        },
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.pushPendingMutations(session)).resolves.toMatchObject({
+      mutationsPushed: 0,
+      mutationsRequeued: 0,
+      hasMore: true,
+    });
+    expect(uploadAttempts).toEqual(["blob-server-quota"]);
+    expect(await store.listDirtyEntries()).toEqual([
+      expect.objectContaining({
+        mutationId: "mutation-after-quota",
+      }),
+    ]);
+    expect(await store.getDirtyEntryMutation("entry-server-quota")).toMatchObject({
+      mutationId: "mutation-server-quota",
+      status: "blocked",
+      blockedReason: "storage_quota_exceeded",
+    });
+    await store.close();
+  });
+
+  it("blocks upserts without staging blobs when known storage is exhausted", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    const bytes = encodeUtf8("body");
+    const hash = await hashBytes(bytes);
+    await store.upsertEntry({
+      entryId: "entry-known-quota",
+      path: "Folder/known-quota.md",
+      revision: 0,
+      blobId: "blob-known-quota",
+      hash,
+      deleted: false,
+      updatedAt: 1,
+      localMtime: null,
+      localSize: bytes.byteLength,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-known-quota",
+      entryId: "entry-known-quota",
+      op: "upsert",
+      baseRevision: 0,
+      blobId: "blob-known-quota",
+      hash,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-known-quota",
+        baseRevision: 0,
+        op: "upsert",
+        blobId: "blob-known-quota",
+        path: "Folder/known-quota.md",
+        hash,
+      }),
+      createdAt: 1,
+    });
+
+    const session = createPushSession(async () => {
+      throw new Error("quota-blocked mutation should not be committed");
+    });
+    session.storageUsedBytes = 50_000_000;
+    session.storageLimitBytes = 50_000_000;
     let uploadAttempts = 0;
     const service = new SyncPushService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",
@@ -427,7 +540,7 @@ describe("SyncPushService drain: limits", () => {
       getRemoteVaultKey: () => TEST_VAULT_KEY,
       fileReader: {
         async readBytes(path) {
-          if (path === "Folder/server-quota.md") {
+          if (path === "Folder/known-quota.md") {
             return bytes;
           }
 
@@ -437,7 +550,6 @@ describe("SyncPushService drain: limits", () => {
       blobClient: {
         async uploadBlob() {
           uploadAttempts += 1;
-          throw new SyncBlobUploadError(413, "quota_exceeded", "quota exceeded");
         },
       },
       onProgress: ignoreProgress,
@@ -448,10 +560,87 @@ describe("SyncPushService drain: limits", () => {
       mutationsRequeued: 0,
       hasMore: false,
     });
-    expect(uploadAttempts).toBe(1);
+    expect(uploadAttempts).toBe(0);
     expect(await store.listDirtyEntries()).toEqual([]);
-    expect(await store.getDirtyEntryMutation("entry-server-quota")).toMatchObject({
-      mutationId: "mutation-server-quota",
+    expect(await store.getDirtyEntryMutation("entry-known-quota")).toMatchObject({
+      mutationId: "mutation-known-quota",
+      status: "blocked",
+      blockedReason: "storage_quota_exceeded",
+    });
+    await store.close();
+  });
+
+  it("blocks upserts without staging blobs when they exceed remaining storage", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    const bytes = new Uint8Array(600_000).fill(1);
+    const hash = await hashBytes(bytes);
+    await store.upsertEntry({
+      entryId: "entry-near-quota",
+      path: "Folder/near-quota.md",
+      revision: 0,
+      blobId: "blob-near-quota",
+      hash,
+      deleted: false,
+      updatedAt: 1,
+      localMtime: null,
+      localSize: bytes.byteLength,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-near-quota",
+      entryId: "entry-near-quota",
+      op: "upsert",
+      baseRevision: 0,
+      blobId: "blob-near-quota",
+      hash,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-near-quota",
+        baseRevision: 0,
+        op: "upsert",
+        blobId: "blob-near-quota",
+        path: "Folder/near-quota.md",
+        hash,
+      }),
+      createdAt: 1,
+    });
+
+    const session = createPushSession(async () => {
+      throw new Error("quota-blocked mutation should not be committed");
+    });
+    session.storageUsedBytes = 49_500_000;
+    session.storageLimitBytes = 50_000_000;
+    let uploadAttempts = 0;
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes(path) {
+          if (path === "Folder/near-quota.md") {
+            return bytes;
+          }
+
+          throw new Error(`unexpected read for ${path}`);
+        },
+      },
+      blobClient: {
+        async uploadBlob() {
+          uploadAttempts += 1;
+        },
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.pushPendingMutations(session)).resolves.toMatchObject({
+      mutationsPushed: 0,
+      mutationsRequeued: 0,
+      hasMore: false,
+    });
+    expect(uploadAttempts).toBe(0);
+    expect(await store.listDirtyEntries()).toEqual([]);
+    expect(await store.getDirtyEntryMutation("entry-near-quota")).toMatchObject({
+      mutationId: "mutation-near-quota",
       status: "blocked",
       blockedReason: "storage_quota_exceeded",
     });

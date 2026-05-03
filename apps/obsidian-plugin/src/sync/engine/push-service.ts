@@ -133,6 +133,9 @@ export class SyncPushService {
             if (prepared.reason === "file_too_large") {
               fileSizeBlocked += 1;
             }
+            if (prepared.reason === "storage_quota_exceeded") {
+              stopAfterCurrentBatch = true;
+            }
             continue;
           }
 
@@ -141,6 +144,9 @@ export class SyncPushService {
 
         if (committable.length === 0) {
           await this.reportProgress(store);
+          if (stopAfterCurrentBatch) {
+            break;
+          }
           continue;
         }
 
@@ -279,6 +285,17 @@ export class SyncPushService {
       prepared: Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>;
     }>
   > {
+    const storageAvailableBytes = getStorageAvailableBytes(session);
+    if (storageAvailableBytes !== null) {
+      return await this.preparePendingMutationsWithStorageBudget(
+        store,
+        token,
+        session,
+        pending,
+        storageAvailableBytes,
+      );
+    }
+
     return await mapWithConcurrency(
       pending,
       this.deps.prepareConcurrency ?? DEFAULT_PUSH_PREPARE_CONCURRENCY,
@@ -293,6 +310,61 @@ export class SyncPushService {
       }),
     );
   }
+
+  private async preparePendingMutationsWithStorageBudget(
+    store: SyncPushStore,
+    token: SyncTokenResponse,
+    session: SyncRealtimeSession,
+    pending: PendingMutationRow[],
+    storageAvailableBytes: number,
+  ): Promise<
+    Array<{
+      mutation: (typeof pending)[number];
+      prepared: Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>;
+    }>
+  > {
+    const preparedMutations: Array<{
+      mutation: (typeof pending)[number];
+      prepared: Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>;
+    }> = [];
+    let remainingStorageBytes = storageAvailableBytes;
+
+    for (const mutation of pending) {
+      const prepared = await this.mutationCommitter.prepareMutationForCommit(
+        store,
+        token,
+        mutation,
+        session.maxFileSizeBytes,
+        remainingStorageBytes,
+      );
+      preparedMutations.push({ mutation, prepared });
+
+      if (!prepared) {
+        continue;
+      }
+      if ("skipped" in prepared) {
+        if (prepared.reason === "storage_quota_exceeded") {
+          break;
+        }
+        continue;
+      }
+
+      remainingStorageBytes = Math.max(
+        0,
+        remainingStorageBytes - prepared.storageBytesAdded,
+      );
+    }
+
+    return preparedMutations;
+  }
+}
+
+function getStorageAvailableBytes(session: SyncRealtimeSession): number | null {
+  if (session.storageLimitBytes <= 0) {
+    return null;
+  }
+
+  return Math.max(0, session.storageLimitBytes - session.storageUsedBytes);
 }
 
 function getContiguousAcceptedCursor(

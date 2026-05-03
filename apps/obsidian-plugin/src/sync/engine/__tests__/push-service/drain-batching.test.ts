@@ -116,6 +116,7 @@ describe("SyncPushService drain: batching", () => {
         revision: mutation.baseRevision + 1,
       };
     });
+    session.storageLimitBytes = 0;
     const service = new SyncPushService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",
       getSyncToken: async () => createToken(),
