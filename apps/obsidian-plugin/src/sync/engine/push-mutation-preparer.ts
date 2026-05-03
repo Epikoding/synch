@@ -103,6 +103,18 @@ export class PushMutationPreparer {
           reason: "storage_quota_exceeded",
         };
       }
+      if (isFileTooLargeUploadError(error)) {
+        await this.blockOversizedUpsert(
+          store,
+          mutation,
+          encryptedBytes.byteLength,
+          maxFileSizeBytes > 0 ? maxFileSizeBytes : null,
+        );
+        return {
+          skipped: true,
+          reason: "file_too_large",
+        };
+      }
 
       throw error;
     }
@@ -126,7 +138,7 @@ export class PushMutationPreparer {
     store: PushMutationStore,
     mutation: PendingMutationRow,
     encryptedSizeBytes: number,
-    maxFileSizeBytes: number,
+    maxFileSizeBytes: number | null,
   ): Promise<void> {
     await store.updateDirtyEntry({
       ...mutation,
@@ -189,5 +201,13 @@ function isQuotaExceededUploadError(error: unknown): boolean {
     error instanceof SyncBlobUploadError &&
     error.status === 413 &&
     error.code === "quota_exceeded"
+  );
+}
+
+function isFileTooLargeUploadError(error: unknown): boolean {
+  return (
+    error instanceof SyncBlobUploadError &&
+    error.status === 413 &&
+    error.code !== "quota_exceeded"
   );
 }

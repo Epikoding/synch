@@ -105,6 +105,94 @@ describe("SyncPushService drain: limits", () => {
     await store.close();
   });
 
+  it.each([
+    ["file_too_large"],
+    [""],
+  ])(
+    "blocks upserts when blob upload returns a non-quota 413 (%s)",
+    async (errorCode) => {
+      const plugin = createTestPlugin();
+      const store = await createInitializedTestSyncStore(plugin);
+      const bytes = encodeUtf8("server rejected body");
+      const hash = await hashBytes(bytes);
+      await store.upsertEntry({
+        entryId: "entry-upload-413",
+        path: "Folder/upload-413.md",
+        revision: 0,
+        blobId: "blob-upload-413",
+        hash,
+        deleted: false,
+        updatedAt: 1,
+        localMtime: null,
+        localSize: bytes.byteLength,
+      });
+      await store.markEntryDirty({
+        mutationId: "mutation-upload-413",
+        entryId: "entry-upload-413",
+        op: "upsert",
+        baseRevision: 0,
+        blobId: "blob-upload-413",
+        hash,
+        encryptedMetadata: await encryptMutationMetadata({
+          entryId: "entry-upload-413",
+          baseRevision: 0,
+          op: "upsert",
+          blobId: "blob-upload-413",
+          path: "Folder/upload-413.md",
+          hash,
+        }),
+        createdAt: 1,
+      });
+
+      const session = createPushSession(async () => {
+        throw new Error("413-blocked mutation should not be committed");
+      });
+      session.maxFileSizeBytes = 0;
+      let uploadAttempts = 0;
+      const onFileSizeBlockedFilesChange = vi.fn();
+      const service = new SyncPushService({
+        getApiBaseUrl: () => "http://127.0.0.1:8787",
+        getSyncToken: async () => createToken(),
+        getSyncStore: () => store,
+        getRemoteVaultKey: () => TEST_VAULT_KEY,
+        fileReader: {
+          async readBytes(path) {
+            if (path === "Folder/upload-413.md") {
+              return bytes;
+            }
+
+            throw new Error(`unexpected read for ${path}`);
+          },
+        },
+        blobClient: {
+          async uploadBlob() {
+            uploadAttempts += 1;
+            throw new SyncBlobUploadError(413, errorCode, "payload too large");
+          },
+        },
+        onProgress: ignoreProgress,
+        onFileSizeBlockedFilesChange,
+      });
+
+      await expect(service.pushPendingMutations(session)).resolves.toMatchObject({
+        mutationsPushed: 0,
+        mutationsRequeued: 0,
+        hasMore: false,
+      });
+      expect(uploadAttempts).toBe(1);
+      expect(onFileSizeBlockedFilesChange).toHaveBeenCalledTimes(1);
+      expect(await store.listDirtyEntries()).toEqual([]);
+      expect(await store.getDirtyEntryMutation("entry-upload-413")).toMatchObject({
+        mutationId: "mutation-upload-413",
+        status: "blocked",
+        blockedReason: "file_too_large",
+        blockedEncryptedSizeBytes: expect.any(Number),
+        blockedMaxFileSizeBytes: null,
+      });
+      await store.close();
+    },
+  );
+
   it("unblocks file-size blocked mutations when the server limit increases", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);
