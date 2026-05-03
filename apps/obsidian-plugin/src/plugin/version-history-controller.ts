@@ -40,13 +40,24 @@ export class SynchVersionHistoryController
 
   async openPane(): Promise<void> {
     const leaf = await this.getOrCreatePaneLeaf({ active: true, reveal: true });
-    this.deps.plugin.app.workspace.revealLeaf(leaf);
+    await this.deps.plugin.app.workspace.revealLeaf(leaf);
   }
 
   private async getOrCreatePaneLeaf(options: {
     active: boolean;
     reveal: boolean;
   }): Promise<WorkspaceLeaf> {
+    const leaves = this.deps.plugin.app.workspace.getLeavesOfType(
+      SYNCH_VERSION_HISTORY_VIEW_TYPE,
+    );
+    const existingLeaf = leaves[0];
+    if (existingLeaf) {
+      for (const leaf of leaves.slice(1)) {
+        leaf.detach();
+      }
+      return existingLeaf;
+    }
+
     return await this.deps.plugin.app.workspace.ensureSideLeaf(
       SYNCH_VERSION_HISTORY_VIEW_TYPE,
       "right",
