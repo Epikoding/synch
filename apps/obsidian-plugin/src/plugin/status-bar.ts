@@ -3,12 +3,12 @@ import { setIcon, type Plugin } from "obsidian";
 import { isStorageWarningStatus } from "../utils/storage-warning";
 import type { SynchStorageStatus, SynchSyncState } from "./view-models";
 
-interface ObsidianSettingsApi {
+export interface ObsidianSettingsApi {
   open(): void;
   openTabById(id: string): void;
 }
 
-interface AppWithSettings {
+export interface AppWithSettings {
   setting?: ObsidianSettingsApi;
 }
 
@@ -66,6 +66,12 @@ export function getStatusBarIcon(state: SynchSyncState): string {
   }
 }
 
+export function openSynchSettings(plugin: Plugin): void {
+  const settings = (plugin.app as AppWithSettings).setting;
+  settings?.open();
+  settings?.openTabById(plugin.manifest.id);
+}
+
 export class SynchStatusBar {
   private statusBar: HTMLElement | null = null;
   private icon: HTMLElement | null = null;
@@ -86,7 +92,7 @@ export class SynchStatusBar {
     });
     this.icon.setAttribute("aria-hidden", "true");
     this.plugin.registerDomEvent(this.statusBar, "click", () => {
-      this.openSettings();
+      openSynchSettings(this.plugin);
     });
     this.refresh();
   }
@@ -125,11 +131,5 @@ export class SynchStatusBar {
       "data-synch-storage-warning",
       hasStorageWarning ? "true" : "false",
     );
-  }
-
-  private openSettings(): void {
-    const settings = (this.plugin.app as AppWithSettings).setting;
-    settings?.open();
-    settings?.openTabById(this.plugin.manifest.id);
   }
 }

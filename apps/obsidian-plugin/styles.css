@@ -59,6 +59,44 @@
   opacity: 0.45;
 }
 
+.synch-mobile-status-indicator {
+  align-items: center;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+  color: var(--text-error);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.5rem;
+  justify-content: center;
+  padding: 0;
+  position: fixed;
+  right: calc(1rem + env(safe-area-inset-right));
+  width: 2.5rem;
+  z-index: var(--layer-popover);
+}
+
+.synch-mobile-status-indicator.synch-mobile-status-indicator-hidden {
+  display: none;
+}
+
+.synch-mobile-status-indicator.synch-status-storage-warning {
+  color: var(--text-warning);
+}
+
+.synch-mobile-status-indicator-icon {
+  display: inline-flex;
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.synch-mobile-status-indicator-icon svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
 .synch-file-size-blocked-icon {
   color: var(--text-warning);
   display: inline-flex;

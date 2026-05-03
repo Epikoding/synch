@@ -1,7 +1,8 @@
-import { Plugin } from "obsidian";
+import { Platform, Plugin } from "obsidian";
 
 import { registerSynchCommands } from "./plugin/commands";
 import { SynchFileSizeBlockedDecorator } from "./plugin/file-size-blocked-decorator";
+import { SynchMobileStatusIndicator } from "./plugin/mobile-status-indicator";
 import { SynchPluginController } from "./plugin/plugin-controller";
 import { SynchStatusBar } from "./plugin/status-bar";
 import {
@@ -13,6 +14,7 @@ import { SynchSettingTab } from "./settings/settings-tab";
 export default class SynchPlugin extends Plugin {
   private controller: SynchPluginController | null = null;
   private fileSizeBlockedDecorator: SynchFileSizeBlockedDecorator | null = null;
+  private mobileStatusIndicator: SynchMobileStatusIndicator | null = null;
   private statusBar: SynchStatusBar | null = null;
   private settingsTab: SynchSettingTab | null = null;
 
@@ -30,8 +32,13 @@ export default class SynchPlugin extends Plugin {
 
     await controller.initialize();
 
-    this.statusBar = new SynchStatusBar(this, controller);
-    this.statusBar.initialize();
+    if (Platform.isMobile) {
+      this.mobileStatusIndicator = new SynchMobileStatusIndicator(this, controller);
+      this.mobileStatusIndicator.initialize();
+    } else {
+      this.statusBar = new SynchStatusBar(this, controller);
+      this.statusBar.initialize();
+    }
     this.fileSizeBlockedDecorator = new SynchFileSizeBlockedDecorator(this, controller);
     this.fileSizeBlockedDecorator.initialize();
 
@@ -79,6 +86,7 @@ export default class SynchPlugin extends Plugin {
 
   private refreshUi(): void {
     this.settingsTab?.refresh();
+    this.mobileStatusIndicator?.refresh();
     this.statusBar?.refresh();
   }
 }
