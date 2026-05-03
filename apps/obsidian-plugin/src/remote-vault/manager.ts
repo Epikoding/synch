@@ -190,7 +190,7 @@ export class RemoteVaultManager {
     password: string,
   ): Promise<void> {
     const wrapper = findPasswordWrapper(bootstrap.wrappers);
-    const remoteVaultKey = await unwrapRemoteVaultKeyWithPassword(password, wrapper.envelope);
+    const remoteVaultKey = await unwrapRemoteVaultKey(password, wrapper.envelope);
     const summary: RemoteVaultSessionSummary = {
       vaultId: bootstrap.vault.id,
       vaultName: bootstrap.vault.name,
@@ -225,6 +225,25 @@ export class RemoteVaultManager {
 
     return this.session;
   }
+}
+
+async function unwrapRemoteVaultKey(
+  password: string,
+  envelope: RemoteVaultBootstrapResponse["wrappers"][number]["envelope"],
+): Promise<Uint8Array> {
+  try {
+    return await unwrapRemoteVaultKeyWithPassword(password, envelope);
+  } catch (error) {
+    if (isCryptoOperationError(error)) {
+      throw new Error("Unable to unlock vault. Check the password and try again.");
+    }
+
+    throw error;
+  }
+}
+
+function isCryptoOperationError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "OperationError";
 }
 
 function validateCreateInput(input: CreateRemoteVaultInput): void {

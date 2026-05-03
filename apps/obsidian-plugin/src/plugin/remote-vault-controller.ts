@@ -67,12 +67,14 @@ export class SynchRemoteVaultController {
         this.deps.plugin.app,
         vaults,
         this.deps.getStoredRemoteVaultId(),
+        async (input) => {
+          await this.deps.remoteVaultManager.bootstrapRemoteVault(input);
+        },
       );
       if (!input) {
         return;
       }
 
-      await this.deps.remoteVaultManager.bootstrapRemoteVault(input);
       await this.deps.initializeSyncStoreForActiveRemoteVault();
       await this.deps.ensureAutoSyncState();
     } catch (error) {

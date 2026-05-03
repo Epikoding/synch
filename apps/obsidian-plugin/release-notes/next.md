@@ -13,3 +13,4 @@
 ## Fixed
 
 - Avoid unnecessary follow-up pulls after local changes are pushed when the accepted sync cursors are already contiguous with the last pulled checkpoint.
+- Keep the connect vault dialog open when a password cannot unlock the vault, and prevent canceling while a connection attempt is still finishing.

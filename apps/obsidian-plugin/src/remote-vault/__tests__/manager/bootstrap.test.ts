@@ -78,4 +78,48 @@ describe("RemoteVaultManager bootstrap", () => {
     expect(manager.getRemoteVaultStatusLabel()).toContain("loaded on this device");
     expect(manager.getRemoteVaultStatusLabel()).not.toContain("vault-remote");
   });
+
+  it("reports a friendly error when the password cannot unwrap the vault key", async () => {
+    const savedVaults: Array<StoredRemoteVaultKeySecret | null> = [];
+    const createdWrapper = await createPasswordWrappedRemoteVaultKey("vault-password", {
+      kdfOverrides: {
+        memoryKiB: 8,
+        iterations: 1,
+        parallelism: 1,
+      },
+    });
+
+    const manager = createManager({
+      savedVaults,
+      remoteVaultClient: {
+        getRemoteVaultBootstrap: async (
+          _apiBaseUrl: string,
+          _sessionToken: string,
+          vaultId: string,
+        ): Promise<RemoteVaultBootstrapResponse> => ({
+          vault: remoteVaultSummary({ id: vaultId }),
+          wrappers: [
+            {
+              id: "wrapper-1",
+              vaultId,
+              keyVersion: 1,
+              kind: "password",
+              userId: "user-1",
+              envelope: createdWrapper.envelope,
+              createdAt: "2026-04-22T00:00:00.000Z",
+              revokedAt: null,
+            },
+          ],
+        }),
+      },
+    });
+
+    await expect(
+      manager.bootstrapRemoteVault({
+        vaultId: "vault-remote",
+        password: "wrong-password",
+      }),
+    ).rejects.toThrow("Unable to unlock vault. Check the password and try again.");
+    expect(savedVaults).toEqual([]);
+  });
 });

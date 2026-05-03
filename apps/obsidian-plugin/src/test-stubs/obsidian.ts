@@ -29,6 +29,7 @@ interface MarkdownRenderCall {
 
 class MockElement {
   text = "";
+  private readonly eventListeners = new Map<string, Array<() => void>>();
 
   constructor(private readonly record: CreatedElementRecord | null = null) {}
 
@@ -72,6 +73,12 @@ class MockElement {
     if (this.record) {
       this.record.attributes[name] = value;
     }
+  }
+
+  addEventListener(name: string, callback: () => void): void {
+    const callbacks = this.eventListeners.get(name) ?? [];
+    callbacks.push(callback);
+    this.eventListeners.set(name, callbacks);
   }
 }
 

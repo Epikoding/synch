@@ -19,8 +19,9 @@ export async function openBootstrapRemoteVaultModal(
   app: App,
   vaults: RemoteVaultRecord[],
   preferredVaultId: string | null,
+  onConnect?: (input: BootstrapRemoteVaultInput) => Promise<void>,
 ): Promise<BootstrapRemoteVaultInput | null> {
-  const modal = new BootstrapRemoteVaultModal(app, vaults, preferredVaultId);
+  const modal = new BootstrapRemoteVaultModal(app, vaults, preferredVaultId, onConnect);
   return await modal.openAndWait();
 }
 
@@ -280,8 +281,15 @@ class BootstrapRemoteVaultModal extends Modal {
   private readonly vaults: RemoteVaultRecord[];
   private selectedVaultId: string;
   private password = "";
+  private submitting = false;
+  private allowSubmittingClose = false;
 
-  constructor(app: App, vaults: RemoteVaultRecord[], preferredVaultId: string | null) {
+  constructor(
+    app: App,
+    vaults: RemoteVaultRecord[],
+    preferredVaultId: string | null,
+    private readonly onConnect?: (input: BootstrapRemoteVaultInput) => Promise<void>,
+  ) {
     super(app);
     this.vaults = vaults;
     this.selectedVaultId =
@@ -302,6 +310,19 @@ class BootstrapRemoteVaultModal extends Modal {
     contentEl.empty();
 
     new Setting(contentEl).setName("Connect Vault").setHeading();
+    let errorEl: { setText(value: string): unknown } | null = null;
+    let cancelButton: { setDisabled(value: boolean): unknown } | null = null;
+    let connectButton: { setButtonText(value: string): unknown; setDisabled(value: boolean): unknown } | null = null;
+    const setError = (message: string): void => {
+      errorEl?.setText(message);
+    };
+    const setSubmitting = (value: boolean): void => {
+      this.submitting = value;
+      cancelButton?.setDisabled(value);
+      connectButton?.setDisabled(value);
+      connectButton?.setButtonText(value ? "Connecting..." : "Connect vault");
+    };
+
     contentEl.createEl("p", {
       cls: "synch-modal-hint",
       text: "Choose a vault from the server, then enter the password to connect it on this device.",
@@ -338,24 +359,54 @@ class BootstrapRemoteVaultModal extends Modal {
         text.inputEl.autocomplete = "current-password";
         text.setPlaceholder("Enter vault password").onChange((value) => {
           this.password = value;
+          setError("");
         });
       });
+
+    errorEl = contentEl.createEl("p", {
+      cls: "synch-modal-error",
+    });
 
     new Setting(contentEl)
       .addButton((button) => {
         button.setButtonText("Cancel").onClick(() => {
           this.close();
         });
+        cancelButton = button;
       })
       .addButton((button) => {
-        button.setButtonText("Connect vault").setCta().onClick(() => {
-          this.result = {
+        button.setButtonText("Connect vault").setCta().onClick(async () => {
+          if (this.submitting) {
+            return;
+          }
+
+          const input = {
             vaultId: this.selectedVaultId,
             password: this.password,
           };
-          this.close();
+
+          setError("");
+          setSubmitting(true);
+          try {
+            await this.onConnect?.(input);
+            this.result = input;
+            this.allowSubmittingClose = true;
+            this.close();
+          } catch (error) {
+            setError(formatErrorMessage(error));
+            setSubmitting(false);
+          }
         });
+        connectButton = button;
       });
+  }
+
+  close(): void {
+    if (this.submitting && !this.allowSubmittingClose) {
+      return;
+    }
+
+    super.close();
   }
 
   onClose(): void {
@@ -395,4 +446,12 @@ class BootstrapRemoteVaultModal extends Modal {
 
     return selectedVault.name;
   }
+}
+
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return String(error);
 }
