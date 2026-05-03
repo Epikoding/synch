@@ -6,6 +6,8 @@
 
 ## Changed
 
+- Show a loading spinner next to the settings sync status while sync is active or reconnecting.
+
 ## Fixed
 
 - Avoid unnecessary follow-up pulls after local changes are pushed when the accepted sync cursors are already contiguous with the last pulled checkpoint.

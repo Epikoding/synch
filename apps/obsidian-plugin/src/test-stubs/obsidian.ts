@@ -11,6 +11,14 @@ const markdownRenderCalls: MarkdownRenderCall[] = [];
 const settingNames: string[] = [];
 const settingDescriptions: string[] = [];
 const settingClasses: string[][] = [];
+const createdElements: CreatedElementRecord[] = [];
+
+interface CreatedElementRecord {
+  tag: string;
+  text: string;
+  classes: string[];
+  attributes: Record<string, string>;
+}
 
 interface MarkdownRenderCall {
   app: unknown;
@@ -22,12 +30,26 @@ interface MarkdownRenderCall {
 class MockElement {
   text = "";
 
+  constructor(private readonly record: CreatedElementRecord | null = null) {}
+
   empty(): void {}
 
-  addClass(_value: string): void {}
+  addClass(value: string): void {
+    this.record?.classes.push(value);
+  }
 
   createEl(_tag: string, options?: { text?: string; cls?: string }): MockElement {
-    const element = new MockElement();
+    const record: CreatedElementRecord = {
+      tag: _tag,
+      text: options?.text ?? "",
+      classes: [],
+      attributes: {},
+    };
+    createdElements.push(record);
+    const element = new MockElement(record);
+    if (options?.cls) {
+      element.addClass(options.cls);
+    }
     if (options?.text) {
       element.text = options.text;
       createdElementTexts.push(options.text);
@@ -41,6 +63,15 @@ class MockElement {
 
   setText(value: string): void {
     this.text = value;
+    if (this.record) {
+      this.record.text = value;
+    }
+  }
+
+  setAttribute(name: string, value: string): void {
+    if (this.record) {
+      this.record.attributes[name] = value;
+    }
   }
 }
 
@@ -405,6 +436,15 @@ export function getCreatedElementTexts(): string[] {
   return [...createdElementTexts];
 }
 
+export function getCreatedElements(): CreatedElementRecord[] {
+  return createdElements.map((element) => ({
+    tag: element.tag,
+    text: element.text,
+    classes: [...element.classes],
+    attributes: { ...element.attributes },
+  }));
+}
+
 export function getMarkdownRenderCalls(): MarkdownRenderCall[] {
   return [...markdownRenderCalls];
 }
@@ -429,6 +469,7 @@ export function resetObsidianMocks(): void {
   progressBarComponents.length = 0;
   extraButtonComponents.length = 0;
   createdElementTexts.length = 0;
+  createdElements.length = 0;
   markdownRenderCalls.length = 0;
   settingNames.length = 0;
   settingDescriptions.length = 0;

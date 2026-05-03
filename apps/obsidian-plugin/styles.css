@@ -66,7 +66,17 @@
 .synch-sync-spinner {
   animation: synch-spin 0.9s linear infinite;
   color: var(--text-muted);
+  display: inline-flex;
+  height: 1em;
+  margin-left: 0.35rem;
   pointer-events: none;
+  vertical-align: -0.125em;
+  width: 1em;
+}
+
+.synch-sync-spinner svg {
+  height: 1em;
+  width: 1em;
 }
 
 @keyframes synch-spin {

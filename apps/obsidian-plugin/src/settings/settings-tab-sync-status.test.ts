@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getButtonComponents,
+  getCreatedElements,
   getExtraButtonComponents,
   getProgressBarComponents,
   getSettingClasses,
@@ -95,6 +96,28 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingDescriptions()[0]).toBe("syncing 37% - 42 / 113");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([0]);
+    expect(getSyncSpinnerElements()).toEqual([
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          "aria-hidden": "true",
+          "data-icon": "loader-circle",
+        }),
+      }),
+    ]);
+  });
+
+  it("shows a spinner while sync is reconnecting", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncState: () => "reconnecting",
+      getSyncStatusLabel: () => "Sync: reconnecting 0%",
+    });
+
+    tab.display();
+
+    expect(getSyncSpinnerElements()).toHaveLength(1);
+    expect(getSyncSpinnerElements()[0]?.attributes["data-icon"]).toBe("loader-circle");
   });
 
   it("shows a stop button while sync is enabled", async () => {
@@ -149,6 +172,7 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
+    expect(getSyncSpinnerElements()).toEqual([]);
     expect(getExtraButtonComponents()).toEqual([]);
   });
 
@@ -297,3 +321,9 @@ describe("SynchSettingTab sync status", () => {
     ]);
   });
 });
+
+function getSyncSpinnerElements() {
+  return getCreatedElements().filter((element) =>
+    element.classes.includes("synch-sync-spinner"),
+  );
+}

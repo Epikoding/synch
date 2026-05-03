@@ -1,4 +1,4 @@
-import { App, Notice, Setting } from "obsidian";
+import { App, Notice, setIcon, Setting } from "obsidian";
 
 import { getDefaultApiBaseUrl } from "../../config";
 import type { SynchFileRules } from "../../plugin/view-models";
@@ -8,6 +8,7 @@ import {
   formatStorageDescription,
   formatSyncDescription,
   getStoragePercent,
+  shouldShowSyncSpinner,
 } from "./format";
 import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
 
@@ -98,6 +99,13 @@ export function renderSyncStatusSetting(
       controller.getSyncStatusLabel(),
       syncProgress,
     ));
+  if (shouldShowSyncSpinner(controller.getSyncState())) {
+    const spinnerEl = syncSetting.nameEl.createSpan({
+      cls: "synch-sync-spinner",
+    });
+    spinnerEl.setAttribute("aria-hidden", "true");
+    setIcon(spinnerEl, "loader-circle");
+  }
   syncSetting.addButton((button) =>
     button
       .setButtonText(controller.isSyncEnabled() ? "Stop sync" : "Start sync")
