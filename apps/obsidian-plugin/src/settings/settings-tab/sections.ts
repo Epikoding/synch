@@ -13,29 +13,24 @@ import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
 
 type RefreshSettings = () => void;
 
-export function renderPluginUpdateSetting(
+export function renderSettingsHeading(
   containerEl: HTMLElement,
   controller: SynchSettingsController,
-  refresh: RefreshSettings,
 ): void {
   const updateStatus = controller.getPluginUpdateStatus();
-  const updateSetting = new Setting(containerEl)
-    .setName("Plugin update")
-    .setDesc(formatPluginUpdateDescription(updateStatus));
-
-  if (updateStatus.state === "update_available") {
-    updateSetting.settingEl.addClass("synch-plugin-update-available");
+  const heading = new Setting(containerEl).setName("Synch").setHeading();
+  if (updateStatus.state !== "update_available") {
+    return;
   }
 
-  if (updateStatus.state === "failed") {
-    updateSetting.addButton((button) =>
-      button.setButtonText("Retry").onClick(async () => {
-        const check = controller.retryPluginUpdateCheck();
-        refresh();
-        await check;
-      }),
-    );
-  }
+  heading.settingEl.addClass("synch-plugin-update-available");
+  heading.nameEl.createSpan({
+    cls: "synch-plugin-update-badge",
+    text: "Update to latest version",
+  });
+  heading.setDesc(
+    `Version ${updateStatus.latestVersion} is available. Current version: ${updateStatus.currentVersion}.`,
+  );
 }
 
 export function renderApiBaseUrlSetting(
@@ -81,22 +76,6 @@ export function renderApiBaseUrlSetting(
           }
         }),
     );
-}
-
-function formatPluginUpdateDescription(
-  status: ReturnType<SynchSettingsController["getPluginUpdateStatus"]>,
-): string {
-  switch (status.state) {
-    case "idle":
-    case "checking":
-      return "Checking latest version...";
-    case "up_to_date":
-      return `Synch is up to date. Current version: ${status.currentVersion}`;
-    case "update_available":
-      return `Version ${status.latestVersion} is available. Current version: ${status.currentVersion}.`;
-    case "failed":
-      return "Could not check for updates.";
-  }
 }
 
 export function renderSyncStatusSetting(

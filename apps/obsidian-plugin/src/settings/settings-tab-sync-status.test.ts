@@ -52,7 +52,7 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingNames()).toContain("Sync");
     expect(getSettingNames()).not.toContain("Storage");
-    expect(getSettingDescriptions()[1]).toBe(
+    expect(getSettingDescriptions()[0]).toBe(
       "Connect a remote vault to start syncing.",
     );
     expect(getProgressBarComponents()).toEqual([]);
@@ -69,10 +69,10 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getSettingNames().slice(0, 5)).toEqual([
       "Synch",
-      "Plugin update",
       "Sync",
       "Authentication",
       "Vault management",
+      "Vault",
     ]);
   });
 
@@ -171,11 +171,11 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingNames().slice(2, 4)).toEqual(["Sync", "Storage"]);
-    expect(getSettingDescriptions()[1]).toBe(
+    expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
+    expect(getSettingDescriptions()[0]).toBe(
       "Sync: synced 100% - 12 / 12",
     );
-    expect(getSettingDescriptions()[2]).toBe("24.3 MB / 50 MB (49%)");
+    expect(getSettingDescriptions()[1]).toBe("24.3 MB / 50 MB (49%)");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
       100,
       49,
@@ -199,11 +199,11 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingNames().slice(2, 4)).toEqual(["Sync", "Storage"]);
-    expect(getSettingDescriptions()[1]).toBe(
+    expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
+    expect(getSettingDescriptions()[0]).toBe(
       "Sync: synced 100% - 12 / 12",
     );
-    expect(getSettingDescriptions()[2]).toBe("24.3 MB");
+    expect(getSettingDescriptions()[1]).toBe("24.3 MB");
     expect(getProgressBarComponents()[1]?.value).toBe(0);
   });
 
@@ -221,9 +221,9 @@ describe("SynchSettingTab sync status", () => {
 
     tab.display();
 
-    expect(getSettingNames().slice(2, 4)).toEqual(["Sync", "Storage"]);
-    expect(getSettingDescriptions()[1]).toBe("Sync: synced 100% - 12 / 12");
-    expect(getSettingDescriptions()[2]).toBe("Checking storage usage...");
+    expect(getSettingNames().slice(1, 3)).toEqual(["Sync", "Storage"]);
+    expect(getSettingDescriptions()[0]).toBe("Sync: synced 100% - 12 / 12");
+    expect(getSettingDescriptions()[1]).toBe("Checking storage usage...");
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
       0,
       0,

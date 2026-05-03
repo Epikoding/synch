@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultApiBaseUrl } from "../config";
 import {
   getButtonComponents,
+  getCreatedElementTexts,
   getProgressBarComponents,
   getSettingClasses,
   getSettingDescriptions,
@@ -49,9 +50,8 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     const buttonTexts = getButtonComponents().map((button) => button.text);
-    expect(getSettingNames().slice(0, 6)).toEqual([
+    expect(getSettingNames().slice(0, 5)).toEqual([
       "Synch",
-      "Plugin update",
       "Account",
       "Authentication",
       "Self-hosted server",
@@ -61,7 +61,7 @@ describe("SynchSettingTab", () => {
     expect(getProgressBarComponents()).toEqual([]);
   });
 
-  it("checks and shows plugin updates as the first settings field", () => {
+  it("checks and shows plugin updates beside the settings heading only when needed", () => {
     const ensurePluginUpdateCheck = vi.fn(async () => {});
     const tab = createSettingsTab({
       ensurePluginUpdateCheck,
@@ -75,14 +75,15 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     expect(ensurePluginUpdateCheck).toHaveBeenCalledTimes(1);
-    expect(getSettingNames()[1]).toBe("Plugin update");
+    expect(getSettingNames()[0]).toBe("Synch");
+    expect(getCreatedElementTexts()).toContain("Update to latest version");
     expect(getSettingDescriptions()[0]).toBe(
       "Version 0.0.2 is available. Current version: 0.0.1.",
     );
-    expect(getSettingClasses()[1]).toContain("synch-plugin-update-available");
+    expect(getSettingClasses()[0]).toContain("synch-plugin-update-available");
   });
 
-  it("shows checking, up-to-date, and failed plugin update states", async () => {
+  it("hides plugin update status from settings when no update is available", () => {
     const tab = createSettingsTab({
       getPluginUpdateStatus: () => ({
         state: "checking",
@@ -92,7 +93,8 @@ describe("SynchSettingTab", () => {
 
     tab.display();
 
-    expect(getSettingDescriptions()[0]).toBe("Checking latest version...");
+    expect(getSettingNames()).not.toContain("Plugin update");
+    expect(getCreatedElementTexts()).not.toContain("Update to latest version");
 
     resetObsidianMocks();
     createSettingsTab({
@@ -103,15 +105,11 @@ describe("SynchSettingTab", () => {
       }),
     }).display();
 
-    expect(getSettingDescriptions()[0]).toBe(
-      "Synch is up to date. Current version: 0.0.1",
-    );
-    expect(getSettingClasses()[1]).not.toContain("synch-plugin-update-available");
+    expect(getSettingNames()).not.toContain("Plugin update");
+    expect(getSettingClasses()[0]).not.toContain("synch-plugin-update-available");
 
     resetObsidianMocks();
-    const retryPluginUpdateCheck = vi.fn(async () => {});
     createSettingsTab({
-      retryPluginUpdateCheck,
       getPluginUpdateStatus: () => ({
         state: "failed",
         currentVersion: "0.0.1",
@@ -119,11 +117,8 @@ describe("SynchSettingTab", () => {
       }),
     }).display();
 
-    expect(getSettingDescriptions()[0]).toBe("Could not check for updates.");
-    expect(getButtonComponents()[0]?.text).toBe("Retry");
-
-    await getButtonComponents()[0]?.click();
-    expect(retryPluginUpdateCheck).toHaveBeenCalledTimes(1);
+    expect(getSettingNames()).not.toContain("Plugin update");
+    expect(getButtonComponents()[0]?.text).toBe("Sign in on this device");
   });
 
   it("shows an editable self-hosted server URL before sign-in", async () => {
@@ -218,7 +213,7 @@ describe("SynchSettingTab", () => {
     const saveButton = getButtonComponents()[1];
     expect(apiBaseUrlInput?.disabled).toBe(true);
     expect(saveButton?.disabled).toBe(true);
-    expect(getSettingDescriptions()[2]).toBe(
+    expect(getSettingDescriptions()[1]).toBe(
       "Disconnect the current vault before changing servers.",
     );
 

@@ -4,6 +4,7 @@
 
 ## Changed
 
+- Show available plugin updates beside the settings heading instead of as a separate settings row.
 - Show remote storage usage as its own settings row below sync status.
 - Render Markdown deleted-file previews with Obsidian formatting while keeping non-Markdown previews as raw text.
 

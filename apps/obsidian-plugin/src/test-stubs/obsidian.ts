@@ -35,6 +35,10 @@ class MockElement {
     return element;
   }
 
+  createSpan(options?: { text?: string; cls?: string }): MockElement {
+    return this.createEl("span", options);
+  }
+
   setText(value: string): void {
     this.text = value;
   }
@@ -298,6 +302,7 @@ export class Setting {
       this.settingEl.classes.push(value);
     },
   };
+  nameEl = new MockElement();
 
   constructor(_containerEl: unknown) {
     settingClasses.push(this.settingEl.classes);
@@ -305,6 +310,7 @@ export class Setting {
 
   setName(value: string): this {
     settingNames.push(value);
+    this.nameEl.setText(value);
     return this;
   }
 

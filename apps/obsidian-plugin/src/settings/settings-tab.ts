@@ -5,8 +5,8 @@ import {
   renderApiBaseUrlSetting,
   renderAuthenticationSetting,
   renderFileSyncSettings,
-  renderPluginUpdateSetting,
   renderRemoteVaultSettings,
+  renderSettingsHeading,
   renderSyncStatusSetting,
 } from "./settings-tab/sections";
 
@@ -53,9 +53,8 @@ export class SynchSettingTab extends PluginSettingTab {
       !hasConnectedRemoteVault;
     this.setStorageStatusWatching(hasAuthenticatedSession && hasConnectedRemoteVault);
 
-    new Setting(containerEl).setName("Synch").setHeading();
     void this.controller.ensurePluginUpdateCheck();
-    renderPluginUpdateSetting(containerEl, this.controller, () => this.refresh());
+    renderSettingsHeading(containerEl, this.controller);
 
     if (hasAuthenticatedSession) {
       renderSyncStatusSetting(containerEl, this.controller, hasConnectedRemoteVault);
