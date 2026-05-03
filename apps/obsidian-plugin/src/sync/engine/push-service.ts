@@ -35,6 +35,7 @@ export interface SyncPushServiceDeps {
   prepareConcurrency?: number;
   onProgress: (progress: SyncProgressCounts) => Promise<void>;
   onConflict?: (event: PushConflictEvent) => void;
+  onFileSizeBlockedFilesChange?: () => void;
   now?: () => number;
 }
 
@@ -91,6 +92,7 @@ export class SyncPushService {
     let filesCreatedOrUpdated = 0;
     let filesDeleted = 0;
     let conflictsCreated = 0;
+    let fileSizeBlocked = 0;
     let shouldPullAfterPush = false;
     const acceptedCursors: number[] = [];
     let processedMutations = 0;
@@ -128,6 +130,9 @@ export class SyncPushService {
             continue;
           }
           if ("skipped" in prepared) {
+            if (prepared.reason === "file_too_large") {
+              fileSizeBlocked += 1;
+            }
             continue;
           }
 
@@ -205,6 +210,11 @@ export class SyncPushService {
         acceptedCursors.some((acceptedCursor) => acceptedCursor > checkpointCursor);
     } finally {
       await store.flush();
+    }
+
+    // TODO: Refresh file-size-blocked decorations when existing blocked files become syncable.
+    if (fileSizeBlocked > 0) {
+      this.deps.onFileSizeBlockedFilesChange?.();
     }
 
     return {

@@ -11,6 +11,7 @@ import type { VersionHistoryViewState } from "./version-history-view";
 import type {
   SynchDeletedFile,
   SynchEntryVersionCursor,
+  SynchFileSizeBlockedFile,
   SynchFileRules,
   SynchPluginUpdateStatus,
   SynchStorageStatus,
@@ -35,6 +36,7 @@ import type { SyncConnection } from "../sync/store/store";
 export interface SynchPluginControllerDeps {
   plugin: Plugin;
   refreshUi: () => void;
+  onFileSizeBlockedFilesChange?: () => void;
 }
 
 export class SynchPluginController implements SynchSettingsController {
@@ -99,6 +101,9 @@ export class SynchPluginController implements SynchSettingsController {
     },
     onStatusChange: () => {
       this.refreshUi();
+    },
+    onFileSizeBlockedFilesChange: () => {
+      this.deps.onFileSizeBlockedFilesChange?.();
     },
   });
   private readonly versionHistoryController = new SynchVersionHistoryController({
@@ -385,6 +390,10 @@ export class SynchPluginController implements SynchSettingsController {
 
   async listDeletedFiles(): Promise<SynchDeletedFile[]> {
     return await this.versionHistoryController.listDeletedFiles();
+  }
+
+  async listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]> {
+    return await this.syncController.listFileSizeBlockedFiles();
   }
 
   async previewDeletedFile(entryId: string): Promise<SynchVersionPreview> {

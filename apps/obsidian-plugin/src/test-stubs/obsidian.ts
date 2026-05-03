@@ -408,6 +408,14 @@ export function setIcon(
   parent.setAttribute("data-icon", iconId);
 }
 
+export function setTooltip(
+  parent: { setAttribute(name: string, value: string): void },
+  tooltip: string,
+  _options?: unknown,
+): void {
+  parent.setAttribute("data-tooltip", tooltip);
+}
+
 export function setRequestUrlMock(mock: RequestUrlMock): void {
   requestUrlMock = mock;
 }

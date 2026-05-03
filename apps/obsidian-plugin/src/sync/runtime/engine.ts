@@ -10,10 +10,12 @@ import type { SyncTokenResponse } from "../remote/client";
 import { SyncEventGate } from "../engine/event-gate";
 import { SyncEventRecorder } from "../engine/event-recorder";
 import type { SyncFileRules } from "../core/file-rules";
+import { decryptSyncMetadata } from "../core/crypto";
 import {
   type ReconcileOnceResult,
   SyncLocalReconcileService,
 } from "../engine/local-reconcile-service";
+import { metadataContextFromMutation } from "../engine/push-mutation-shared";
 import { ObsidianSyncVaultAdapter } from "../vault/obsidian-vault-adapter";
 import { SyncPullService } from "../engine/pull-service";
 import { SyncPushService } from "../engine/push-service";
@@ -66,6 +68,7 @@ export interface SyncEngineDeps {
   setSyncProgress: (progress: UserVisibleSyncProgress | null) => void;
   setSyncStatus: (status: UserVisibleSyncState) => void;
   setStorageStatus: (status: SyncStorageStatus | null) => void;
+  onFileSizeBlockedFilesChange?: () => void;
   isOffline?: OfflineDetector;
 }
 
@@ -101,6 +104,9 @@ export class SyncEngine {
       this.reportActivityProgress(progress);
     },
     onConflict: (event) => this.deps.notifySyncConflict(event),
+    onFileSizeBlockedFilesChange: () => {
+      this.deps.onFileSizeBlockedFilesChange?.();
+    },
   });
   private readonly syncLocalReconcileService = new SyncLocalReconcileService({
     getSyncStore: () => this.syncStore,
@@ -118,9 +124,13 @@ export class SyncEngine {
       }),
     unblockFileSizeBlockedMutations: async (session) =>
       await this.withSyncActivity("local", async () => {
-        return await this.syncPushService.unblockFileSizeBlockedMutations(
+        const unblocked = await this.syncPushService.unblockFileSizeBlockedMutations(
           session.maxFileSizeBytes,
         );
+        if (unblocked > 0) {
+          this.deps.onFileSizeBlockedFilesChange?.();
+        }
+        return unblocked;
       }),
     pullOnce: async (session) =>
       await this.withSyncActivity("pull", async () => {
@@ -290,6 +300,35 @@ export class SyncEngine {
     return (pending?.length ?? 0) > 0;
   }
 
+  async listFileSizeBlockedFiles(): Promise<SyncFileSizeBlockedFile[]> {
+    const store = this.syncStore;
+    if (!store) {
+      return [];
+    }
+
+    const mutations = await store.listBlockedDirtyEntriesByReason("file_too_large");
+    const remoteVaultKey = this.deps.getRemoteVaultKey();
+    const files: SyncFileSizeBlockedFile[] = [];
+    for (const mutation of mutations) {
+      if (mutation.op !== "upsert") {
+        continue;
+      }
+
+      const metadata = await decryptSyncMetadata(
+        remoteVaultKey,
+        mutation.encryptedMetadata,
+        metadataContextFromMutation(mutation),
+      );
+      files.push({
+        path: metadata.path,
+        encryptedSizeBytes: mutation.blockedEncryptedSizeBytes ?? null,
+        maxFileSizeBytes: mutation.blockedMaxFileSizeBytes ?? null,
+      });
+    }
+
+    return files;
+  }
+
   async listEntryVersionsForPath(
     path: string,
     before: EntryVersionPageCursor | null,
@@ -417,3 +456,9 @@ export class SyncEngine {
 }
 
 export type SyncEngineEntryVersionsPage = SyncEntryVersionsPage;
+
+export interface SyncFileSizeBlockedFile {
+  path: string;
+  encryptedSizeBytes: number | null;
+  maxFileSizeBytes: number | null;
+}

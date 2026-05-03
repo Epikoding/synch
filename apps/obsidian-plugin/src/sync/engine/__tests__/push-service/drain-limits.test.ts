@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { encodeUtf8, hashBytes } from "../../../core/content";
 import { SyncBlobUploadError } from "../../../remote/blob-client";
@@ -53,6 +53,7 @@ describe("SyncPushService drain: limits", () => {
     });
     session.maxFileSizeBytes = 1;
     let uploaded = false;
+    const onFileSizeBlockedFilesChange = vi.fn();
     const service = new SyncPushService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",
       getSyncToken: async () => createToken(),
@@ -73,6 +74,7 @@ describe("SyncPushService drain: limits", () => {
         },
       },
       onProgress: ignoreProgress,
+      onFileSizeBlockedFilesChange,
     });
 
     await expect(service.pushPendingMutations(session)).resolves.toEqual({
@@ -85,6 +87,7 @@ describe("SyncPushService drain: limits", () => {
       shouldPullAfterPush: false,
       hasMore: false,
     });
+    expect(onFileSizeBlockedFilesChange).toHaveBeenCalledTimes(1);
     expect(uploaded).toBe(false);
     expect(await store.listDirtyEntries()).toEqual([]);
     expect(await store.getDirtyEntryMutation("entry-too-large")).toMatchObject({

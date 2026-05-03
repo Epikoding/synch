@@ -224,6 +224,26 @@ describe("SyncController", () => {
 
     expect(controller.getSyncState()).toBe("attention_needed");
   });
+
+  it("returns no file-size blocked files without an active authenticated remote vault session", async () => {
+    const listFileSizeBlockedFiles = vi
+      .spyOn(SyncEngine.prototype, "listFileSizeBlockedFiles")
+      .mockResolvedValue([
+        {
+          path: "large.md",
+          encryptedSizeBytes: 12_400_000,
+          maxFileSizeBytes: 10_000_000,
+        },
+      ]);
+    const controller = new SyncController(
+      createDeps({
+        hasActiveRemoteVaultSession: () => false,
+      }),
+    );
+
+    await expect(controller.listFileSizeBlockedFiles()).resolves.toEqual([]);
+    expect(listFileSizeBlockedFiles).not.toHaveBeenCalled();
+  });
 });
 
 function createDeps(

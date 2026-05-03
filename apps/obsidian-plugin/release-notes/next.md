@@ -3,6 +3,7 @@
 ## Added
 
 - Show an Obsidian status bar and settings warning when remote vault storage is almost full.
+- Mark files in Obsidian's file explorer when Synch cannot sync them because their encrypted size exceeds the file size limit.
 
 ## Changed
 

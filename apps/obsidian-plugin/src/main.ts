@@ -1,6 +1,7 @@
 import { Plugin } from "obsidian";
 
 import { registerSynchCommands } from "./plugin/commands";
+import { SynchFileSizeBlockedDecorator } from "./plugin/file-size-blocked-decorator";
 import { SynchPluginController } from "./plugin/plugin-controller";
 import { SynchStatusBar } from "./plugin/status-bar";
 import {
@@ -11,6 +12,7 @@ import { SynchSettingTab } from "./settings/settings-tab";
 
 export default class SynchPlugin extends Plugin {
   private controller: SynchPluginController | null = null;
+  private fileSizeBlockedDecorator: SynchFileSizeBlockedDecorator | null = null;
   private statusBar: SynchStatusBar | null = null;
   private settingsTab: SynchSettingTab | null = null;
 
@@ -20,6 +22,9 @@ export default class SynchPlugin extends Plugin {
       refreshUi: () => {
         this.refreshUi();
       },
+      onFileSizeBlockedFilesChange: () => {
+        this.fileSizeBlockedDecorator?.queueRefresh();
+      },
     });
     this.controller = controller;
 
@@ -27,6 +32,8 @@ export default class SynchPlugin extends Plugin {
 
     this.statusBar = new SynchStatusBar(this, controller);
     this.statusBar.initialize();
+    this.fileSizeBlockedDecorator = new SynchFileSizeBlockedDecorator(this, controller);
+    this.fileSizeBlockedDecorator.initialize();
 
     this.registerView(
       SYNCH_VERSION_HISTORY_VIEW_TYPE,
@@ -43,6 +50,7 @@ export default class SynchPlugin extends Plugin {
       controller.registerVaultEvents();
       void controller.ensureAutoSyncState();
       void controller.ensureVersionHistoryPane();
+      void this.fileSizeBlockedDecorator?.refresh();
     });
   }
 

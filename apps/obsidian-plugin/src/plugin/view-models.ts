@@ -26,6 +26,12 @@ export interface SynchStorageStatus {
   storageLimitBytes: number;
 }
 
+export interface SynchFileSizeBlockedFile {
+  path: string;
+  encryptedSizeBytes: number | null;
+  maxFileSizeBytes: number | null;
+}
+
 export type SynchPluginUpdateStatus =
   | {
       state: "idle" | "checking";

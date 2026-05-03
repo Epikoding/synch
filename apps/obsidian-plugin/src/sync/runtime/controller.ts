@@ -18,7 +18,11 @@ import {
   readDexieSyncStoreConnection,
 } from "../store/dexie";
 import type { DeletedSyncEntryRow, SyncConnection } from "../store/store";
-import { SyncEngine, type SyncEngineEntryVersionsPage } from "./engine";
+import {
+  SyncEngine,
+  type SyncEngineEntryVersionsPage,
+  type SyncFileSizeBlockedFile,
+} from "./engine";
 import type { SyncEntryVersionPreview } from "./version-history-service";
 import {
   formatUserVisibleSyncState,
@@ -40,6 +44,7 @@ export interface SyncControllerDeps {
   notifyError: (error: unknown, prefix: string) => void;
   notify?: (message: string, timeout?: number) => void;
   onStatusChange?: () => void;
+  onFileSizeBlockedFilesChange?: () => void;
   isOffline?: OfflineDetector;
 }
 
@@ -63,6 +68,9 @@ export class SyncController {
     setSyncProgress: (progress) => this.setSyncProgress(progress),
     setSyncStatus: (status) => this.setSyncStatus(status),
     setStorageStatus: (status) => this.setStorageStatus(status),
+    onFileSizeBlockedFilesChange: () => {
+      this.deps.onFileSizeBlockedFilesChange?.();
+    },
     isOffline: this.deps.isOffline,
   });
   private storageStatus: SyncStorageStatus | null = null;
@@ -268,6 +276,14 @@ export class SyncController {
 
   markAttentionNeeded(): void {
     this.setSyncStatus("attention_needed");
+  }
+
+  async listFileSizeBlockedFiles(): Promise<SyncFileSizeBlockedFile[]> {
+    if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
+      return [];
+    }
+
+    return await this.syncEngine.listFileSizeBlockedFiles();
   }
 
   async listEntryVersionsForPath(

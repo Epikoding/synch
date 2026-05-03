@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { encodeUtf8, hashBytes } from "../core/content";
 import { DEFAULT_SYNC_FILE_RULES } from "../core/file-rules";
+import { queueLocalUpsertMutation } from "../core/mutation-queue";
 import type { SyncTokenResponse } from "../remote/client";
 import { createInitializedTestSyncStore } from "../../test-support/test-plugin";
 import { SyncEngine } from "./engine";
@@ -78,6 +79,55 @@ describe("SyncEngine", () => {
       blockedReason: "file_too_large",
     });
     await store.close();
+  });
+
+  it("lists file-size blocked files with decrypted paths and size metadata", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const store = await createInitializedTestSyncStore(plugin);
+    const fileSizeBlocked = await queueLocalUpsertMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Folder/large.md",
+      entryId: "entry-large",
+      base: null,
+      hash: "hash-large",
+    });
+    await store.updateDirtyEntry({
+      ...fileSizeBlocked.mutation,
+      status: "blocked",
+      blockedReason: "file_too_large",
+      blockedEncryptedSizeBytes: 12_400_000,
+      blockedMaxFileSizeBytes: 10_000_000,
+    });
+    const quotaBlocked = await queueLocalUpsertMutation(store, {
+      remoteVaultKey: TEST_VAULT_KEY,
+      path: "Folder/quota.md",
+      entryId: "entry-quota",
+      base: null,
+      hash: "hash-quota",
+    });
+    await store.updateDirtyEntry({
+      ...quotaBlocked.mutation,
+      status: "blocked",
+      blockedReason: "storage_quota_exceeded",
+    });
+    const engine = createEngine(plugin);
+    engine.setStore(store);
+
+    await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([
+      {
+        path: "Folder/large.md",
+        encryptedSizeBytes: 12_400_000,
+        maxFileSizeBytes: 10_000_000,
+      },
+    ]);
+    await store.close();
+  });
+
+  it("returns no file-size blocked files when the store is not initialized", async () => {
+    const plugin = createPlugin({}, async () => encodeUtf8("body"));
+    const engine = createEngine(plugin);
+
+    await expect(engine.listFileSizeBlockedFiles()).resolves.toEqual([]);
   });
 
   it("does not let baseline progress overwrite an active pull", async () => {
