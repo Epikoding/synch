@@ -566,6 +566,7 @@ describe("SyncPushService drain: limits", () => {
       mutationsPushed: 0,
       mutationsRequeued: 0,
       hasMore: true,
+      stopReason: "storage_quota_exceeded",
     });
     expect(uploadAttempts).toEqual(["blob-server-quota"]);
     expect(await store.listDirtyEntries()).toEqual([
@@ -647,6 +648,7 @@ describe("SyncPushService drain: limits", () => {
       mutationsPushed: 0,
       mutationsRequeued: 0,
       hasMore: false,
+      stopReason: "storage_quota_exceeded",
     });
     expect(uploadAttempts).toBe(0);
     expect(await store.listDirtyEntries()).toEqual([]);
@@ -724,6 +726,7 @@ describe("SyncPushService drain: limits", () => {
       mutationsPushed: 0,
       mutationsRequeued: 0,
       hasMore: false,
+      stopReason: "storage_quota_exceeded",
     });
     expect(uploadAttempts).toBe(0);
     expect(await store.listDirtyEntries()).toEqual([]);

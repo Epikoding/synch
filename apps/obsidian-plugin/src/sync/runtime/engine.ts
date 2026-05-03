@@ -69,6 +69,7 @@ export interface SyncEngineDeps {
   setSyncStatus: (status: UserVisibleSyncState) => void;
   setStorageStatus: (status: SyncStorageStatus | null) => void;
   onFileSizeBlockedFilesChange?: () => void;
+  onStorageQuotaExceeded?: () => void | Promise<void>;
   isOffline?: OfflineDetector;
 }
 
@@ -163,6 +164,9 @@ export class SyncEngine {
 
       this.deps.setSyncStatus("attention_needed");
       this.deps.notifyError(error, "Auto sync failed");
+    },
+    onStorageQuotaExceeded: async () => {
+      await this.deps.onStorageQuotaExceeded?.();
     },
   });
   private readonly syncVaultEventHandler = new SyncVaultEventHandler({

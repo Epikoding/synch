@@ -39,6 +39,7 @@ export interface SyncAutoLoopDeps {
   onSyncScheduled?: () => void;
   onIdle?: () => void;
   onError?: (error: unknown) => void;
+  onStorageQuotaExceeded?: () => void | Promise<void>;
 }
 
 export interface SyncRealtimeClientLike {
@@ -390,6 +391,14 @@ export class SyncAutoLoop {
           }
           const pushResult = await this.deps.pushPendingMutations(session);
           pushCompleted = true;
+          if (pushResult.stopReason === "storage_quota_exceeded") {
+            try {
+              await this.deps.onStorageQuotaExceeded?.();
+            } finally {
+              this.stop();
+            }
+            return;
+          }
           shouldPullNow = shouldPullNow || pushResult.shouldPullAfterPush;
           if (pushResult.hasMore) {
             this.requestPush();

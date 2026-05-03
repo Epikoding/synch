@@ -45,6 +45,7 @@ export interface SyncControllerDeps {
   notify?: (message: string, timeout?: number) => void;
   onStatusChange?: () => void;
   onFileSizeBlockedFilesChange?: () => void;
+  onStorageQuotaExceeded?: () => void | Promise<void>;
   isOffline?: OfflineDetector;
 }
 
@@ -70,6 +71,9 @@ export class SyncController {
     setStorageStatus: (status) => this.setStorageStatus(status),
     onFileSizeBlockedFilesChange: () => {
       this.deps.onFileSizeBlockedFilesChange?.();
+    },
+    onStorageQuotaExceeded: async () => {
+      await this.deps.onStorageQuotaExceeded?.();
     },
     isOffline: this.deps.isOffline,
   });

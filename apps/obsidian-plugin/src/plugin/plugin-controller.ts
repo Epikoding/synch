@@ -105,6 +105,10 @@ export class SynchPluginController implements SynchSettingsController {
     onFileSizeBlockedFilesChange: () => {
       this.deps.onFileSizeBlockedFilesChange?.();
     },
+    onStorageQuotaExceeded: async () => {
+      await this.setSyncEnabled(false);
+      new Notice("Storage quota exceeded. Sync has been paused.");
+    },
   });
   private readonly versionHistoryController = new SynchVersionHistoryController({
     plugin: this.plugin,

@@ -58,6 +58,7 @@ export interface PushPendingMutationsResult {
   conflictsCreated: number;
   shouldPullAfterPush: boolean;
   hasMore: boolean;
+  stopReason?: "storage_quota_exceeded";
 }
 
 export class SyncPushService {
@@ -98,6 +99,7 @@ export class SyncPushService {
     let processedMutations = 0;
     let hasMore = false;
     let stopAfterCurrentBatch = false;
+    let stopReason: PushPendingMutationsResult["stopReason"];
 
     try {
       while (processedMutations < DEFAULT_PUSH_DRAIN_LIMIT) {
@@ -135,6 +137,7 @@ export class SyncPushService {
             }
             if (prepared.reason === "storage_quota_exceeded") {
               stopAfterCurrentBatch = true;
+              stopReason = "storage_quota_exceeded";
             }
             continue;
           }
@@ -232,6 +235,7 @@ export class SyncPushService {
       conflictsCreated,
       shouldPullAfterPush,
       hasMore,
+      ...(stopReason ? { stopReason } : {}),
     };
   }
 

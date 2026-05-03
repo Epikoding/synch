@@ -87,6 +87,38 @@ describe("SynchPluginController sync enabled setting", () => {
       syncEnabled: false,
     });
   });
+
+  it("persists disabled sync when storage quota is exceeded", async () => {
+    const plugin = createPluginWithSettings({
+      apiBaseUrl: "http://127.0.0.1:8787",
+      fileRules: DEFAULT_SYNC_FILE_RULES,
+      syncEnabled: true,
+    });
+    const stopAutoSyncAndMarkPaused = vi
+      .spyOn(SyncController.prototype, "stopAutoSyncAndMarkPaused")
+      .mockImplementation(() => {});
+    const refreshUi = vi.fn();
+    const controller = new SynchPluginController({
+      plugin,
+      refreshUi,
+    });
+    await controller.initialize();
+
+    const { syncController } = controller as unknown as {
+      syncController: {
+        deps: {
+          onStorageQuotaExceeded: () => Promise<void>;
+        };
+      };
+    };
+    await syncController.deps.onStorageQuotaExceeded();
+
+    expect(stopAutoSyncAndMarkPaused).toHaveBeenCalledTimes(1);
+    expect(refreshUi).toHaveBeenCalled();
+    expect(plugin.savedData?.[SYNCH_SETTINGS_KEY]).toMatchObject({
+      syncEnabled: false,
+    });
+  });
 });
 
 function createPluginWithSettings(settings: SynchPluginSettings): Plugin & {

@@ -233,4 +233,47 @@ describe("SyncAutoLoop local changes", () => {
     autoLoop.stop();
     await store.close();
   });
+
+  it("stops auto sync instead of re-pushing when storage quota is exceeded", async () => {
+    vi.useFakeTimers();
+
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const pushPendingMutations = vi.fn(async () =>
+      createPushResult({
+        hasMore: true,
+        stopReason: "storage_quota_exceeded",
+      }),
+    );
+    const pullOnce = vi.fn(async () => {});
+    const onStorageQuotaExceeded = vi.fn(async () => {});
+    const closedSessions: SyncRealtimeSession[] = [];
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations,
+      pullOnce,
+      realtimeClient: createRealtimeClient(undefined, (session) => {
+        const close = session.close.bind(session);
+        session.close = () => {
+          closedSessions.push(session);
+          close();
+        };
+      }),
+      pushDebounceMs: 100,
+      onStorageQuotaExceeded,
+    });
+
+    await autoLoop.start();
+    autoLoop.notifyLocalChange();
+
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(pushPendingMutations).toHaveBeenCalledTimes(1);
+    expect(pullOnce).toHaveBeenCalledTimes(0);
+    expect(onStorageQuotaExceeded).toHaveBeenCalledTimes(1);
+    expect(closedSessions).toHaveLength(1);
+    await store.close();
+  });
 });
