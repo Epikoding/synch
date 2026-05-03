@@ -429,4 +429,114 @@ describe("SyncLocalReconcileService queueing", () => {
     });
     await store.close();
   });
+
+  it("reads files concurrently while applying queued mutations in scan order", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const appliedPaths: Array<string | null> = [];
+    const observedStore = new Proxy(store, {
+      get(target, property, receiver) {
+        if (property === "applyLocalState") {
+          return async (entry: Parameters<typeof store.applyLocalState>[0]) => {
+            appliedPaths.push(entry.path);
+            await store.applyLocalState(entry);
+          };
+        }
+
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const bodies = ["first", "second", "third"].map(encodeUtf8);
+    const readsStarted: string[] = [];
+    const deferredReads = new Map<string, Deferred<Uint8Array>>();
+    const files = bodies.map((bytes, index) => {
+      const path = `Notes/file-${index}.md`;
+      const deferred = createDeferred<Uint8Array>();
+      deferredReads.set(path, deferred);
+      return {
+        path,
+        mtime: 10,
+        size: bytes.byteLength,
+        async readBytes() {
+          readsStarted.push(path);
+          return await deferred.promise;
+        },
+      };
+    });
+
+    const service = new SyncLocalReconcileService({
+      getSyncStore: () => observedStore,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      hashConcurrency: 2,
+      shouldSyncPath: () => true,
+      scanner: {
+        async listFiles() {
+          return files;
+        },
+      },
+    });
+
+    const reconcilePromise = service.reconcileOnce();
+    await waitFor(() => readsStarted.length === 2);
+    expect(readsStarted).toEqual(["Notes/file-0.md", "Notes/file-1.md"]);
+
+    deferredReads.get("Notes/file-1.md")?.resolve(bodies[1]);
+    await waitFor(() => readsStarted.length === 3);
+    expect(await store.listDirtyEntries()).toEqual([]);
+
+    deferredReads.get("Notes/file-2.md")?.resolve(bodies[2]);
+    deferredReads.get("Notes/file-0.md")?.resolve(bodies[0]);
+
+    await expect(reconcilePromise).resolves.toEqual({
+      filesScanned: 3,
+      filesQueuedForUpsert: 3,
+      filesQueuedForDelete: 0,
+    });
+    expect(appliedPaths).toEqual([
+      "Notes/file-0.md",
+      "Notes/file-1.md",
+      "Notes/file-2.md",
+    ]);
+
+    const pending = await store.listDirtyEntries();
+    const metadata = await Promise.all(pending.map(decryptPendingMetadata));
+    expect([...metadata].sort((left, right) => left.path.localeCompare(right.path))).toEqual([
+      {
+        path: "Notes/file-0.md",
+        hash: await hashBytes(bodies[0]),
+      },
+      {
+        path: "Notes/file-1.md",
+        hash: await hashBytes(bodies[1]),
+      },
+      {
+        path: "Notes/file-2.md",
+        hash: await hashBytes(bodies[2]),
+      },
+    ]);
+    await store.close();
+  });
 });
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 1_000;
+  while (!predicate()) {
+    if (Date.now() > deadline) {
+      throw new Error("timed out waiting for condition");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}

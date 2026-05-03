@@ -8,6 +8,7 @@
 ## Changed
 
 - Show a loading spinner next to the settings sync status while sync is active or reconnecting.
+- Scan changed local files faster during sync by reading file contents concurrently.
 
 ## Fixed
 

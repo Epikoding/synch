@@ -17,6 +17,8 @@ import type {
 } from "../store/ports";
 import { isAutoMergeTextPath } from "./text-merge-policy";
 
+const DEFAULT_RECONCILE_HASH_CONCURRENCY = 8;
+
 export interface LocalSyncFile {
   path: string;
   mtime: number;
@@ -33,6 +35,7 @@ export interface SyncLocalReconcileServiceDeps {
   getRemoteVaultKey: () => Uint8Array;
   scanner: LocalFileScanner;
   shouldSyncPath(path: string): boolean;
+  hashConcurrency?: number;
 }
 
 export interface SyncLocalReconcileStore
@@ -83,6 +86,7 @@ export class SyncLocalReconcileService {
       renameCandidates.set(entry.hash, bucket);
     }
 
+    const hashInputs: ReconcileHashInput[] = [];
     for (const file of localFiles) {
       const existing = await store.getLocalStateByPath(file.path);
       const pendingDeleteEntry = pendingDeleteEntriesByPath.get(file.path) ?? null;
@@ -93,7 +97,30 @@ export class SyncLocalReconcileService {
         continue;
       }
 
-      const hash = await hashBytes(await file.readBytes());
+      hashInputs.push({
+        file,
+        existing,
+        existingHasPendingDelete,
+        restoredDeletedEntry,
+      });
+    }
+
+    const hashedFiles = await mapWithConcurrency(
+      hashInputs,
+      this.deps.hashConcurrency ?? DEFAULT_RECONCILE_HASH_CONCURRENCY,
+      async (input) => ({
+        ...input,
+        hash: await hashBytes(await input.file.readBytes()),
+      }),
+    );
+
+    for (const {
+      file,
+      existing,
+      existingHasPendingDelete,
+      restoredDeletedEntry,
+      hash,
+    } of hashedFiles) {
       if (
         existing &&
         !existingHasPendingDelete &&
@@ -254,6 +281,13 @@ export class SyncLocalReconcileService {
   }
 }
 
+interface ReconcileHashInput {
+  file: LocalSyncFile;
+  existing: LocalSyncEntryRow | null;
+  existingHasPendingDelete: boolean;
+  restoredDeletedEntry: LocalSyncEntryRow | null;
+}
+
 function canSkipHash(
   existing: LocalSyncEntryRow | null,
   file: LocalSyncFile,
@@ -297,4 +331,40 @@ function shouldRequireBaseBlob(
   remote: RemoteSyncEntryRow | null,
 ): boolean {
   return !!remote && !remote.deleted && !!remote.blobId && isAutoMergeTextPath(path);
+}
+
+async function mapWithConcurrency<T, U>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<U>,
+): Promise<U[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+  let firstError: unknown = null;
+  const normalizedConcurrency = Number.isFinite(concurrency) ? Math.floor(concurrency) : 1;
+  const workerCount = Math.max(1, Math.min(normalizedConcurrency, items.length));
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length && !firstError) {
+        const index = nextIndex;
+        nextIndex += 1;
+        try {
+          results[index] = await mapper(items[index]);
+        } catch (error) {
+          firstError = firstError ?? error;
+        }
+      }
+    }),
+  );
+
+  if (firstError) {
+    throw firstError;
+  }
+
+  return results;
 }
