@@ -166,6 +166,129 @@ describe("SyncPushService drain: basic queue", () => {
     await store.close();
   });
 
+  it("checkpoints accepted push cursors when they are contiguous with the last pull", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    await store.setCursor(10);
+    await store.markEntryDirty({
+      mutationId: "mutation-delete-a",
+      entryId: "entry-a",
+      op: "delete",
+      baseRevision: 1,
+      blobId: null,
+      hash: null,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-a",
+        baseRevision: 1,
+        op: "delete",
+        blobId: null,
+        path: "Folder/a.md",
+      }),
+      createdAt: 1,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-delete-b",
+      entryId: "entry-b",
+      op: "delete",
+      baseRevision: 2,
+      blobId: null,
+      hash: null,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-b",
+        baseRevision: 2,
+        op: "delete",
+        blobId: null,
+        path: "Folder/b.md",
+      }),
+      createdAt: 2,
+    });
+
+    const cursors = [11, 12];
+    const session = createPushSession(async (mutation) => ({
+      cursor: cursors.shift() ?? 0,
+      entryId: mutation.entryId,
+      revision: mutation.baseRevision + 1,
+    }));
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes() {
+          throw new Error("delete mutations should not read bytes");
+        },
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.pushPendingMutations(session)).resolves.toEqual({
+      cursor: 12,
+      mutationsPushed: 2,
+      mutationsRequeued: 0,
+      filesCreatedOrUpdated: 0,
+      filesDeleted: 2,
+      conflictsCreated: 0,
+      shouldPullAfterPush: false,
+      hasMore: false,
+    });
+    expect(await store.getCursor()).toBe(12);
+    await store.close();
+  });
+
+  it("keeps accepted push cursors out of the checkpoint when they leave a gap", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    await store.setCursor(10);
+    await store.markEntryDirty({
+      mutationId: "mutation-delete-gap",
+      entryId: "entry-gap",
+      op: "delete",
+      baseRevision: 1,
+      blobId: null,
+      hash: null,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-gap",
+        baseRevision: 1,
+        op: "delete",
+        blobId: null,
+        path: "Folder/gap.md",
+      }),
+      createdAt: 1,
+    });
+
+    const session = createPushSession(async (mutation) => ({
+      cursor: 12,
+      entryId: mutation.entryId,
+      revision: mutation.baseRevision + 1,
+    }));
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes() {
+          throw new Error("delete mutations should not read bytes");
+        },
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.pushPendingMutations(session)).resolves.toEqual({
+      cursor: 12,
+      mutationsPushed: 1,
+      mutationsRequeued: 0,
+      filesCreatedOrUpdated: 0,
+      filesDeleted: 1,
+      conflictsCreated: 0,
+      shouldPullAfterPush: true,
+      hasMore: false,
+    });
+    expect(await store.getCursor()).toBe(10);
+    await store.close();
+  });
+
   it("returns without using the realtime session when the queue is empty", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);

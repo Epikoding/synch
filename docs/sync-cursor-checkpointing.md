@@ -38,26 +38,47 @@ that all changes through 12 were applied.
 
 ## Current rule
 
-Push must not advance `last_pulled_cursor`.
+Push must not treat the maximum accepted cursor as a checkpoint.
 
 Push may update local entry state for accepted mutations and clear dirty
-mutations, but cursor checkpointing belongs to pull. After an accepted push, the
-client should schedule a pull so the pull path can apply the vault-wide stream
-and advance the checkpoint only after a gap-free window is complete.
+mutations.
+
+Push may advance `last_pulled_cursor` only for the accepted cursor prefix that is
+contiguous with the current checkpoint. If the current checkpoint is `N`, accepted
+cursors `N + 1`, `N + 2`, and so on may be checkpointed until the first gap.
+Accepted cursors after a gap must not be checkpointed by push.
+
+Examples:
+
+```text
+local last_pulled_cursor = 10
+push accepted cursors = [11, 12]
+
+safe next last_pulled_cursor = 12
+```
+
+```text
+local last_pulled_cursor = 10
+push accepted cursors = [12]
+
+safe next last_pulled_cursor = 10
+follow-up pull required to process cursor 11
+```
+
+When a push leaves accepted cursors beyond the safe contiguous prefix, the client
+should schedule a pull so the pull path can apply the vault-wide stream and
+advance the checkpoint only after a gap-free window is complete.
 
 The server still returns accepted cursors for commit results because clients need
-them for local entry state and reporting, but those cursors are not local pull
-checkpoints.
+them for local entry state, reporting, and this contiguous-prefix checkpoint
+optimization.
 
 ## Future optimization
 
-The conservative rule can be optimized later, but only with tests that preserve
-the gap-free invariant.
+Further optimizations must preserve the gap-free invariant.
 
 Potential optimizations:
 
-- allow push to checkpoint only when accepted cursors are exactly
-  `last_pulled_cursor + 1`, `+2`, and so on with no gaps;
 - coalesce repeated push-triggered pulls so a burst of local changes schedules
   one follow-up pull;
 - skip blob fetch/decrypt during pull when an entry state is already known to be

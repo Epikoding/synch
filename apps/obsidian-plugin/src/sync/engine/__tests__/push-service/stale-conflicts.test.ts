@@ -443,7 +443,7 @@ describe("SyncPushService stale revisions", () => {
       filesCreatedOrUpdated: 1,
       filesDeleted: 0,
       conflictsCreated: 0,
-      shouldPullAfterPush: true,
+      shouldPullAfterPush: false,
       hasMore: false,
     });
     expect(committed).toHaveLength(1);
@@ -459,6 +459,7 @@ describe("SyncPushService stale revisions", () => {
       revision: 4,
       hash: mergedHash,
     });
+    expect(await store.getCursor()).toBe(10);
 
     await store.close();
   });

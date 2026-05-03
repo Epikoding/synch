@@ -83,13 +83,16 @@ export class SyncPushService {
     }
 
     const token = await this.deps.getSyncToken();
-    let cursor = await store.getCursor();
+    const startingCursor = await store.getCursor();
+    let cursor = startingCursor;
+    let checkpointCursor = startingCursor;
     let mutationsPushed = 0;
     let mutationsRequeued = 0;
     let filesCreatedOrUpdated = 0;
     let filesDeleted = 0;
     let conflictsCreated = 0;
     let shouldPullAfterPush = false;
+    const acceptedCursors: number[] = [];
     let processedMutations = 0;
     let hasMore = false;
     let stopAfterCurrentBatch = false;
@@ -178,7 +181,7 @@ export class SyncPushService {
             continue;
           }
           cursor = Math.max(cursor, result.accepted.cursor);
-          shouldPullAfterPush = true;
+          acceptedCursors.push(result.accepted.cursor);
           filesCreatedOrUpdated += result.filesCreatedOrUpdated;
           filesDeleted += result.filesDeleted;
           mutationsPushed += 1;
@@ -190,6 +193,16 @@ export class SyncPushService {
       }
 
       hasMore = (await store.listDirtyEntries(1)).length > 0;
+      checkpointCursor = getContiguousAcceptedCursor(
+        checkpointCursor,
+        acceptedCursors,
+      );
+      if (checkpointCursor > startingCursor) {
+        await store.setCursor(checkpointCursor);
+      }
+      shouldPullAfterPush =
+        shouldPullAfterPush ||
+        acceptedCursors.some((acceptedCursor) => acceptedCursor > checkpointCursor);
     } finally {
       await store.flush();
     }
@@ -270,6 +283,22 @@ export class SyncPushService {
       }),
     );
   }
+}
+
+function getContiguousAcceptedCursor(
+  currentCursor: number,
+  acceptedCursors: number[],
+): number {
+  if (acceptedCursors.length === 0) {
+    return currentCursor;
+  }
+
+  const remaining = new Set(acceptedCursors);
+  let cursor = currentCursor;
+  while (remaining.delete(cursor + 1)) {
+    cursor += 1;
+  }
+  return cursor;
 }
 
 function shouldUnblockFileSizeMutation(
