@@ -7,10 +7,6 @@
   font-size: var(--font-ui-small);
 }
 
-.synch-plugin-update-available .setting-item-description {
-  color: var(--text-warning);
-}
-
 .synch-storage-warning .setting-item-description {
   color: var(--text-warning);
 }
@@ -19,7 +15,7 @@
   color: var(--text-warning);
   font-size: var(--font-ui-small);
   font-weight: var(--font-normal);
-  margin-left: 0.5rem;
+  white-space: nowrap;
 }
 
 .synch-status-bar {

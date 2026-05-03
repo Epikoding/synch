@@ -341,6 +341,7 @@ export class Setting {
     },
   };
   nameEl = new MockElement();
+  controlEl = new MockElement();
 
   constructor(_containerEl: unknown) {
     settingClasses.push(this.settingEl.classes);

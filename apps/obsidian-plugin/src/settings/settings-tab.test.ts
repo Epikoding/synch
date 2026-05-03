@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDefaultApiBaseUrl } from "../config";
 import {
   getButtonComponents,
+  getCreatedElements,
   getCreatedElementTexts,
   getProgressBarComponents,
   getSettingClasses,
@@ -61,7 +62,7 @@ describe("SynchSettingTab", () => {
     expect(getProgressBarComponents()).toEqual([]);
   });
 
-  it("checks and shows plugin updates beside the settings heading only when needed", () => {
+  it("checks and shows plugin updates on the right side of the settings heading only when needed", () => {
     const ensurePluginUpdateCheck = vi.fn(async () => {});
     const tab = createSettingsTab({
       ensurePluginUpdateCheck,
@@ -76,10 +77,16 @@ describe("SynchSettingTab", () => {
 
     expect(ensurePluginUpdateCheck).toHaveBeenCalledTimes(1);
     expect(getSettingNames()[0]).toBe("Synch");
-    expect(getCreatedElementTexts()).toContain("Update to latest version");
-    expect(getSettingDescriptions()[0]).toBe(
+    expect(getCreatedElementTexts()).toContain("Latest version available");
+    expect(getSettingDescriptions()).not.toContain(
       "Version 0.0.2 is available. Current version: 0.0.1.",
     );
+    expect(getCreatedElements()).toContainEqual({
+      tag: "span",
+      text: "Latest version available",
+      classes: ["synch-plugin-update-badge"],
+      attributes: {},
+    });
     expect(getSettingClasses()[0]).toContain("synch-plugin-update-available");
   });
 
@@ -94,7 +101,7 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     expect(getSettingNames()).not.toContain("Plugin update");
-    expect(getCreatedElementTexts()).not.toContain("Update to latest version");
+    expect(getCreatedElementTexts()).not.toContain("Latest version available");
 
     resetObsidianMocks();
     createSettingsTab({

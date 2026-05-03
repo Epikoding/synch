@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   Plugin,
@@ -12,6 +12,10 @@ const TestPlugin = Plugin as unknown as new () => Plugin;
 describe("SynchPluginController plugin update check", () => {
   beforeEach(() => {
     resetObsidianMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("deduplicates in-flight update checks", async () => {
@@ -71,5 +75,29 @@ describe("SynchPluginController plugin update check", () => {
       currentVersion: "0.0.1",
       error: "GitHub manifest does not contain a version.",
     });
+  });
+
+  it("refreshes plugin update checks after five minutes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const request = vi.fn(async () => ({
+      status: 200,
+      json: { version: "0.0.1" },
+    }));
+    setRequestUrlMock(request);
+    const controller = new SynchPluginController({
+      plugin: new TestPlugin(),
+      refreshUi: vi.fn(),
+    });
+
+    await controller.ensurePluginUpdateCheck();
+    await controller.ensurePluginUpdateCheck();
+
+    expect(request).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(5 * 60 * 1000);
+    await controller.ensurePluginUpdateCheck();
+
+    expect(request).toHaveBeenCalledTimes(2);
   });
 });

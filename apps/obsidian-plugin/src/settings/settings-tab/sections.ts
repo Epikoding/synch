@@ -25,13 +25,10 @@ export function renderSettingsHeading(
   }
 
   heading.settingEl.addClass("synch-plugin-update-available");
-  heading.nameEl.createSpan({
+  heading.controlEl.createSpan({
     cls: "synch-plugin-update-badge",
-    text: "Update to latest version",
+    text: "Latest version available",
   });
-  heading.setDesc(
-    `Version ${updateStatus.latestVersion} is available. Current version: ${updateStatus.currentVersion}.`,
-  );
 }
 
 export function renderApiBaseUrlSetting(

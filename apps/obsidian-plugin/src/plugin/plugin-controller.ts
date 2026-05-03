@@ -33,6 +33,8 @@ import {
 import { RemoteVaultManager } from "../remote-vault/manager";
 import type { SyncConnection } from "../sync/store/store";
 
+const PLUGIN_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
 export interface SynchPluginControllerDeps {
   plugin: Plugin;
   refreshUi: () => void;
@@ -45,6 +47,7 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
   private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
   private pluginUpdateCheckPromise: Promise<void> | null = null;
+  private pluginUpdateCheckedAt = 0;
   private pluginUpdateStatus: SynchPluginUpdateStatus = {
     state: "idle",
     currentVersion: this.plugin.manifest.version,
@@ -190,8 +193,15 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async ensurePluginUpdateCheck(): Promise<void> {
-    if (this.pluginUpdateStatus.state !== "idle") {
+    if (this.pluginUpdateCheckPromise) {
       await this.pluginUpdateCheckPromise;
+      return;
+    }
+
+    if (
+      this.pluginUpdateStatus.state !== "idle" &&
+      Date.now() - this.pluginUpdateCheckedAt < PLUGIN_UPDATE_CHECK_INTERVAL_MS
+    ) {
       return;
     }
 
@@ -439,6 +449,7 @@ export class SynchPluginController implements SynchSettingsController {
         };
       })
       .finally(() => {
+        this.pluginUpdateCheckedAt = Date.now();
         this.pluginUpdateCheckPromise = null;
         this.refreshUi();
       });
