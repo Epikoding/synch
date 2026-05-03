@@ -1,6 +1,7 @@
 import { setIcon, type Plugin } from "obsidian";
 
-import type { SynchSyncState } from "./view-models";
+import { isStorageWarningStatus } from "../utils/storage-warning";
+import type { SynchStorageStatus, SynchSyncState } from "./view-models";
 
 interface ObsidianSettingsApi {
   open(): void;
@@ -14,6 +15,7 @@ interface AppWithSettings {
 export interface SynchStatusBarState {
   getSyncState(): SynchSyncState;
   getSyncPercent(): number;
+  getStorageStatus(): SynchStorageStatus | null;
 }
 
 const STATUS_BAR_STATE_CLASSES = [
@@ -24,6 +26,7 @@ const STATUS_BAR_STATE_CLASSES = [
   "synch-status-reconnecting",
   "synch-status-up-to-date",
   "synch-status-attention-needed",
+  "synch-status-storage-warning",
 ];
 
 export function getStatusBarStateClass(state: SynchSyncState): string {
@@ -94,23 +97,34 @@ export class SynchStatusBar {
     }
 
     const state = this.state.getSyncState();
+    const hasStorageWarning = isStorageWarningStatus(this.state.getStorageStatus());
 
     this.statusBar.addClass("synch-status-bar");
     for (const className of STATUS_BAR_STATE_CLASSES) {
       this.statusBar.removeClass(className);
     }
     this.statusBar.addClass(getStatusBarStateClass(state));
+    this.statusBar.toggleClass("synch-status-storage-warning", hasStorageWarning);
     this.statusBar.toggleClass(
       "synch-status-active",
-      state === "syncing" || state === "reconnecting",
+      !hasStorageWarning && (state === "syncing" || state === "reconnecting"),
     );
     if (this.icon) {
-      setIcon(this.icon, getStatusBarIcon(state));
+      setIcon(this.icon, hasStorageWarning ? "triangle-alert" : getStatusBarIcon(state));
     }
     this.statusBar.removeAttribute("title");
-    this.statusBar.setAttribute("aria-label", "Open Synch settings");
+    this.statusBar.setAttribute(
+      "aria-label",
+      hasStorageWarning
+        ? "Synch storage is almost full. Open Synch settings"
+        : "Open Synch settings",
+    );
     this.statusBar.setAttribute("data-synch-sync-state", state);
     this.statusBar.setAttribute("data-synch-sync-percent", String(this.state.getSyncPercent()));
+    this.statusBar.setAttribute(
+      "data-synch-storage-warning",
+      hasStorageWarning ? "true" : "false",
+    );
   }
 
   private openSettings(): void {

@@ -7,7 +7,7 @@ import {
   SynchStatusBar,
   type SynchStatusBarState,
 } from "./status-bar";
-import type { SynchSyncState } from "./view-models";
+import type { SynchStorageStatus, SynchSyncState } from "./view-models";
 
 class FakeStatusBarElement {
   text = "";
@@ -114,10 +114,12 @@ function createPlugin(): Plugin & {
 function createState(
   syncState: SynchSyncState,
   percent = 37,
+  storageStatus: SynchStorageStatus | null = null,
 ): SynchStatusBarState {
   return {
     getSyncState: () => syncState,
     getSyncPercent: () => percent,
+    getStorageStatus: () => storageStatus,
   };
 }
 
@@ -132,6 +134,7 @@ function expectElementState(
   expect(item.attributes.get("aria-label")).toBe("Open Synch settings");
   expect(item.attributes.get("data-synch-sync-state")).toBe(syncState);
   expect(item.attributes.get("data-synch-sync-percent")).toBe(String(percent));
+  expect(item.attributes.get("data-synch-storage-warning")).toBe("false");
   expect(item.children[0].attributes.get("data-icon")).toBe(getStatusBarIcon(syncState));
 }
 
@@ -195,4 +198,28 @@ describe("SynchStatusBar", () => {
       expect(item.classes.has("synch-status-active")).toBe(active);
     },
   );
+
+  it("shows a storage warning without changing the sync state", () => {
+    const plugin = createPlugin();
+    const statusBar = new SynchStatusBar(
+      plugin,
+      createState("up_to_date", 100, {
+        storageUsedBytes: 95,
+        storageLimitBytes: 100,
+      }),
+    );
+
+    statusBar.initialize();
+
+    const item = plugin.addedStatusBarItems[0];
+    expect(item.classes).toContain("synch-status-up-to-date");
+    expect(item.classes).toContain("synch-status-storage-warning");
+    expect(item.classes.has("synch-status-active")).toBe(false);
+    expect(item.attributes.get("aria-label")).toBe(
+      "Synch storage is almost full. Open Synch settings",
+    );
+    expect(item.attributes.get("data-synch-sync-state")).toBe("up_to_date");
+    expect(item.attributes.get("data-synch-storage-warning")).toBe("true");
+    expect(item.children[0].attributes.get("data-icon")).toBe("triangle-alert");
+  });
 });

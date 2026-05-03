@@ -87,7 +87,9 @@ export class SyncController {
   }
 
   async stop(): Promise<void> {
+    this.syncEngine.setStorageStatusWatching(false);
     this.syncEngine.stopAutoSync();
+    this.setStorageStatus(null);
     await this.syncEngine.closeStore();
   }
 
@@ -108,6 +110,7 @@ export class SyncController {
   }
 
   stopAutoSyncAndMarkNotReady(): void {
+    this.syncEngine.setStorageStatusWatching(false);
     this.syncEngine.stopAutoSync();
     this.setStorageStatus(null);
     this.setSyncProgress({
@@ -118,11 +121,14 @@ export class SyncController {
   }
 
   stopAutoSyncAndMarkPaused(): void {
+    this.syncEngine.setStorageStatusWatching(false);
     this.syncEngine.stopAutoSync();
+    this.setStorageStatus(null);
     this.setSyncStatus("paused");
   }
 
   async resetLocalSyncState(): Promise<void> {
+    this.syncEngine.setStorageStatusWatching(false);
     this.syncEngine.stopAutoSync();
     this.setStorageStatus(null);
     const store = this.syncEngine.detachStore();
@@ -169,6 +175,7 @@ export class SyncController {
 
   async ensureAutoSyncState(): Promise<void> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
+      this.syncEngine.setStorageStatusWatching(false);
       this.syncEngine.stopAutoSync();
       this.setStorageStatus(null);
       if (this.shouldShowOfflineBeforeReady()) {
@@ -185,6 +192,7 @@ export class SyncController {
     }
 
     try {
+      this.syncEngine.setStorageStatusWatching(true);
       const reconcile = await this.syncEngine.reconcileOnce();
       await this.syncEngine.unblockQuotaBlockedMutations();
       await this.syncEngine.waitForLocalMutationWork();
@@ -198,6 +206,8 @@ export class SyncController {
         this.syncEngine.notifyLocalChange();
       }
     } catch (error) {
+      this.syncEngine.setStorageStatusWatching(false);
+      this.setStorageStatus(null);
       if (isOfflineLikeError(error, this.deps.isOffline)) {
         this.setSyncStatus("offline");
         return;
@@ -221,6 +231,7 @@ export class SyncController {
       return;
     }
 
+    this.syncEngine.setStorageStatusWatching(true);
     const started = await this.syncEngine.startAutoSync();
     if (!started) {
       await this.syncEngine.resumeAutoSyncConnection();

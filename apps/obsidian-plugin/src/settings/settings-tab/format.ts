@@ -1,4 +1,8 @@
 import type { SynchSyncProgress, SynchSyncState } from "../../plugin/view-models";
+import {
+  isStorageFullStatus,
+  isStorageWarningStatus,
+} from "../../utils/storage-warning";
 import type { SynchSettingsController } from "../controller";
 
 export function shouldShowSyncSpinner(state: SynchSyncState): boolean {
@@ -14,6 +18,20 @@ export function formatSyncDescription(
 }
 
 export function formatStorageDescription(
+  storageStatus: NonNullable<ReturnType<SynchSettingsController["getStorageStatus"]>>,
+): string {
+  const usage = formatStorageUsage(storageStatus);
+  if (isStorageFullStatus(storageStatus)) {
+    return `Storage full: ${usage}`;
+  }
+  if (isStorageWarningStatus(storageStatus)) {
+    return `Storage almost full: ${usage}`;
+  }
+
+  return usage;
+}
+
+function formatStorageUsage(
   storageStatus: NonNullable<ReturnType<SynchSettingsController["getStorageStatus"]>>,
 ): string {
   if (storageStatus.storageLimitBytes <= 0) {

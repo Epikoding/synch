@@ -2,6 +2,7 @@ import { App, Notice, Setting } from "obsidian";
 
 import { getDefaultApiBaseUrl } from "../../config";
 import type { SynchFileRules } from "../../plugin/view-models";
+import { isStorageWarningStatus } from "../../utils/storage-warning";
 import type { SynchSettingsController } from "../controller";
 import {
   formatStorageDescription,
@@ -105,12 +106,15 @@ export function renderSyncStatusSetting(
       }),
   );
 
-  new Setting(containerEl)
+  const storageSetting = new Setting(containerEl)
     .setName("Storage")
     .setDesc(storageStatus ? formatStorageDescription(storageStatus) : "Checking storage usage...")
     .addProgressBar((progressBar) => {
       progressBar.setValue(storageStatus ? getStoragePercent(storageStatus) : 0);
     });
+  if (isStorageWarningStatus(storageStatus)) {
+    storageSetting.settingEl.addClass("synch-storage-warning");
+  }
 }
 
 export function renderAuthenticationSetting(

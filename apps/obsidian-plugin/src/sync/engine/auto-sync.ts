@@ -305,6 +305,10 @@ export class SyncAutoLoop {
     try {
       if (this.storageStatusWatching) {
         session.watchStorageStatus();
+        this.deps.onStorageStatusChange?.({
+          storageUsedBytes: session.storageUsedBytes,
+          storageLimitBytes: session.storageLimitBytes,
+        });
       } else {
         session.unwatchStorageStatus();
       }

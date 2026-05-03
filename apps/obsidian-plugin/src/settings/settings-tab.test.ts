@@ -249,7 +249,7 @@ describe("SynchSettingTab", () => {
     expect(buttonTexts).not.toContain("Sign out");
   });
 
-  it("watches remote storage usage only while a connected settings tab is visible", () => {
+  it("does not own remote storage usage watching while visible", () => {
     const watchStorageStatus = vi.fn();
     const unwatchStorageStatus = vi.fn();
     const tab = createSettingsTab({
@@ -263,8 +263,8 @@ describe("SynchSettingTab", () => {
     tab.display();
     tab.hide();
 
-    expect(watchStorageStatus).toHaveBeenCalledTimes(1);
-    expect(unwatchStorageStatus).toHaveBeenCalledTimes(1);
+    expect(watchStorageStatus).not.toHaveBeenCalled();
+    expect(unwatchStorageStatus).not.toHaveBeenCalled();
   });
 
   it("does not watch remote storage usage when a hidden settings tab refreshes", () => {

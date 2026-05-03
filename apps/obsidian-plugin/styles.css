@@ -11,6 +11,10 @@
   color: var(--text-warning);
 }
 
+.synch-storage-warning .setting-item-description {
+  color: var(--text-warning);
+}
+
 .synch-plugin-update-badge {
   color: var(--text-warning);
   font-size: var(--font-ui-small);
@@ -38,6 +42,10 @@
 .synch-status-bar.synch-status-offline,
 .synch-status-bar.synch-status-attention-needed {
   color: var(--text-error);
+}
+
+.synch-status-bar.synch-status-storage-warning {
+  color: var(--text-warning);
 }
 
 .synch-status-bar-icon {

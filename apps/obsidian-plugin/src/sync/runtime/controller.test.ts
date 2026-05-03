@@ -105,13 +105,75 @@ describe("SyncController", () => {
     const stopAutoSync = vi
       .spyOn(SyncEngine.prototype, "stopAutoSync")
       .mockImplementation(() => {});
+    const setStorageStatusWatching = vi
+      .spyOn(SyncEngine.prototype, "setStorageStatusWatching")
+      .mockImplementation(() => {});
     const controller = new SyncController(createDeps());
 
     controller.stopAutoSyncAndMarkPaused();
 
+    expect(setStorageStatusWatching).toHaveBeenCalledWith(false);
     expect(stopAutoSync).toHaveBeenCalledTimes(1);
     expect(controller.getSyncState()).toBe("paused");
     expect(controller.getSyncStatusLabel()).toBe("Sync: paused 0%");
+  });
+
+  it("watches storage status while auto sync starts for a connected vault", async () => {
+    vi.spyOn(SyncEngine.prototype, "reconcileOnce").mockResolvedValue({
+      filesScanned: 1,
+      filesQueuedForUpsert: 0,
+      filesQueuedForDelete: 0,
+    });
+    vi.spyOn(SyncEngine.prototype, "unblockQuotaBlockedMutations").mockResolvedValue();
+    vi.spyOn(SyncEngine.prototype, "hasPendingMutations").mockResolvedValue(false);
+    vi.spyOn(SyncEngine.prototype, "startAutoSync").mockResolvedValue(true);
+    const setStorageStatusWatching = vi
+      .spyOn(SyncEngine.prototype, "setStorageStatusWatching")
+      .mockImplementation(() => {});
+
+    const controller = new SyncController(createDeps());
+
+    await controller.ensureAutoSyncState();
+
+    expect(setStorageStatusWatching).toHaveBeenCalledWith(true);
+  });
+
+  it("does not watch storage status without an active authenticated vault", async () => {
+    const stopAutoSync = vi
+      .spyOn(SyncEngine.prototype, "stopAutoSync")
+      .mockImplementation(() => {});
+    const setStorageStatusWatching = vi
+      .spyOn(SyncEngine.prototype, "setStorageStatusWatching")
+      .mockImplementation(() => {});
+    const controller = new SyncController(
+      createDeps({
+        hasActiveRemoteVaultSession: () => false,
+        hasAuthenticatedSession: () => false,
+      }),
+    );
+
+    await controller.ensureAutoSyncState();
+
+    expect(setStorageStatusWatching).toHaveBeenCalledWith(false);
+    expect(stopAutoSync).toHaveBeenCalledTimes(1);
+    expect(controller.getStorageStatus()).toBeNull();
+  });
+
+  it("clears storage watching when local sync state is reset", async () => {
+    const stopAutoSync = vi
+      .spyOn(SyncEngine.prototype, "stopAutoSync")
+      .mockImplementation(() => {});
+    vi.spyOn(SyncEngine.prototype, "detachStore").mockReturnValue(null);
+    const setStorageStatusWatching = vi
+      .spyOn(SyncEngine.prototype, "setStorageStatusWatching")
+      .mockImplementation(() => {});
+    const controller = new SyncController(createDeps());
+
+    await controller.resetLocalSyncState();
+
+    expect(setStorageStatusWatching).toHaveBeenCalledWith(false);
+    expect(stopAutoSync).toHaveBeenCalledTimes(1);
+    expect(controller.getStorageStatus()).toBeNull();
   });
 
   it("shows offline instead of not ready when a stored vault cannot activate offline", async () => {

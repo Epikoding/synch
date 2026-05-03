@@ -4,6 +4,7 @@ import {
   getButtonComponents,
   getExtraButtonComponents,
   getProgressBarComponents,
+  getSettingClasses,
   getSettingDescriptions,
   getSettingNames,
   resetObsidianMocks,
@@ -177,6 +178,75 @@ describe("SynchSettingTab sync status", () => {
     expect(getProgressBarComponents().map(({ value }) => value)).toEqual([
       49,
     ]);
+    expect(getSettingClasses()[2]).not.toContain("synch-storage-warning");
+  });
+
+  it("does not warn below the remote storage warning threshold", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncStatusLabel: () => "Sync: synced 100%",
+      getSyncProgress: () => ({
+        completedEntries: 12,
+        totalEntries: 12,
+      }),
+      getStorageStatus: () => ({
+        storageUsedBytes: 94,
+        storageLimitBytes: 100,
+      }),
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()[1]).toBe("94 B / 100 B (94%)");
+    expect(getProgressBarComponents()[0]?.value).toBe(94);
+    expect(getSettingClasses()[2]).not.toContain("synch-storage-warning");
+  });
+
+  it("warns when remote storage is at least 95 percent full", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncStatusLabel: () => "Sync: synced 100%",
+      getSyncProgress: () => ({
+        completedEntries: 12,
+        totalEntries: 12,
+      }),
+      getStorageStatus: () => ({
+        storageUsedBytes: 95,
+        storageLimitBytes: 100,
+      }),
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()[1]).toBe(
+      "Storage almost full: 95 B / 100 B (95%)",
+    );
+    expect(getProgressBarComponents()[0]?.value).toBe(95);
+    expect(getSettingClasses()[2]).toContain("synch-storage-warning");
+  });
+
+  it("shows a full warning when remote storage reaches the limit", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncStatusLabel: () => "Sync: synced 100%",
+      getSyncProgress: () => ({
+        completedEntries: 12,
+        totalEntries: 12,
+      }),
+      getStorageStatus: () => ({
+        storageUsedBytes: 101,
+        storageLimitBytes: 100,
+      }),
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()[1]).toBe("Storage full: 101 B / 100 B (101%)");
+    expect(getProgressBarComponents()[0]?.value).toBe(100);
+    expect(getSettingClasses()[2]).toContain("synch-storage-warning");
   });
 
   it("shows unlimited remote storage usage without a zero-byte limit", () => {
@@ -202,6 +272,7 @@ describe("SynchSettingTab sync status", () => {
     );
     expect(getSettingDescriptions()[1]).toBe("24.3 MB");
     expect(getProgressBarComponents()[0]?.value).toBe(0);
+    expect(getSettingClasses()[2]).not.toContain("synch-storage-warning");
   });
 
   it("reserves the storage row before the websocket reports usage", () => {

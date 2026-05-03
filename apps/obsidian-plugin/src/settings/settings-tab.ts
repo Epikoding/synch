@@ -12,7 +12,6 @@ import {
 
 export class SynchSettingTab extends PluginSettingTab {
   private isVisible = false;
-  private isWatchingStorageStatus = false;
 
   constructor(
     app: App,
@@ -37,7 +36,6 @@ export class SynchSettingTab extends PluginSettingTab {
 
   hide(): void {
     this.isVisible = false;
-    this.setStorageStatusWatching(false);
     super.hide();
   }
 
@@ -51,7 +49,6 @@ export class SynchSettingTab extends PluginSettingTab {
       !hasAuthenticatedSession &&
       !isDeviceLoginInProgress &&
       !hasConnectedRemoteVault;
-    this.setStorageStatusWatching(hasAuthenticatedSession && hasConnectedRemoteVault);
 
     void this.controller.ensurePluginUpdateCheck();
     renderSettingsHeading(containerEl, this.controller);
@@ -87,19 +84,6 @@ export class SynchSettingTab extends PluginSettingTab {
       () => this.refresh(),
     );
     renderFileSyncSettings(this.app, containerEl, this.controller, () => this.refresh());
-  }
-
-  private setStorageStatusWatching(enabled: boolean): void {
-    if (this.isWatchingStorageStatus === enabled) {
-      return;
-    }
-
-    this.isWatchingStorageStatus = enabled;
-    if (enabled) {
-      this.controller.watchStorageStatus();
-    } else {
-      this.controller.unwatchStorageStatus();
-    }
   }
 
 }

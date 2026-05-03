@@ -2,6 +2,8 @@
 
 ## Added
 
+- Show an Obsidian status bar and settings warning when remote vault storage is almost full.
+
 ## Changed
 
 ## Fixed
