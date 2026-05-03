@@ -277,15 +277,6 @@ export class SyncEngine {
     });
   }
 
-  async unblockQuotaBlockedMutations(): Promise<void> {
-    await this.runLocalMutationWork(async () => {
-      // Quota-blocked mutations are retried during sync initialization for now.
-      // A later improvement should unblock and reschedule them when live storage
-      // status changes indicate that quota is available again.
-      await this.syncStore?.unblockDirtyEntriesByReason("storage_quota_exceeded");
-    });
-  }
-
   async refreshSyncProgress(): Promise<void> {
     const store = this.syncStore;
     if (!store) {

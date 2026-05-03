@@ -470,7 +470,7 @@ describe("SyncPushService drain: limits", () => {
     await store.close();
   });
 
-  it("blocks upserts when the server reports quota exhaustion during upload", async () => {
+  it("stops with pending upserts when the server reports quota exhaustion during upload", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);
     const bytes = encodeUtf8("body");
@@ -533,7 +533,7 @@ describe("SyncPushService drain: limits", () => {
     });
 
     const session = createPushSession(async () => {
-      throw new Error("quota-blocked mutation should not be committed");
+      throw new Error("quota-exceeded mutation should not be committed");
     });
     const uploadAttempts: string[] = [];
     const service = new SyncPushService({
@@ -568,21 +568,26 @@ describe("SyncPushService drain: limits", () => {
       hasMore: true,
       stopReason: "storage_quota_exceeded",
     });
-    expect(uploadAttempts).toEqual(["blob-server-quota"]);
-    expect(await store.listDirtyEntries()).toEqual([
-      expect.objectContaining({
-        mutationId: "mutation-after-quota",
-      }),
+    expect(new Set(uploadAttempts)).toEqual(
+      new Set(["blob-server-quota", "blob-after-quota"]),
+    );
+    const pending = await store.listDirtyEntries();
+    expect(pending.map((mutation) => mutation.mutationId)).toEqual([
+      "mutation-server-quota",
+      "mutation-after-quota",
     ]);
-    expect(await store.getDirtyEntryMutation("entry-server-quota")).toMatchObject({
-      mutationId: "mutation-server-quota",
-      status: "blocked",
-      blockedReason: "storage_quota_exceeded",
-    });
+    expect(pending.map((mutation) => mutation.status ?? "pending")).toEqual([
+      "pending",
+      "pending",
+    ]);
+    expect(pending.map((mutation) => mutation.blockedReason ?? null)).toEqual([
+      null,
+      null,
+    ]);
     await store.close();
   });
 
-  it("blocks upserts without staging blobs when known storage is exhausted", async () => {
+  it("stops with a pending upsert when storage quota is exhausted", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);
     const bytes = encodeUtf8("body");
@@ -617,7 +622,7 @@ describe("SyncPushService drain: limits", () => {
     });
 
     const session = createPushSession(async () => {
-      throw new Error("quota-blocked mutation should not be committed");
+      throw new Error("quota-exceeded mutation should not be committed");
     });
     session.storageUsedBytes = 50_000_000;
     session.storageLimitBytes = 50_000_000;
@@ -639,6 +644,7 @@ describe("SyncPushService drain: limits", () => {
       blobClient: {
         async uploadBlob() {
           uploadAttempts += 1;
+          throw new SyncBlobUploadError(413, "quota_exceeded", "quota exceeded");
         },
       },
       onProgress: ignoreProgress,
@@ -647,20 +653,24 @@ describe("SyncPushService drain: limits", () => {
     await expect(service.pushPendingMutations(session)).resolves.toMatchObject({
       mutationsPushed: 0,
       mutationsRequeued: 0,
-      hasMore: false,
+      hasMore: true,
       stopReason: "storage_quota_exceeded",
     });
-    expect(uploadAttempts).toBe(0);
-    expect(await store.listDirtyEntries()).toEqual([]);
-    expect(await store.getDirtyEntryMutation("entry-known-quota")).toMatchObject({
+    expect(uploadAttempts).toBe(1);
+    const pending = await store.listDirtyEntries();
+    expect(pending.map((mutation) => mutation.mutationId)).toEqual([
+      "mutation-known-quota",
+    ]);
+    const quotaMutation = await store.getDirtyEntryMutation("entry-known-quota");
+    expect(quotaMutation).toMatchObject({
       mutationId: "mutation-known-quota",
-      status: "blocked",
-      blockedReason: "storage_quota_exceeded",
     });
+    expect(quotaMutation?.status ?? "pending").toBe("pending");
+    expect(quotaMutation?.blockedReason ?? null).toBeNull();
     await store.close();
   });
 
-  it("blocks upserts without staging blobs when they exceed remaining storage", async () => {
+  it("stops with a pending upsert when the server rejects near-quota uploads", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);
     const bytes = new Uint8Array(600_000).fill(1);
@@ -695,7 +705,7 @@ describe("SyncPushService drain: limits", () => {
     });
 
     const session = createPushSession(async () => {
-      throw new Error("quota-blocked mutation should not be committed");
+      throw new Error("quota-exceeded mutation should not be committed");
     });
     session.storageUsedBytes = 49_500_000;
     session.storageLimitBytes = 50_000_000;
@@ -717,6 +727,7 @@ describe("SyncPushService drain: limits", () => {
       blobClient: {
         async uploadBlob() {
           uploadAttempts += 1;
+          throw new SyncBlobUploadError(413, "quota_exceeded", "quota exceeded");
         },
       },
       onProgress: ignoreProgress,
@@ -725,16 +736,20 @@ describe("SyncPushService drain: limits", () => {
     await expect(service.pushPendingMutations(session)).resolves.toMatchObject({
       mutationsPushed: 0,
       mutationsRequeued: 0,
-      hasMore: false,
+      hasMore: true,
       stopReason: "storage_quota_exceeded",
     });
-    expect(uploadAttempts).toBe(0);
-    expect(await store.listDirtyEntries()).toEqual([]);
-    expect(await store.getDirtyEntryMutation("entry-near-quota")).toMatchObject({
+    expect(uploadAttempts).toBe(1);
+    const pending = await store.listDirtyEntries();
+    expect(pending.map((mutation) => mutation.mutationId)).toEqual([
+      "mutation-near-quota",
+    ]);
+    const quotaMutation = await store.getDirtyEntryMutation("entry-near-quota");
+    expect(quotaMutation).toMatchObject({
       mutationId: "mutation-near-quota",
-      status: "blocked",
-      blockedReason: "storage_quota_exceeded",
     });
+    expect(quotaMutation?.status ?? "pending").toBe("pending");
+    expect(quotaMutation?.blockedReason ?? null).toBeNull();
     await store.close();
   });
 

@@ -80,7 +80,6 @@ export class PushMutationPreparer {
       storageAvailableBytes !== null &&
       storageBytesAdded > storageAvailableBytes
     ) {
-      await this.blockQuotaExceededUpsert(store, mutation);
       return {
         skipped: true,
         reason: "storage_quota_exceeded",
@@ -97,7 +96,6 @@ export class PushMutationPreparer {
       );
     } catch (error) {
       if (isQuotaExceededUploadError(error)) {
-        await this.blockQuotaExceededUpsert(store, mutation);
         return {
           skipped: true,
           reason: "storage_quota_exceeded",
@@ -146,17 +144,6 @@ export class PushMutationPreparer {
       blockedReason: "file_too_large",
       blockedEncryptedSizeBytes: encryptedSizeBytes,
       blockedMaxFileSizeBytes: maxFileSizeBytes,
-    });
-  }
-
-  private async blockQuotaExceededUpsert(
-    store: PushMutationStore,
-    mutation: PendingMutationRow,
-  ): Promise<void> {
-    await store.updateDirtyEntry({
-      ...mutation,
-      status: "blocked",
-      blockedReason: "storage_quota_exceeded",
     });
   }
 

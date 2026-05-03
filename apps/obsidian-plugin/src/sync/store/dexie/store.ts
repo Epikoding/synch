@@ -390,9 +390,7 @@ export class DexieSyncStore implements SyncStore {
     return blocked.map((row) => toPendingMutationRow(row)).filter(isPresent);
   }
 
-  async unblockDirtyEntriesByReason(
-    reason: PendingMutationBlockedReason,
-  ): Promise<void> {
+  async unblockDirtyEntriesByReason(reason: PendingMutationBlockedReason): Promise<void> {
     const blocked = await this.db.entries
       .where("pendingStatus")
       .equals("blocked")

@@ -16,9 +16,6 @@ describe("SyncController", () => {
       filesQueuedForUpsert: 0,
       filesQueuedForDelete: 0,
     });
-    const unblockQuotaBlockedMutations = vi
-      .spyOn(SyncEngine.prototype, "unblockQuotaBlockedMutations")
-      .mockResolvedValue();
     const hasPendingMutations = vi
       .spyOn(SyncEngine.prototype, "hasPendingMutations")
       .mockResolvedValue(true);
@@ -34,12 +31,8 @@ describe("SyncController", () => {
     await controller.ensureAutoSyncState();
 
     expect(startAutoSync).toHaveBeenCalledTimes(1);
-    expect(unblockQuotaBlockedMutations).toHaveBeenCalledTimes(1);
     expect(notifyLocalChange).toHaveBeenCalledTimes(1);
     expect(reconcileOnce.mock.invocationCallOrder[0]).toBeLessThan(
-      unblockQuotaBlockedMutations.mock.invocationCallOrder[0] ?? 0,
-    );
-    expect(unblockQuotaBlockedMutations.mock.invocationCallOrder[0]).toBeLessThan(
       hasPendingMutations.mock.invocationCallOrder[0] ?? 0,
     );
     expect(startAutoSync.mock.invocationCallOrder[0]).toBeLessThan(
@@ -124,7 +117,6 @@ describe("SyncController", () => {
       filesQueuedForUpsert: 0,
       filesQueuedForDelete: 0,
     });
-    vi.spyOn(SyncEngine.prototype, "unblockQuotaBlockedMutations").mockResolvedValue();
     vi.spyOn(SyncEngine.prototype, "hasPendingMutations").mockResolvedValue(false);
     vi.spyOn(SyncEngine.prototype, "startAutoSync").mockResolvedValue(true);
     const setStorageStatusWatching = vi

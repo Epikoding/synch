@@ -138,6 +138,7 @@ export class SyncPushService {
             if (prepared.reason === "storage_quota_exceeded") {
               stopAfterCurrentBatch = true;
               stopReason = "storage_quota_exceeded";
+              break;
             }
             continue;
           }
@@ -289,17 +290,6 @@ export class SyncPushService {
       prepared: Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>;
     }>
   > {
-    const storageAvailableBytes = getStorageAvailableBytes(session);
-    if (storageAvailableBytes !== null) {
-      return await this.preparePendingMutationsWithStorageBudget(
-        store,
-        token,
-        session,
-        pending,
-        storageAvailableBytes,
-      );
-    }
-
     return await mapWithConcurrency(
       pending,
       this.deps.prepareConcurrency ?? DEFAULT_PUSH_PREPARE_CONCURRENCY,
@@ -314,61 +304,6 @@ export class SyncPushService {
       }),
     );
   }
-
-  private async preparePendingMutationsWithStorageBudget(
-    store: SyncPushStore,
-    token: SyncTokenResponse,
-    session: SyncRealtimeSession,
-    pending: PendingMutationRow[],
-    storageAvailableBytes: number,
-  ): Promise<
-    Array<{
-      mutation: (typeof pending)[number];
-      prepared: Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>;
-    }>
-  > {
-    const preparedMutations: Array<{
-      mutation: (typeof pending)[number];
-      prepared: Awaited<ReturnType<PushMutationCommitter["prepareMutationForCommit"]>>;
-    }> = [];
-    let remainingStorageBytes = storageAvailableBytes;
-
-    for (const mutation of pending) {
-      const prepared = await this.mutationCommitter.prepareMutationForCommit(
-        store,
-        token,
-        mutation,
-        session.maxFileSizeBytes,
-        remainingStorageBytes,
-      );
-      preparedMutations.push({ mutation, prepared });
-
-      if (!prepared) {
-        continue;
-      }
-      if ("skipped" in prepared) {
-        if (prepared.reason === "storage_quota_exceeded") {
-          break;
-        }
-        continue;
-      }
-
-      remainingStorageBytes = Math.max(
-        0,
-        remainingStorageBytes - prepared.storageBytesAdded,
-      );
-    }
-
-    return preparedMutations;
-  }
-}
-
-function getStorageAvailableBytes(session: SyncRealtimeSession): number | null {
-  if (session.storageLimitBytes <= 0) {
-    return null;
-  }
-
-  return Math.max(0, session.storageLimitBytes - session.storageUsedBytes);
 }
 
 function getContiguousAcceptedCursor(
@@ -414,8 +349,7 @@ async function mapWithConcurrency<T, U>(
   const results = new Array<U>(items.length);
   let nextIndex = 0;
   let firstError: unknown = null;
-  const normalizedConcurrency = Number.isFinite(concurrency) ? Math.floor(concurrency) : 1;
-  const workerCount = Math.max(1, Math.min(normalizedConcurrency, items.length));
+  const workerCount = normalizeConcurrency(concurrency, items.length);
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
@@ -436,4 +370,9 @@ async function mapWithConcurrency<T, U>(
   }
 
   return results;
+}
+
+function normalizeConcurrency(concurrency: number, itemCount: number): number {
+  const normalizedConcurrency = Number.isFinite(concurrency) ? Math.floor(concurrency) : 1;
+  return Math.max(1, Math.min(normalizedConcurrency, itemCount));
 }
