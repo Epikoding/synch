@@ -27,6 +27,7 @@ export default defineConfig({
 						BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
 						SYNC_TOKEN_SECRET: process.env.SYNC_TOKEN_SECRET,
 						SELF_HOSTED: false,
+						DEV_MODE: false,
 						AUTH_EMAIL_FROM: "Synch <noreply@example.com>",
 						TEST_MIGRATIONS: migrations,
 					},

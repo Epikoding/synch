@@ -17,6 +17,7 @@ export type AuthConfig = {
 	baseURL: string;
 	trustedOrigins: string[];
 	selfHosted: boolean;
+	devMode: boolean;
 	email?: SendEmail;
 	emailFrom?: string;
 	plugins?: BetterAuthPlugin[];
@@ -34,7 +35,7 @@ export function createAuth(database: D1Database, config: AuthConfig) {
 		trustedOrigins: config.trustedOrigins,
 		emailAndPassword: {
 			enabled: true,
-			requireEmailVerification: !config.selfHosted,
+			requireEmailVerification: !config.selfHosted && !config.devMode,
 		},
 		emailVerification,
 		databaseHooks: {

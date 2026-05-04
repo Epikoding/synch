@@ -1,7 +1,7 @@
 import type { AuthConfig } from "./factory";
 
 export function createEmailVerificationConfig(config: AuthConfig) {
-	if (config.selfHosted) {
+	if (config.selfHosted || config.devMode) {
 		return undefined;
 	}
 

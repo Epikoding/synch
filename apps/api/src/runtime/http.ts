@@ -15,9 +15,10 @@ import { CloudflareVaultPurgeQueue } from "../vault/purge-queue";
 import { VaultRepository } from "../vault/repository";
 import { VaultService } from "../vault/service";
 
-type RuntimeEnv = Env & {
+type RuntimeEnv = Omit<Env, "AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL"> & {
 	EMAIL?: SendEmail;
 	AUTH_EMAIL_FROM?: string;
+	DEV_MODE?: boolean | string;
 	WWW_BASE_URL?: string;
 	POLAR_ACCESS_TOKEN?: string;
 	POLAR_WEBHOOK_SECRET?: string;
@@ -63,6 +64,7 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 		baseURL: authBaseUrl,
 		trustedOrigins: Array.from(new Set([publicOrigin, corsOrigin])),
 		selfHosted: env.SELF_HOSTED,
+		devMode: resolveBooleanBinding(env.DEV_MODE, false),
 		email: env.EMAIL,
 		emailFrom: env.AUTH_EMAIL_FROM,
 		plugins: polarAuthPlugin ? [polarAuthPlugin] : [],
@@ -110,7 +112,10 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 	};
 }
 
-function resolveBooleanBinding(value: string | undefined, fallback: boolean): boolean {
+function resolveBooleanBinding(value: boolean | string | undefined, fallback: boolean): boolean {
+	if (typeof value === "boolean") {
+		return value;
+	}
 	if (value === undefined || value.trim() === "") {
 		return fallback;
 	}

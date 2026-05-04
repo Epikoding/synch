@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 import { createRuntimeApp } from "../../../src/runtime";
 import { extractCookieHeader, uniqueId } from "../../helpers/api";
 
-type RuntimeTestEnv = Env & {
+type RuntimeTestEnv = Omit<Env, "AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL"> & {
 	EMAIL?: SendEmail;
 	AUTH_EMAIL_FROM?: string;
+	DEV_MODE?: boolean | string;
 	WWW_BASE_URL?: string;
 };
 
