@@ -30,7 +30,10 @@
 						vault does not delete local Obsidian files.
 					</p>
 				</div>
-				<div id="user" class="text-zinc-500 text-xs bg-zinc-900/50 border border-zinc-800 rounded-full px-3 py-1.5 whitespace-nowrap hidden sm:inline-block"></div>
+				<div id="user-container" class="hidden items-center gap-4">
+					<div id="user" class="text-zinc-500 text-xs bg-zinc-900/50 border border-zinc-800 rounded-full px-3 py-1.5 whitespace-nowrap"></div>
+					<button id="logout" type="button" class="shrink-0 text-zinc-500 text-xs hover:text-zinc-300 transition-colors">Sign out</button>
+				</div>
 			</header>
 
 			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -67,7 +70,9 @@
 
 		<script>
 			const statusEl = document.querySelector("#status");
+			const userContainerEl = document.querySelector("#user-container");
 			const userEl = document.querySelector("#user");
+			const logoutButton = document.querySelector("#logout");
 			const listEl = document.querySelector("#vault-list");
 			const refreshButton = document.querySelector("#refresh");
 			const deleteDialog = document.querySelector("#delete-dialog");
@@ -89,6 +94,10 @@
 				void deleteSelectedVault();
 			});
 
+			logoutButton.addEventListener("click", () => {
+				void signOut();
+			});
+
 			void initialize();
 
 			async function initialize() {
@@ -99,8 +108,21 @@
 				}
 
 				userEl.textContent = session.user.email || session.user.name || "Signed in";
-				userEl.classList.remove("hidden");
+				userContainerEl.classList.remove("hidden");
+				userContainerEl.classList.add("flex");
 				await loadVaults();
+			}
+
+			async function signOut() {
+				logoutButton.disabled = true;
+				try {
+					await fetch("/api/auth/sign-out", {
+						method: "POST",
+						credentials: "include",
+					});
+				} finally {
+					redirectToLogin();
+				}
 			}
 
 			async function loadSession() {
