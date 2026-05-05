@@ -3,6 +3,7 @@ import type {
   CommitMutationPayload,
   DeletedEntryPageCursor,
   EntryVersionPageCursor,
+  RestoreEntryVersionPayload,
   ServerMessage,
   SyncRealtimeCallbacks,
   SyncRealtimeClientOptions,
@@ -44,18 +45,17 @@ type ClientMessage =
   | {
       type: "restore_entry_version";
       requestId: string;
-      entryId: string;
-      versionId: string;
-      baseRevision: number;
-      op: "upsert" | "delete";
-      blobId: string | null;
-      encryptedMetadata: string;
+    } & RestoreEntryVersionPayload
+  | {
+      type: "restore_entry_versions";
+      requestId: string;
+      restores: RestoreEntryVersionPayload[];
     }
-	  | {
-	      type: "detach_local_vault";
-	      requestId: string;
-	    }
-	  | {
+  | {
+      type: "detach_local_vault";
+      requestId: string;
+    }
+  | {
       type: "heartbeat";
       requestId: string;
     }

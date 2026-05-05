@@ -100,6 +100,17 @@ export const restoreEntryVersionMessageSchema = z.object({
 	encryptedMetadata: nonEmptyString,
 });
 
+const restoreEntryVersionPayloadSchema = restoreEntryVersionMessageSchema.omit({
+	type: true,
+	requestId: true,
+});
+
+export const restoreEntryVersionsMessageSchema = z.object({
+	type: z.literal("restore_entry_versions"),
+	requestId: requestIdSchema,
+	restores: z.array(restoreEntryVersionPayloadSchema).min(1).max(100),
+});
+
 export const ackCursorMessageSchema = z.object({
 	type: z.literal("ack_cursor"),
 	requestId: requestIdSchema,
@@ -131,6 +142,7 @@ export const clientControlMessageSchema = z.discriminatedUnion("type", [
 	listEntryVersionsMessageSchema,
 	listDeletedEntriesMessageSchema,
 	restoreEntryVersionMessageSchema,
+	restoreEntryVersionsMessageSchema,
 	ackCursorMessageSchema,
 	detachLocalVaultMessageSchema,
 	heartbeatMessageSchema,
@@ -146,6 +158,7 @@ export type ListEntryStatesMessage = z.infer<typeof listEntryStatesMessageSchema
 export type ListEntryVersionsMessage = z.infer<typeof listEntryVersionsMessageSchema>;
 export type ListDeletedEntriesMessage = z.infer<typeof listDeletedEntriesMessageSchema>;
 export type RestoreEntryVersionMessage = z.infer<typeof restoreEntryVersionMessageSchema>;
+export type RestoreEntryVersionsMessage = z.infer<typeof restoreEntryVersionsMessageSchema>;
 export type AckCursorMessage = z.infer<typeof ackCursorMessageSchema>;
 export type DetachLocalVaultMessage = z.infer<typeof detachLocalVaultMessageSchema>;
 export type HeartbeatMessage = z.infer<typeof heartbeatMessageSchema>;

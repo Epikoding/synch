@@ -186,6 +186,43 @@ describe("sync protocol schema", () => {
 		});
 	});
 
+	it("accepts an entry restore batch request", () => {
+		const parsed = parseClientControlMessage({
+			type: "restore_entry_versions",
+			requestId: "request-restore-batch",
+			restores: [
+				{
+					entryId: "entry-1",
+					versionId: "version-1",
+					baseRevision: 2,
+					op: "upsert",
+					blobId: "blob-1",
+					encryptedMetadata: "ciphertext",
+				},
+			],
+		});
+
+		expect(parsed.success).toBe(true);
+		if (!parsed.success) {
+			throw new Error("expected entry restore batch message to parse");
+		}
+
+		expect(parsed.data).toEqual({
+			type: "restore_entry_versions",
+			requestId: "request-restore-batch",
+			restores: [
+				{
+					entryId: "entry-1",
+					versionId: "version-1",
+					baseRevision: 2,
+					op: "upsert",
+					blobId: "blob-1",
+					encryptedMetadata: "ciphertext",
+				},
+			],
+		});
+	});
+
 	it("accepts a commit batch", () => {
 		const parsed = parseClientControlMessage({
 			type: "commit_mutations",

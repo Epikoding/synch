@@ -6,6 +6,7 @@ import type {
   DeletedEntryPageCursor,
   EntryVersion,
   EntryVersionPageCursor,
+  RestoreEntryVersionPayload,
   SyncRealtimeSession,
 } from "../remote/realtime-client";
 import type {
@@ -132,20 +133,73 @@ export class SyncVersionHistoryService {
     });
   }
 
-  async restoreDeletedEntry(entryId: string, baseRevision: number): Promise<void> {
-    await this.deps.runLocalMutationWork(async () => {
+  async restoreDeletedEntries(
+    entries: RestorableEntry[],
+  ): Promise<SyncDeletedEntriesRestoreResult> {
+    return await this.deps.runLocalMutationWork(async () => {
       const store = this.deps.getStore();
-      const dirty = await store.getDirtyEntryMutation(entryId);
-      if (dirty) {
-        throw new Error("Sync local changes before restoring this deleted file.");
-      }
+      const failures: SyncDeletedEntryRestoreFailure[] = [];
+      const payloads: RestoreEntryVersionPayload[] = [];
 
-      const version = await this.findLatestRestorableEntryVersion(entryId);
-      if (!version) {
-        throw new Error("No restorable version exists for this deleted file.");
-      }
+      await this.deps.withRealtimeSession(async (session) => {
+        for (const entry of entries) {
+          const dirty = await store.getDirtyEntryMutation(entry.entryId);
+          if (dirty) {
+            failures.push({
+              entryId: entry.entryId,
+              message: "Sync local changes before restoring this deleted file.",
+            });
+            continue;
+          }
 
-      await this.restoreEntryVersion({ entryId, revision: baseRevision }, version);
+          const version = await this.findLatestRestorableEntryVersionInSession(
+            session,
+            entry.entryId,
+          );
+          if (!version) {
+            failures.push({
+              entryId: entry.entryId,
+              message: "No restorable version exists for this deleted file.",
+            });
+            continue;
+          }
+
+          try {
+            payloads.push(await this.createRestoreEntryVersionPayload(entry, version));
+          } catch (error) {
+            failures.push({
+              entryId: entry.entryId,
+              message: toRestoreFailureMessage(error),
+            });
+          }
+        }
+
+        if (payloads.length === 0) {
+          return;
+        }
+
+        const restored = await session.restoreEntryVersions(payloads);
+        const accepted = restored.results.filter(
+          (result) => result.status === "accepted",
+        );
+        for (const rejected of restored.results) {
+          if (rejected.status === "rejected") {
+            failures.push({
+              entryId: rejected.entryId,
+              message: rejected.message,
+            });
+          }
+        }
+
+        if (accepted.length > 0) {
+          await this.deps.pullOnce(session);
+        }
+      });
+
+      return {
+        restored: entries.length - failures.length,
+        failures,
+      };
     });
   }
 
@@ -204,6 +258,18 @@ export class SyncVersionHistoryService {
     entry: RestorableEntry,
     version: EntryVersion,
   ): Promise<void> {
+    const payload = await this.createRestoreEntryVersionPayload(entry, version);
+
+    await this.deps.withRealtimeSession(async (session) => {
+      await session.restoreEntryVersion(payload);
+      await this.deps.pullOnce(session);
+    });
+  }
+
+  private async createRestoreEntryVersionPayload(
+    entry: RestorableEntry,
+    version: EntryVersion,
+  ): Promise<RestoreEntryVersionPayload> {
     const metadata = await decryptSyncMetadata(
       this.deps.getRemoteVaultKey(),
       version.encryptedMetadata,
@@ -224,18 +290,14 @@ export class SyncVersionHistoryService {
         blobId: version.blobId,
       },
     );
-
-    await this.deps.withRealtimeSession(async (session) => {
-      await session.restoreEntryVersion({
-        entryId: entry.entryId,
-        versionId: version.versionId,
-        baseRevision: entry.revision,
-        op: version.op,
-        blobId: version.blobId,
-        encryptedMetadata,
-      });
-      await this.deps.pullOnce(session);
-    });
+    return {
+      entryId: entry.entryId,
+      versionId: version.versionId,
+      baseRevision: entry.revision,
+      op: version.op,
+      blobId: version.blobId,
+      encryptedMetadata,
+    };
   }
 
   private async previewEntryVersion(
@@ -332,10 +394,24 @@ export interface SyncDeletedEntry {
   deletedAt: number;
 }
 
+export interface SyncDeletedEntriesRestoreResult {
+  restored: number;
+  failures: SyncDeletedEntryRestoreFailure[];
+}
+
+export interface SyncDeletedEntryRestoreFailure {
+  entryId: string;
+  message: string;
+}
+
 type RestorableEntry = {
   entryId: string;
   revision: number;
 };
+
+function toRestoreFailureMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 export type SyncEntryVersionPreview =
   | {

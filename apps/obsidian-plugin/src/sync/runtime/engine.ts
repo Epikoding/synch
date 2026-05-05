@@ -39,6 +39,7 @@ import type { UserVisibleSyncProgress } from "./user-visible-status";
 import { SyncVaultEventHandler } from "./vault-event-handler";
 import {
   SyncVersionHistoryService,
+  type SyncDeletedEntriesRestoreResult,
   type SyncDeletedEntriesPage,
   type SyncEntryVersionPreview,
   type SyncEntryVersionsPage,
@@ -359,8 +360,10 @@ export class SyncEngine {
     return await this.syncVersionHistoryService.listDeletedEntries(before, limit);
   }
 
-  async restoreDeletedEntry(entryId: string, baseRevision: number): Promise<void> {
-    await this.syncVersionHistoryService.restoreDeletedEntry(entryId, baseRevision);
+  async restoreDeletedEntries(
+    entries: Array<{ entryId: string; revision: number }>,
+  ): Promise<SyncDeletedEntriesRestoreResult> {
+    return await this.syncVersionHistoryService.restoreDeletedEntries(entries);
   }
 
   async previewDeletedEntry(

@@ -4,12 +4,14 @@ import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
   SynchDeletedFile,
+  SynchDeletedFilesRestoreResult,
   SynchVersionPreview,
 } from "../../plugin/view-models";
 import { VersionPreviewModal } from "../../plugin/version-preview-modal";
 import { formatDeletedFileTimestamp } from "./format";
 
 const DELETED_FILES_PAGE_SIZE = 25;
+const MAX_DELETED_FILES_RESTORE_SELECTION = 100;
 
 export class ExcludedFoldersModal extends Modal {
   private readonly selectedFolders: Set<string>;
@@ -91,7 +93,9 @@ export class DeletedFilesModal extends Modal {
         entryId: string,
         fallbackPath: string,
       ) => Promise<SynchVersionPreview>;
-      restoreDeletedFiles: (files: SynchDeletedFile[]) => Promise<void>;
+      restoreDeletedFiles: (
+        files: SynchDeletedFile[],
+      ) => Promise<SynchDeletedFilesRestoreResult>;
     },
   ) {
     super(app);
@@ -191,6 +195,15 @@ export class DeletedFilesModal extends Modal {
             .onChange((value) => {
               for (const file of this.deletedFiles) {
                 if (value) {
+                  if (this.selectedEntryIds.has(file.entryId)) {
+                    continue;
+                  }
+                  if (
+                    this.selectedEntryIds.size >= MAX_DELETED_FILES_RESTORE_SELECTION
+                  ) {
+                    this.showRestoreSelectionLimitNotice();
+                    break;
+                  }
                   this.selectedEntryIds.add(file.entryId);
                 } else {
                   this.selectedEntryIds.delete(file.entryId);
@@ -227,11 +240,24 @@ export class DeletedFilesModal extends Modal {
             });
         });
         setting.addToggle((toggle) => {
+          const selected = this.selectedEntryIds.has(file.entryId);
           toggle
-            .setValue(this.selectedEntryIds.has(file.entryId))
-            .setDisabled(this.loading)
+            .setValue(selected)
+            .setDisabled(
+              this.loading ||
+                (!selected &&
+                  this.selectedEntryIds.size >=
+                    MAX_DELETED_FILES_RESTORE_SELECTION),
+            )
             .onChange((value) => {
               if (value) {
+                if (
+                  this.selectedEntryIds.size >= MAX_DELETED_FILES_RESTORE_SELECTION
+                ) {
+                  this.showRestoreSelectionLimitNotice();
+                  this.render();
+                  return;
+                }
                 this.selectedEntryIds.add(file.entryId);
               } else {
                 this.selectedEntryIds.delete(file.entryId);
@@ -292,24 +318,40 @@ export class DeletedFilesModal extends Modal {
     this.loading = true;
     this.render();
 
-    let restored = 0;
-    let failed = 0;
+    let result: SynchDeletedFilesRestoreResult;
+    try {
+      result = await this.options.restoreDeletedFiles(selectedFiles);
+    } catch (error) {
+      new Notice(
+        `Deleted file restore failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      await this.loadDeletedFiles();
+      return;
+    }
+
+    const failedEntryIds = new Set(
+      result.failures.map((failure) => failure.entryId),
+    );
     for (const file of selectedFiles) {
-      try {
-        await this.options.restoreDeletedFiles([file]);
-        restored += 1;
+      if (!failedEntryIds.has(file.entryId)) {
         this.selectedEntryIds.delete(file.entryId);
-      } catch {
-        failed += 1;
       }
     }
 
+    const failed = result.failures.length;
+    const restored = result.restored;
     const parts = [`${restored} restored`];
     if (failed > 0) {
       parts.push(`${failed} failed`);
     }
     new Notice(`Deleted file restore finished: ${parts.join(", ")}.`);
     await this.loadDeletedFiles();
+  }
+
+  private showRestoreSelectionLimitNotice(): void {
+    new Notice(
+      `Restore up to ${MAX_DELETED_FILES_RESTORE_SELECTION} deleted files at a time.`,
+    );
   }
 
   private async previewDeletedFile(file: SynchDeletedFile): Promise<void> {

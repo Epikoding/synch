@@ -329,8 +329,9 @@ export function renderRemoteVaultSettings(
             previewDeletedFile: async (entryId, fallbackPath) =>
               await controller.previewDeletedFile(entryId, fallbackPath),
             restoreDeletedFiles: async (files) => {
-              await controller.restoreDeletedFiles(files);
+              const result = await controller.restoreDeletedFiles(files);
               refresh();
+              return result;
             },
           }).open();
         }),

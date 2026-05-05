@@ -4,6 +4,7 @@ import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
   SynchDeletedFile,
+  SynchDeletedFilesRestoreResult,
   SynchEntryVersion,
   SynchEntryVersionCursor,
   SynchEntryVersionsPage,
@@ -165,15 +166,21 @@ export class SynchVersionHistoryController
     };
   }
 
-  async restoreDeletedFiles(files: SynchDeletedFile[]): Promise<void> {
+  async restoreDeletedFiles(
+    files: SynchDeletedFile[],
+  ): Promise<SynchDeletedFilesRestoreResult> {
     if (!this.deps.hasAuthenticatedSession() || !this.deps.hasConnectedRemoteVault()) {
       throw new Error("Connect and sign in before restoring deleted files.");
     }
 
-    for (const file of files) {
-      await this.deps.syncController.restoreDeletedEntry(file.entryId, file.revision);
-    }
+    const result = await this.deps.syncController.restoreDeletedEntries(
+      files.map((file) => ({
+        entryId: file.entryId,
+        revision: file.revision,
+      })),
+    );
     this.deps.refreshUi();
+    return result;
   }
 
   async previewDeletedFile(

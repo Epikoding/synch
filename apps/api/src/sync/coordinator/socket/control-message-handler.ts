@@ -9,6 +9,8 @@ import type {
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
 	RestoreEntryVersionResult,
+	RestoreEntryVersionsMessage,
+	RestoreEntryVersionsResult,
 	SocketSession,
 } from "../types";
 import {
@@ -41,6 +43,10 @@ export type CoordinatorControlMessageUseCases = {
 		session: SocketSession,
 		message: RestoreEntryVersionMessage,
 	): Promise<RestoreEntryVersionResult>;
+	restoreEntryVersions(
+		session: SocketSession,
+		message: RestoreEntryVersionsMessage,
+	): Promise<RestoreEntryVersionsResult>;
 };
 
 export class CoordinatorControlMessageHandler {
@@ -214,6 +220,32 @@ export class CoordinatorControlMessageHandler {
 			let result: RestoreEntryVersionResult;
 			try {
 				result = await this.useCases.restoreEntryVersion(session, parsed);
+			} catch (error) {
+				const details = websocketRequestError(
+					error,
+					"entry_restore_failed",
+					"entry restore failed",
+				);
+				this.socketService.sendSocketMessage(ws, {
+					type: "entry_restore_failed",
+					requestId: parsed.requestId,
+					code: details.code,
+					message: details.message,
+				});
+				return;
+			}
+
+			this.socketService.sendSocketMessage(ws, result.message);
+			if (result.broadcastCursor !== null) {
+				this.broadcastCursorExcept(ws, result.broadcastCursor);
+			}
+			return;
+		}
+
+		if (parsed.type === "restore_entry_versions") {
+			let result: RestoreEntryVersionsResult;
+			try {
+				result = await this.useCases.restoreEntryVersions(session, parsed);
 			} catch (error) {
 				const details = websocketRequestError(
 					error,

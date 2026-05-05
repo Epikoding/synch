@@ -11,6 +11,7 @@ export type {
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
+	RestoreEntryVersionsMessage,
 	UnwatchStorageStatusMessage,
 	WatchStorageStatusMessage,
 } from "./protocol";
@@ -217,6 +218,32 @@ export type EntryVersionRestoredMessage = {
 	revision: number;
 };
 
+export type RestoreEntryVersionBatchResult =
+	| {
+			status: "accepted";
+			entryId: string;
+			restoredFromVersionId: string;
+			restoredFromRevision: number;
+			cursor: number;
+			revision: number;
+	  }
+	| {
+			status: "rejected";
+			entryId: string;
+			versionId: string;
+			code: string;
+			message: string;
+			expectedBaseRevision?: number;
+			receivedBaseRevision?: number;
+	  };
+
+export type EntryVersionsRestoredMessage = {
+	type: "entry_versions_restored";
+	requestId: string;
+	cursor: number;
+	results: RestoreEntryVersionBatchResult[];
+};
+
 export type EntryRestoreFailedMessage = {
 	type: "entry_restore_failed";
 	requestId: string;
@@ -249,6 +276,7 @@ export type ServerControlMessage =
 	| DeletedEntriesListedMessage
 	| DeletedEntriesListFailedMessage
 	| EntryVersionRestoredMessage
+	| EntryVersionsRestoredMessage
 	| EntryRestoreFailedMessage
 	| SessionErrorMessage;
 
@@ -335,5 +363,10 @@ export type CommitMutationsResult = {
 
 export type RestoreEntryVersionResult = {
 	message: EntryVersionRestoredMessage;
+	broadcastCursor: number | null;
+};
+
+export type RestoreEntryVersionsResult = {
+	message: EntryVersionsRestoredMessage;
 	broadcastCursor: number | null;
 };

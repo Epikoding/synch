@@ -11,6 +11,8 @@ import type {
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
 	RestoreEntryVersionResult,
+	RestoreEntryVersionsMessage,
+	RestoreEntryVersionsResult,
 	SocketSession,
 } from "./types";
 import type { SyncTokenService } from "../access/token-service";
@@ -79,6 +81,8 @@ export class CoordinatorService {
 			async (vaultId) => await this.readVersionHistoryRetentionMs(vaultId),
 			async (session, message, options) =>
 				await this.commitMutation(session, message, options),
+			async (session, message, options) =>
+				await this.commitMutations(session, message, options),
 		);
 		this.entrySyncService = new EntrySyncService(stateRepository);
 		this.mutationCommitService = new MutationCommitService(
@@ -105,6 +109,8 @@ export class CoordinatorService {
 					await this.listDeletedEntries(session, message),
 				restoreEntryVersion: async (session, message) =>
 					await this.restoreEntryVersion(session, message),
+				restoreEntryVersions: async (session, message) =>
+					await this.restoreEntryVersions(session, message),
 			},
 			async () => await this.scheduleHealthSummaryFlush(),
 		);
@@ -162,6 +168,13 @@ export class CoordinatorService {
 		message: RestoreEntryVersionMessage,
 	): Promise<RestoreEntryVersionResult> {
 		return await this.entryHistoryService.restoreEntryVersion(session, message);
+	}
+
+	async restoreEntryVersions(
+		session: SocketSession,
+		message: RestoreEntryVersionsMessage,
+	): Promise<RestoreEntryVersionsResult> {
+		return await this.entryHistoryService.restoreEntryVersions(session, message);
 	}
 
 	async stageBlob(

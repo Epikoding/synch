@@ -12,6 +12,8 @@ import type {
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
 	RestoreEntryVersionResult,
+	RestoreEntryVersionsMessage,
+	RestoreEntryVersionsResult,
 	SocketSession,
 } from "./sync/coordinator/types";
 import { CoordinatorService } from "./sync/coordinator/service";
@@ -88,6 +90,14 @@ export class SyncCoordinator extends DurableObject {
 	): Promise<RestoreEntryVersionResult> {
 		await this.ready;
 		return await this.coordinatorService.restoreEntryVersion(session, message);
+	}
+
+	async restoreEntryVersions(
+		session: SocketSession,
+		message: RestoreEntryVersionsMessage,
+	): Promise<RestoreEntryVersionsResult> {
+		await this.ready;
+		return await this.coordinatorService.restoreEntryVersions(session, message);
 	}
 
 	async ackCursor(

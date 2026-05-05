@@ -6,9 +6,11 @@ import type {
   DeletedEntryPageCursor,
   EntryVersionPageCursor,
   EntryVersionRestoredResponse,
+  EntryVersionsRestoredResponse,
   EntryVersionsResponse,
   HelloAckMessage,
   RealtimeSessionState,
+  RestoreEntryVersionPayload,
   SyncPolicy,
   SyncRealtimeSession,
   SyncStorageStatus,
@@ -144,14 +146,9 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     };
   }
 
-  async restoreEntryVersion(input: {
-    entryId: string;
-    versionId: string;
-    baseRevision: number;
-    op: "upsert" | "delete";
-    blobId: string | null;
-    encryptedMetadata: string;
-  }): Promise<EntryVersionRestoredResponse> {
+  async restoreEntryVersion(
+    input: RestoreEntryVersionPayload,
+  ): Promise<EntryVersionRestoredResponse> {
     const message = await this.transport.request({
       type: "restore_entry_version",
       entryId: input.entryId,
@@ -172,6 +169,24 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
       restoredFromRevision: message.restoredFromRevision,
       cursor: message.cursor,
       revision: message.revision,
+    };
+  }
+
+  async restoreEntryVersions(
+    input: RestoreEntryVersionPayload[],
+  ): Promise<EntryVersionsRestoredResponse> {
+    const message = await this.transport.request({
+      type: "restore_entry_versions",
+      restores: input,
+    });
+
+    if (message.type !== "entry_versions_restored") {
+      throw new Error("restore entry versions did not produce an entry_versions_restored response");
+    }
+
+    return {
+      cursor: message.cursor,
+      results: message.results,
     };
   }
 

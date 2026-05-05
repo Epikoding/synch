@@ -283,6 +283,9 @@ export function createRealtimeSession(input: {
     async restoreEntryVersion() {
       throw new Error("pull tests should not restore entry versions");
     },
+    async restoreEntryVersions() {
+      throw new Error("pull tests should not restore entry versions");
+    },
 	    async detachLocalVault() {},
 	    async commitMutation() {
       throw new Error("pull tests should not commit mutations");

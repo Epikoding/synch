@@ -140,6 +140,102 @@ describe("coordinator entry version history", () => {
 		);
 	});
 
+	it("restores entry history in batches with per-entry results", async () => {
+		const session = testSocketSession();
+		const stateRepository = createMockCoordinatorStateRepository({
+			readEntry: vi.fn(() => ({
+				entry_id: "entry-1",
+				revision: 2,
+				blob_id: "blob-current",
+				encrypted_metadata: "current-metadata",
+				deleted: 0,
+			})),
+			readEntryVersion: vi.fn(() => ({
+				version_id: "version-1",
+				entry_id: "entry-1",
+				source_revision: 1,
+				op_type: "upsert",
+				blob_id: "blob-1",
+				encrypted_metadata: "old-metadata",
+				reason: "auto",
+				bucket_start_ms: 0,
+				captured_at: 123,
+				created_by_user_id: "user-2",
+				created_by_local_vault_id: "local-vault-2",
+			})),
+		});
+		const service = createCoordinatorService({ stateRepository });
+		const commitMutations = vi.spyOn(service, "commitMutations").mockResolvedValue({
+			message: {
+				type: "commit_mutations_committed",
+				requestId: "request-restore-batch",
+				cursor: 42,
+				results: [
+					{
+						status: "accepted",
+						mutationId: "mutation-1",
+						cursor: 42,
+						entryId: "entry-1",
+						revision: 3,
+					},
+				],
+			},
+			broadcastCursor: 42,
+		});
+
+		await expect(
+			service.restoreEntryVersions(session, {
+				type: "restore_entry_versions",
+				requestId: "request-restore-batch",
+				restores: [
+					{
+						entryId: "entry-1",
+						versionId: "version-1",
+						baseRevision: 2,
+						op: "upsert",
+						blobId: "blob-1",
+						encryptedMetadata: "reencrypted-metadata",
+					},
+				],
+			}),
+		).resolves.toEqual({
+			message: {
+				type: "entry_versions_restored",
+				requestId: "request-restore-batch",
+				cursor: 42,
+				results: [
+					{
+						status: "accepted",
+						entryId: "entry-1",
+						restoredFromVersionId: "version-1",
+						restoredFromRevision: 1,
+						cursor: 42,
+						revision: 3,
+					},
+				],
+			},
+			broadcastCursor: 42,
+		});
+
+		expect(commitMutations).toHaveBeenCalledWith(
+			session,
+			{
+				type: "commit_mutations",
+				requestId: "request-restore-batch",
+				mutations: [
+					expect.objectContaining({
+						entryId: "entry-1",
+						op: "upsert",
+						baseRevision: 2,
+						blobId: "blob-1",
+						encryptedMetadata: "reencrypted-metadata",
+					}),
+				],
+			},
+			{ forcedHistoryBefore: "before_restore" },
+		);
+	});
+
 	it("rejects stale client-assisted restores", async () => {
 		const session = testSocketSession();
 		const stateRepository = createMockCoordinatorStateRepository({

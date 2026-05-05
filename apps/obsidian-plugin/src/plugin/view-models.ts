@@ -78,6 +78,16 @@ export interface SynchDeletedFilesPage {
   nextBefore: SynchDeletedFileCursor | null;
 }
 
+export interface SynchDeletedFilesRestoreResult {
+  restored: number;
+  failures: SynchDeletedFileRestoreFailure[];
+}
+
+export interface SynchDeletedFileRestoreFailure {
+  entryId: string;
+  message: string;
+}
+
 export interface SynchEntryVersionCursor {
   capturedAt: number;
   versionId: string;

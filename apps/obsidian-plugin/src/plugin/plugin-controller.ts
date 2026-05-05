@@ -13,6 +13,7 @@ import type {
   SynchDeletedFile,
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
+  SynchDeletedFilesRestoreResult,
   SynchEntryVersionCursor,
   SynchFileSizeBlockedFile,
   SynchFileRules,
@@ -454,8 +455,10 @@ export class SynchPluginController implements SynchSettingsController {
     );
   }
 
-  async restoreDeletedFiles(files: SynchDeletedFile[]): Promise<void> {
-    await this.versionHistoryController.restoreDeletedFiles(files);
+  async restoreDeletedFiles(
+    files: SynchDeletedFile[],
+  ): Promise<SynchDeletedFilesRestoreResult> {
+    return await this.versionHistoryController.restoreDeletedFiles(files);
   }
 
   refreshVersionHistoryViews(): void {

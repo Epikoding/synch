@@ -20,6 +20,7 @@ import {
 } from "../store/dexie";
 import type { SyncConnection } from "../store/store";
 import type { SyncDeletedEntriesPage } from "./version-history-service";
+import type { SyncDeletedEntriesRestoreResult } from "./version-history-service";
 import {
   SyncEngine,
   type SyncEngineEntryVersionsPage,
@@ -334,11 +335,13 @@ export class SyncController {
     return await this.syncEngine.listDeletedEntries(before, limit);
   }
 
-  async restoreDeletedEntry(entryId: string, baseRevision: number): Promise<void> {
+  async restoreDeletedEntries(
+    entries: Array<{ entryId: string; revision: number }>,
+  ): Promise<SyncDeletedEntriesRestoreResult> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
       throw new Error("Connect and sign in before restoring deleted files.");
     }
-    await this.syncEngine.restoreDeletedEntry(entryId, baseRevision);
+    return await this.syncEngine.restoreDeletedEntries(entries);
   }
 
   async previewDeletedEntry(

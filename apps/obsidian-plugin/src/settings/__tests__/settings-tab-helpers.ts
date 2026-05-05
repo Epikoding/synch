@@ -64,7 +64,10 @@ export function createSettingsTab(
       capturedAt: null,
       message: "This version has no previewable content.",
     })),
-    restoreDeletedFiles: vi.fn(async () => {}),
+    restoreDeletedFiles: vi.fn(async (files) => ({
+      restored: files.length,
+      failures: [],
+    })),
     ...overrides,
   };
 

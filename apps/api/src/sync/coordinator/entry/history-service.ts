@@ -2,12 +2,17 @@ import { apiError } from "../../../errors";
 import type {
 	CommitMutationMessage,
 	CommitMutationResult,
+	CommitMutationsMessage,
+	CommitMutationsResult,
 	DeletedEntriesListedMessage,
 	EntryVersionsListedMessage,
 	ListDeletedEntriesMessage,
 	ListEntryVersionsMessage,
+	RestoreEntryVersionBatchResult,
 	RestoreEntryVersionMessage,
 	RestoreEntryVersionResult,
+	RestoreEntryVersionsMessage,
+	RestoreEntryVersionsResult,
 	SocketSession,
 } from "../types";
 import type { CoordinatorStateRepository } from "../state-repository";
@@ -24,6 +29,11 @@ export class EntryHistoryService {
 			message: CommitMutationMessage,
 			options?: { forcedHistoryBefore?: "before_restore" | null },
 		) => Promise<CommitMutationResult>,
+		private readonly commitMutations: (
+			session: SocketSession,
+			message: CommitMutationsMessage,
+			options?: { forcedHistoryBefore?: "before_restore" | null },
+		) => Promise<CommitMutationsResult>,
 	) {}
 
 	async listDeletedEntries(
@@ -193,4 +203,157 @@ export class EntryHistoryService {
 			broadcastCursor: committed.broadcastCursor,
 		};
 	}
+
+	async restoreEntryVersions(
+		session: SocketSession,
+		message: RestoreEntryVersionsMessage,
+	): Promise<RestoreEntryVersionsResult> {
+		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
+			session.vaultId,
+		);
+		const retentionStart = Date.now() - versionHistoryRetentionMs;
+		const results: RestoreEntryVersionBatchResult[] = [];
+		const mutationIndexes: number[] = [];
+		const restoredFromRevisions: number[] = [];
+		const mutations: CommitMutationsMessage["mutations"] = [];
+
+		for (const restore of message.restores) {
+			const current = this.stateRepository.readEntry(restore.entryId);
+			if (!current) {
+				results.push(rejectedRestore(restore, "not_found", "entry not found"));
+				continue;
+			}
+
+			const target = this.stateRepository.readEntryVersion(
+				restore.entryId,
+				restore.versionId,
+				retentionStart,
+			);
+			if (!target) {
+				results.push(
+					rejectedRestore(restore, "not_found", "requested version was not found"),
+				);
+				continue;
+			}
+
+			if (current.revision !== restore.baseRevision) {
+				results.push({
+					status: "rejected",
+					entryId: restore.entryId,
+					versionId: restore.versionId,
+					code: "stale_revision",
+					message: `expected base revision ${current.revision} but received ${restore.baseRevision}`,
+					expectedBaseRevision: current.revision,
+					receivedBaseRevision: restore.baseRevision,
+				});
+				continue;
+			}
+
+			if (target.op_type !== restore.op || target.blob_id !== restore.blobId) {
+				results.push(
+					rejectedRestore(
+						restore,
+						"version_mismatch",
+						"restore payload does not match the requested version",
+					),
+				);
+				continue;
+			}
+
+			mutationIndexes.push(results.length);
+			restoredFromRevisions.push(target.source_revision);
+			results.push({
+				status: "rejected",
+				entryId: restore.entryId,
+				versionId: restore.versionId,
+				code: "restore_commit_pending",
+				message: "entry version restore has not been committed",
+			});
+			mutations.push({
+				mutationId: crypto.randomUUID(),
+				entryId: restore.entryId,
+				op: restore.op,
+				baseRevision: restore.baseRevision,
+				blobId: restore.blobId,
+				encryptedMetadata: restore.encryptedMetadata,
+			});
+		}
+
+		if (mutations.length === 0) {
+			return {
+				message: {
+					type: "entry_versions_restored",
+					requestId: message.requestId,
+					cursor: this.stateRepository.currentCursor(),
+					results,
+				},
+				broadcastCursor: null,
+			};
+		}
+
+		const committed = await this.commitMutations(
+			session,
+			{
+				type: "commit_mutations",
+				requestId: message.requestId,
+				mutations,
+			},
+			{
+				forcedHistoryBefore: "before_restore",
+			},
+		);
+
+		for (let i = 0; i < committed.message.results.length; i += 1) {
+			const commitResult = committed.message.results[i];
+			const resultIndex = mutationIndexes[i];
+			const restore = message.restores[resultIndex];
+			if (!commitResult || resultIndex === undefined || !restore) {
+				continue;
+			}
+
+			results[resultIndex] =
+				commitResult.status === "accepted"
+					? {
+							status: "accepted",
+							entryId: restore.entryId,
+							restoredFromVersionId: restore.versionId,
+							restoredFromRevision: restoredFromRevisions[i] ?? restore.baseRevision,
+							cursor: commitResult.cursor,
+							revision: commitResult.revision,
+						}
+					: {
+							status: "rejected",
+							entryId: restore.entryId,
+							versionId: restore.versionId,
+							code: commitResult.code,
+							message: commitResult.message,
+							expectedBaseRevision: commitResult.expectedBaseRevision,
+							receivedBaseRevision: commitResult.receivedBaseRevision,
+						};
+		}
+
+		return {
+			message: {
+				type: "entry_versions_restored",
+				requestId: message.requestId,
+				cursor: committed.message.cursor,
+				results,
+			},
+			broadcastCursor: committed.broadcastCursor,
+		};
+	}
+}
+
+function rejectedRestore(
+	restore: RestoreEntryVersionsMessage["restores"][number],
+	code: string,
+	message: string,
+): RestoreEntryVersionBatchResult {
+	return {
+		status: "rejected",
+		entryId: restore.entryId,
+		versionId: restore.versionId,
+		code,
+		message,
+	};
 }

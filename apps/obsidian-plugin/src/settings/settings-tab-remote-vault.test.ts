@@ -4,6 +4,7 @@ import {
   getButtonComponents,
   getCreatedElementTexts,
   getMarkdownRenderCalls,
+  getNotices,
   getSettingClasses,
   getSettingNames,
   getToggleComponents,
@@ -98,7 +99,10 @@ describe("SynchSettingTab remote vault settings", () => {
   });
 
   it("restores selected deleted files from the modal", async () => {
-    const restoreDeletedFiles = vi.fn(async () => {});
+    const restoreDeletedFiles = vi.fn(async (files) => ({
+      restored: files.length,
+      failures: [],
+    }));
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
@@ -152,7 +156,10 @@ describe("SynchSettingTab remote vault settings", () => {
   });
 
   it("toggles all loaded deleted files from the modal", async () => {
-    const restoreDeletedFiles = vi.fn(async () => {});
+    const restoreDeletedFiles = vi.fn(async (files) => ({
+      restored: files.length,
+      failures: [],
+    }));
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
@@ -200,15 +207,14 @@ describe("SynchSettingTab remote vault settings", () => {
     await getLatestButton("Restore selected (2)")?.click();
     await nextTask();
 
-    expect(restoreDeletedFiles).toHaveBeenNthCalledWith(1, [
+    expect(restoreDeletedFiles).toHaveBeenCalledTimes(1);
+    expect(restoreDeletedFiles).toHaveBeenCalledWith([
       {
         entryId: "entry-ready",
         path: "Notes/ready.md",
         revision: 3,
         deletedAt: 1,
       },
-    ]);
-    expect(restoreDeletedFiles).toHaveBeenNthCalledWith(2, [
       {
         entryId: "entry-other",
         path: "Notes/other.md",
@@ -216,6 +222,49 @@ describe("SynchSettingTab remote vault settings", () => {
         deletedAt: 2,
       },
     ]);
+  });
+
+  it("limits deleted file restore selection to 100 files", async () => {
+    const deletedFiles = Array.from({ length: 101 }, (_, index) => ({
+      entryId: `entry-${index}`,
+      path: `Notes/${index}.md`,
+      revision: 3,
+      deletedAt: index,
+    }));
+    const restoreDeletedFiles = vi.fn(async (files) => ({
+      restored: files.length,
+      failures: [],
+    }));
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      listDeletedFiles: vi.fn(async () => ({
+        files: deletedFiles,
+        hasMore: false,
+        nextBefore: null,
+      })),
+      restoreDeletedFiles,
+    });
+
+    tab.display();
+    await getButtonComponents()
+      .find((button) => button.text === "View deleted files")
+      ?.click();
+    await nextTask();
+
+    await getToggleComponents().slice(-102)[0]?.change(true);
+
+    expect(getLatestButton("Restore selected (100)")?.disabled).toBe(false);
+    expect(getNotices()).toContainEqual({
+      message: "Restore up to 100 deleted files at a time.",
+      timeout: undefined,
+    });
+
+    await getLatestButton("Restore selected (100)")?.click();
+    await nextTask();
+
+    expect(restoreDeletedFiles).toHaveBeenCalledTimes(1);
+    expect(restoreDeletedFiles.mock.calls[0]?.[0]).toHaveLength(100);
   });
 
   it("loads additional deleted file pages from the modal", async () => {

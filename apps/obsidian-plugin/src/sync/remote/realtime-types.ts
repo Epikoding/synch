@@ -57,6 +57,15 @@ export interface CommitMutationsResult {
   results: CommitMutationBatchResult[];
 }
 
+export interface RestoreEntryVersionPayload {
+  entryId: string;
+  versionId: string;
+  baseRevision: number;
+  op: "upsert" | "delete";
+  blobId: string | null;
+  encryptedMetadata: string;
+}
+
 export interface SyncRealtimeSession {
   serverCursor: number;
   storageUsedBytes: number;
@@ -79,16 +88,14 @@ export interface SyncRealtimeSession {
     before: DeletedEntryPageCursor | null;
     limit: number;
   }): Promise<DeletedEntriesResponse>;
-	  restoreEntryVersion(input: {
-    entryId: string;
-    versionId: string;
-    baseRevision: number;
-    op: "upsert" | "delete";
-    blobId: string | null;
-    encryptedMetadata: string;
-	  }): Promise<EntryVersionRestoredResponse>;
-	  detachLocalVault(): Promise<void>;
-	  commitMutation(mutation: CommitMutationPayload): Promise<CommitAcceptedResult>;
+  restoreEntryVersion(
+    input: RestoreEntryVersionPayload,
+  ): Promise<EntryVersionRestoredResponse>;
+  restoreEntryVersions(
+    input: RestoreEntryVersionPayload[],
+  ): Promise<EntryVersionsRestoredResponse>;
+  detachLocalVault(): Promise<void>;
+  commitMutation(mutation: CommitMutationPayload): Promise<CommitAcceptedResult>;
   commitMutations(mutations: CommitMutationPayload[]): Promise<CommitMutationsResult>;
   close(): void;
 }
@@ -139,6 +146,25 @@ export interface EntryVersionRestoredResponse {
   restoredFromRevision: number;
   cursor: number;
   revision: number;
+}
+
+export type RestoreEntryVersionBatchResult =
+  | ({
+      status: "accepted";
+    } & EntryVersionRestoredResponse)
+  | {
+      status: "rejected";
+      entryId: string;
+      versionId: string;
+      code: string;
+      message: string;
+      expectedBaseRevision?: number;
+      receivedBaseRevision?: number;
+    };
+
+export interface EntryVersionsRestoredResponse {
+  cursor: number;
+  results: RestoreEntryVersionBatchResult[];
 }
 
 export class SyncRealtimeError extends Error {
@@ -257,6 +283,10 @@ export type ServerMessage =
       type: "entry_version_restored";
       requestId: string;
     } & EntryVersionRestoredResponse)
+  | ({
+      type: "entry_versions_restored";
+      requestId: string;
+    } & EntryVersionsRestoredResponse)
   | {
       type: "entry_restore_failed";
       requestId: string;

@@ -3,6 +3,7 @@ import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
   SynchDeletedFile,
+  SynchDeletedFilesRestoreResult,
   SynchFileSizeBlockedFile,
   SynchFileRules,
   SynchPluginUpdateStatus,
@@ -52,5 +53,5 @@ export interface SynchSettingsController {
     limit: number,
   ): Promise<SynchDeletedFilesPage>;
   previewDeletedFile(entryId: string, fallbackPath: string): Promise<SynchVersionPreview>;
-  restoreDeletedFiles(files: SynchDeletedFile[]): Promise<void>;
+  restoreDeletedFiles(files: SynchDeletedFile[]): Promise<SynchDeletedFilesRestoreResult>;
 }

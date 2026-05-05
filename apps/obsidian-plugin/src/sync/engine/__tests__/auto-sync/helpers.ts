@@ -92,6 +92,9 @@ export function createRealtimeClient(
         async restoreEntryVersion() {
           throw new Error("auto-sync tests should not restore entry versions");
 	        },
+        async restoreEntryVersions() {
+          throw new Error("auto-sync tests should not restore entry versions");
+        },
 	        async detachLocalVault() {},
 	        async commitMutation(_mutation: CommitMutationPayload) {
           return {

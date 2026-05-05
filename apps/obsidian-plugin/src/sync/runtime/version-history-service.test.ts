@@ -107,12 +107,18 @@ describe("SyncVersionHistoryService", () => {
         blobId: "blob-old",
       },
     );
-    const restoreEntryVersion = vi.fn(async () => ({
-      entryId: "entry-deleted",
-      restoredFromVersionId: "version-old",
-      restoredFromRevision: 2,
+    const restoreEntryVersions = vi.fn(async () => ({
       cursor: 4,
-      revision: 4,
+      results: [
+        {
+          status: "accepted" as const,
+          entryId: "entry-deleted",
+          restoredFromVersionId: "version-old",
+          restoredFromRevision: 2,
+          cursor: 4,
+          revision: 4,
+        },
+      ],
     }));
     const session = createRealtimeSession({
       listEntryVersions: async () => ({
@@ -140,7 +146,7 @@ describe("SyncVersionHistoryService", () => {
         hasMore: false,
         nextBefore: null,
       }),
-      restoreEntryVersion,
+      restoreEntryVersions,
     });
     const pullOnce = vi.fn();
     const service = createService(store, {
@@ -148,9 +154,14 @@ describe("SyncVersionHistoryService", () => {
       withRealtimeSession: async (work) => await work(session),
     });
 
-    await service.restoreDeletedEntry("entry-deleted", 3);
+    await expect(
+      service.restoreDeletedEntries([{ entryId: "entry-deleted", revision: 3 }]),
+    ).resolves.toEqual({
+      restored: 1,
+      failures: [],
+    });
 
-    expect(restoreEntryVersion).toHaveBeenCalledWith(
+    expect(restoreEntryVersions).toHaveBeenCalledWith([
       expect.objectContaining({
         entryId: "entry-deleted",
         versionId: "version-old",
@@ -158,7 +169,82 @@ describe("SyncVersionHistoryService", () => {
         op: "upsert",
         blobId: "blob-old",
       }),
-    );
+    ]);
+    expect(pullOnce).toHaveBeenCalledWith(session);
+
+    await store.close();
+  });
+
+  it("continues restoring deleted entries when one payload cannot be prepared", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const goodVersion = await createEntryVersion({
+      entryId: "entry-good",
+      sourceRevision: 2,
+      versionId: "version-good",
+      path: "Folder/good.md",
+    });
+    const restoreEntryVersions = vi.fn(async () => ({
+      cursor: 4,
+      results: [
+        {
+          status: "accepted" as const,
+          entryId: "entry-good",
+          restoredFromVersionId: "version-good",
+          restoredFromRevision: 2,
+          cursor: 4,
+          revision: 4,
+        },
+      ],
+    }));
+    const listEntryVersions = vi.fn(async ({ entryId }: { entryId: string }) => ({
+      entryId,
+      versions:
+        entryId === "entry-good"
+          ? [goodVersion]
+          : [
+              {
+                versionId: "version-bad",
+                sourceRevision: 2,
+                op: "upsert" as const,
+                blobId: "blob-old",
+                encryptedMetadata: "not encrypted metadata",
+                reason: "before_delete" as const,
+                capturedAt: 200,
+              },
+            ],
+      hasMore: false,
+      nextBefore: null,
+    }));
+    const session = createRealtimeSession({
+      listEntryVersions,
+      restoreEntryVersions,
+    });
+    const pullOnce = vi.fn();
+    const service = createService(store, {
+      pullOnce,
+      withRealtimeSession: async (work) => await work(session),
+    });
+
+    await expect(
+      service.restoreDeletedEntries([
+        { entryId: "entry-bad", revision: 3 },
+        { entryId: "entry-good", revision: 3 },
+      ]),
+    ).resolves.toMatchObject({
+      restored: 1,
+      failures: [
+        {
+          entryId: "entry-bad",
+        },
+      ],
+    });
+
+    expect(restoreEntryVersions).toHaveBeenCalledWith([
+      expect.objectContaining({
+        entryId: "entry-good",
+        versionId: "version-good",
+      }),
+    ]);
     expect(pullOnce).toHaveBeenCalledWith(session);
 
     await store.close();
@@ -522,7 +608,7 @@ describe("SyncVersionHistoryService", () => {
       localMtime: null,
       localSize: null,
     });
-    const restoreEntryVersion = vi.fn();
+    const restoreEntryVersions = vi.fn();
     const session = createRealtimeSession({
       listEntryVersions: async () => ({
         entryId: "entry-deleted",
@@ -540,16 +626,24 @@ describe("SyncVersionHistoryService", () => {
         hasMore: false,
         nextBefore: null,
       }),
-      restoreEntryVersion,
+      restoreEntryVersions,
     });
     const service = createService(store, {
       withRealtimeSession: async (work) => await work(session),
     });
 
-    await expect(service.restoreDeletedEntry("entry-deleted", 3)).rejects.toThrow(
-      "No restorable version exists for this deleted file.",
-    );
-    expect(restoreEntryVersion).not.toHaveBeenCalled();
+    await expect(
+      service.restoreDeletedEntries([{ entryId: "entry-deleted", revision: 3 }]),
+    ).resolves.toEqual({
+      restored: 0,
+      failures: [
+        {
+          entryId: "entry-deleted",
+          message: "No restorable version exists for this deleted file.",
+        },
+      ],
+    });
+    expect(restoreEntryVersions).not.toHaveBeenCalled();
 
     await store.close();
   });
@@ -651,6 +745,10 @@ function createRealtimeSession(
       nextBefore: null,
     })),
     restoreEntryVersion: vi.fn(),
+    restoreEntryVersions: vi.fn(async () => ({
+      cursor: 0,
+      results: [],
+    })),
     commitMutation: vi.fn(),
     commitMutations: vi.fn(),
     close: vi.fn(),
