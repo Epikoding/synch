@@ -26,6 +26,7 @@ const STATUS_BAR_STATE_CLASSES = [
   "synch-status-reconnecting",
   "synch-status-up-to-date",
   "synch-status-attention-needed",
+  "synch-status-update-required",
   "synch-status-storage-warning",
 ];
 
@@ -45,6 +46,8 @@ export function getStatusBarStateClass(state: SynchSyncState): string {
       return "synch-status-up-to-date";
     case "attention_needed":
       return "synch-status-attention-needed";
+    case "update_required":
+      return "synch-status-update-required";
   }
 }
 
@@ -62,6 +65,7 @@ export function getStatusBarIcon(state: SynchSyncState): string {
     case "up_to_date":
       return "check";
     case "attention_needed":
+    case "update_required":
       return "triangle-alert";
   }
 }
@@ -123,6 +127,8 @@ export class SynchStatusBar {
       "aria-label",
       hasStorageWarning
         ? "Synch storage is almost full. Open Synch settings"
+        : state === "update_required"
+          ? "Synch plugin update required. Open Synch settings"
         : "Open Synch settings",
     );
     this.statusBar.setAttribute("data-synch-sync-state", state);

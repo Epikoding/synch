@@ -12,6 +12,7 @@ const settingNames: string[] = [];
 const settingDescriptions: string[] = [];
 const settingClasses: string[][] = [];
 const createdElements: CreatedElementRecord[] = [];
+const notices: Array<{ message: string; timeout?: number }> = [];
 
 interface CreatedElementRecord {
   tag: string;
@@ -406,7 +407,9 @@ export class Setting {
 }
 
 export class Notice {
-  constructor(_message: string) {}
+  constructor(message: string, timeout?: number) {
+    notices.push({ message, timeout });
+  }
 }
 
 export function setIcon(
@@ -477,6 +480,10 @@ export function getSettingClasses(): string[][] {
   return settingClasses.map((classes) => [...classes]);
 }
 
+export function getNotices(): Array<{ message: string; timeout?: number }> {
+  return notices.map((notice) => ({ ...notice }));
+}
+
 export function resetObsidianMocks(): void {
   requestUrlMock = null;
   buttonComponents.length = 0;
@@ -490,6 +497,7 @@ export function resetObsidianMocks(): void {
   settingNames.length = 0;
   settingDescriptions.length = 0;
   settingClasses.length = 0;
+  notices.length = 0;
 }
 
 export async function requestUrl(input: unknown): Promise<unknown> {

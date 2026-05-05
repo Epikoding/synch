@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Plugin, resetObsidianMocks } from "../test-stubs/obsidian";
+import {
+  getNotices,
+  Plugin,
+  resetObsidianMocks,
+  setRequestUrlMock,
+} from "../test-stubs/obsidian";
 import { DEFAULT_SYNC_FILE_RULES } from "../sync/core/file-rules";
 import { SyncController } from "../sync/runtime/controller";
 import { SYNCH_SETTINGS_KEY, type SynchPluginSettings } from "../settings/schema";
@@ -69,6 +74,59 @@ describe("SynchPluginController sync enabled setting", () => {
     expect(plugin.savedData?.[SYNCH_SETTINGS_KEY]).toMatchObject({
       syncEnabled: true,
     });
+  });
+
+  it("does not enable sync when the server requires a plugin update", async () => {
+    const plugin = createPluginWithSettings({
+      apiBaseUrl: "http://127.0.0.1:8787",
+      fileRules: DEFAULT_SYNC_FILE_RULES,
+      syncEnabled: false,
+    });
+    setRequestUrlMock(
+      vi.fn(async () => ({
+        status: 200,
+        json: {
+          status: "update_required",
+          minVersion: "1.2.0",
+          message: "Update Synch before syncing.",
+        },
+      })),
+    );
+    const ensureAutoSyncState = vi
+      .spyOn(SyncController.prototype, "ensureAutoSyncState")
+      .mockResolvedValue();
+    const stopAutoSyncAndMarkNotReady = vi
+      .spyOn(SyncController.prototype, "stopAutoSyncAndMarkNotReady")
+      .mockImplementation(() => {});
+    const refreshUi = vi.fn();
+    const controller = new SynchPluginController({
+      plugin,
+      refreshUi,
+    });
+    await controller.initialize();
+
+    expect(controller.getSyncState()).toBe("update_required");
+    expect(controller.getSyncStatusLabel()).toBe("Plugin update required.");
+    expect(getNotices()).toContainEqual({
+      message: "Update Synch before syncing.",
+      timeout: 0,
+    });
+
+    await controller.setSyncEnabled(true);
+    await controller.ensureAutoSyncState();
+
+    expect(controller.getPluginUpdateStatus()).toEqual({
+      state: "update_required",
+      currentVersion: "0.0.1",
+      minVersion: "1.2.0",
+      message: "Update Synch before syncing.",
+    });
+    expect(ensureAutoSyncState).not.toHaveBeenCalled();
+    expect(stopAutoSyncAndMarkNotReady).toHaveBeenCalled();
+    expect(controller.isSyncEnabled()).toBe(false);
+    expect(refreshUi).toHaveBeenCalled();
+    expect(getNotices().filter((notice) => notice.message === "Update Synch before syncing."))
+      .toHaveLength(2);
   });
 
   it("stops auto sync and persists disabled state when sync is disabled", async () => {

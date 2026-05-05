@@ -14,7 +14,8 @@ export type SynchSyncState =
   | "offline"
   | "reconnecting"
   | "up_to_date"
-  | "attention_needed";
+  | "attention_needed"
+  | "update_required";
 
 export interface SynchSyncProgress {
   completedEntries: number;
@@ -46,6 +47,12 @@ export type SynchPluginUpdateStatus =
       state: "update_available";
       currentVersion: string;
       latestVersion: string;
+    }
+  | {
+      state: "update_required";
+      currentVersion: string;
+      minVersion: string;
+      message: string;
     }
   | {
       state: "failed";

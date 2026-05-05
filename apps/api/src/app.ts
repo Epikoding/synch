@@ -6,6 +6,7 @@ import { registerBillingRoutes } from "./billing/routes";
 import type { BillingService } from "./billing/service";
 import { onError } from "./errors";
 import { registerHealthRoutes } from "./health/routes";
+import { registerPluginVersionRoutes } from "./plugin-version/routes";
 import type { SubscriptionPolicyReader } from "./subscription/policy-service";
 import { registerSyncAccessRoutes } from "./sync/access/routes";
 import type { SyncService } from "./sync/access/service";
@@ -49,6 +50,7 @@ export function createApp(deps: AppDependencies, config: AppConfig): Hono {
 
 	registerAuthRoutes(app, deps.auth);
 	registerHealthRoutes(app);
+	registerPluginVersionRoutes(app);
 	registerSyncAccessRoutes(app, deps);
 	registerVaultRoutes(app, deps);
 	if (config.billingEnabled) {

@@ -21,6 +21,7 @@ import type {
   SynchSyncState,
   SynchVersionPreview,
 } from "./view-models";
+import { SynchServerPluginVersionChecker } from "./server-version-checker";
 import { SynchPluginUpdateChecker } from "./update-checker";
 import { normalizeExcludedFolders, type SyncFileRules } from "../sync/core/file-rules";
 import type { SyncTokenResponse } from "../sync/remote/client";
@@ -48,6 +49,7 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly pluginDataStore = new SynchPluginDataStore(this.plugin);
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
   private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
+  private readonly serverPluginVersionChecker = new SynchServerPluginVersionChecker();
   private pluginUpdateCheckPromise: Promise<void> | null = null;
   private pluginUpdateCheckedAt = 0;
   private pluginUpdateStatus: SynchPluginUpdateStatus = {
@@ -151,6 +153,7 @@ export class SynchPluginController implements SynchSettingsController {
   async initialize(): Promise<void> {
     await this.pluginDataStore.initialize();
     await this.initializeSettings();
+    await this.checkServerPluginVersion();
     this.storedRemoteVaultKeySecret = await readStoredRemoteVaultKeySecret(this.plugin);
     this.storedSyncConnection = await this.syncController.readStoredConnection();
     await this.authManager.initialize();
@@ -161,6 +164,10 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   registerVaultEvents(): void {
+    if (this.isPluginUpdateRequired()) {
+      return;
+    }
+
     this.syncController.registerVaultEvents();
   }
 
@@ -189,6 +196,10 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async ensurePluginUpdateCheck(): Promise<void> {
+    if (this.isPluginUpdateRequired()) {
+      return;
+    }
+
     if (this.pluginUpdateCheckPromise) {
       await this.pluginUpdateCheckPromise;
       return;
@@ -205,6 +216,10 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async retryPluginUpdateCheck(): Promise<void> {
+    if (this.isPluginUpdateRequired()) {
+      return;
+    }
+
     await this.checkPluginUpdate();
   }
 
@@ -233,10 +248,18 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   getSyncStatusLabel(): string {
+    if (this.isPluginUpdateRequired()) {
+      return "Plugin update required.";
+    }
+
     return this.syncController.getSyncStatusLabel();
   }
 
   getSyncState(): SynchSyncState {
+    if (this.isPluginUpdateRequired()) {
+      return "update_required";
+    }
+
     return this.syncController.getSyncState();
   }
 
@@ -253,6 +276,13 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async setSyncEnabled(enabled: boolean): Promise<void> {
+    if (enabled && this.isPluginUpdateRequired()) {
+      new Notice(this.getPluginUpdateRequiredMessage());
+      this.syncController.stopAutoSyncAndMarkNotReady();
+      this.refreshUi();
+      return;
+    }
+
     const changed = await this.settingsStore.updateSyncEnabled(enabled);
     if (!enabled) {
       this.syncController.stopAutoSyncAndMarkPaused();
@@ -433,6 +463,10 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   private async checkPluginUpdate(): Promise<void> {
+    if (this.isPluginUpdateRequired()) {
+      return;
+    }
+
     if (this.pluginUpdateCheckPromise) {
       await this.pluginUpdateCheckPromise;
       return;
@@ -484,6 +518,11 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   private async runReadyAutoSync(startAutoSync: () => Promise<void>): Promise<void> {
+    if (this.isPluginUpdateRequired()) {
+      this.syncController.stopAutoSyncAndMarkNotReady();
+      return;
+    }
+
     const authReadiness = await this.authManager.refreshReadiness();
 
     if (authReadiness.state === "pending_network") {
@@ -561,6 +600,42 @@ export class SynchPluginController implements SynchSettingsController {
   private notifyError(error: unknown, prefix: string): void {
     const message = error instanceof Error ? error.message : String(error);
     new Notice(`${prefix}: ${message}`);
+  }
+
+  private async checkServerPluginVersion(): Promise<void> {
+    try {
+      const status = await this.serverPluginVersionChecker.check(
+        this.getApiBaseUrl(),
+        this.plugin.manifest.version,
+      );
+      if (status.status !== "update_required") {
+        return;
+      }
+
+      this.pluginUpdateStatus = {
+        state: "update_required",
+        currentVersion: this.plugin.manifest.version,
+        minVersion: status.minVersion,
+        message: status.message,
+      };
+      this.syncController.stopAutoSyncAndMarkNotReady();
+      new Notice(this.getPluginUpdateRequiredMessage(), 0);
+      this.refreshUi();
+    } catch {
+      // Only a confirmed server policy response should block sync startup.
+    }
+  }
+
+  private isPluginUpdateRequired(): boolean {
+    return this.pluginUpdateStatus.state === "update_required";
+  }
+
+  private getPluginUpdateRequiredMessage(): string {
+    if (this.pluginUpdateStatus.state !== "update_required") {
+      return "Synch plugin update is required.";
+    }
+
+    return this.pluginUpdateStatus.message;
   }
 
   private getActiveRemoteVaultKey(): Uint8Array {

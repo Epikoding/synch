@@ -110,6 +110,26 @@ describe("SynchSettingTab", () => {
     expect(getSettingClasses()[0]).toContain("synch-plugin-update-available");
   });
 
+  it("shows required plugin updates as a sync blocker", () => {
+    const tab = createSettingsTab({
+      getPluginUpdateStatus: () => ({
+        state: "update_required",
+        currentVersion: "0.0.1",
+        minVersion: "1.2.0",
+        message: "Update Synch before syncing.",
+      }),
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+    });
+
+    tab.display();
+
+    expect(getCreatedElementTexts()).toContain("Update required");
+    expect(getSettingNames()).toContain("Sync paused");
+    expect(getSettingDescriptions()).toContain("Update Synch before syncing.");
+    expect(getButtonComponents().map((button) => button.text)).not.toContain("Start sync");
+  });
+
   it("hides plugin update status from settings when no update is available", () => {
     const tab = createSettingsTab({
       getPluginUpdateStatus: () => ({

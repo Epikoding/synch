@@ -9,6 +9,7 @@ import {
 
 const MOBILE_STATUS_INDICATOR_STATE_CLASSES = [
   "synch-status-attention-needed",
+  "synch-status-update-required",
   "synch-status-storage-warning",
 ];
 
@@ -52,7 +53,8 @@ export class SynchMobileStatusIndicator {
 
     const state = this.state.getSyncState();
     const hasStorageWarning = isStorageWarningStatus(this.state.getStorageStatus());
-    const shouldShow = hasStorageWarning || state === "attention_needed";
+    const shouldShow =
+      hasStorageWarning || state === "attention_needed" || state === "update_required";
 
     for (const className of MOBILE_STATUS_INDICATOR_STATE_CLASSES) {
       this.indicator.removeClass(className);
@@ -60,13 +62,15 @@ export class SynchMobileStatusIndicator {
     this.indicator.addClass("synch-mobile-status-indicator");
     this.indicator.toggleClass("synch-mobile-status-indicator-hidden", !shouldShow);
     this.indicator.toggleClass("synch-status-storage-warning", hasStorageWarning);
-    if (!hasStorageWarning && state === "attention_needed") {
+    if (!hasStorageWarning && (state === "attention_needed" || state === "update_required")) {
       this.indicator.addClass(getStatusBarStateClass(state));
     }
     this.indicator.setAttribute(
       "aria-label",
       hasStorageWarning
         ? "Synch storage is almost full. Open Synch settings"
+        : state === "update_required"
+          ? "Synch plugin update required. Open Synch settings"
         : "Synch needs attention. Open Synch settings",
     );
     this.indicator.setAttribute("data-synch-sync-state", state);

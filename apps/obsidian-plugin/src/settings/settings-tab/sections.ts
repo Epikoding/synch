@@ -20,6 +20,15 @@ export function renderSettingsHeading(
 ): void {
   const updateStatus = controller.getPluginUpdateStatus();
   const heading = new Setting(containerEl).setName("Synch").setHeading();
+  if (updateStatus.state === "update_required") {
+    heading.settingEl.addClass("synch-plugin-update-available");
+    heading.controlEl.createSpan({
+      cls: "synch-plugin-update-badge",
+      text: "Update required",
+    });
+    return;
+  }
+
   if (updateStatus.state !== "update_available") {
     return;
   }
@@ -81,6 +90,14 @@ export function renderSyncStatusSetting(
   controller: SynchSettingsController,
   hasConnectedRemoteVault: boolean,
 ): void {
+  const updateStatus = controller.getPluginUpdateStatus();
+  if (updateStatus.state === "update_required") {
+    new Setting(containerEl)
+      .setName("Sync paused")
+      .setDesc(updateStatus.message);
+    return;
+  }
+
   if (!hasConnectedRemoteVault) {
     new Setting(containerEl)
       .setName("Sync")

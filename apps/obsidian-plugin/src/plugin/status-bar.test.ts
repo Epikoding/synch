@@ -222,4 +222,20 @@ describe("SynchStatusBar", () => {
     expect(item.attributes.get("data-synch-storage-warning")).toBe("true");
     expect(item.children[0].attributes.get("data-icon")).toBe("triangle-alert");
   });
+
+  it("shows plugin update required as an alert state", () => {
+    const plugin = createPlugin();
+    const statusBar = new SynchStatusBar(plugin, createState("update_required", 0));
+
+    statusBar.initialize();
+
+    const item = plugin.addedStatusBarItems[0];
+    expect(item.classes).toContain("synch-status-update-required");
+    expect(item.classes.has("synch-status-active")).toBe(false);
+    expect(item.attributes.get("aria-label")).toBe(
+      "Synch plugin update required. Open Synch settings",
+    );
+    expect(item.attributes.get("data-synch-sync-state")).toBe("update_required");
+    expect(item.children[0].attributes.get("data-icon")).toBe("triangle-alert");
+  });
 });

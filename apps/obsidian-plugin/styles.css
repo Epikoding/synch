@@ -36,7 +36,8 @@
 }
 
 .synch-status-bar.synch-status-offline,
-.synch-status-bar.synch-status-attention-needed {
+.synch-status-bar.synch-status-attention-needed,
+.synch-status-bar.synch-status-update-required {
   color: var(--text-error);
 }
 

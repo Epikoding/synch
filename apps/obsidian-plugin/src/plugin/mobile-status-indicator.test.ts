@@ -151,6 +151,27 @@ describe("SynchMobileStatusIndicator", () => {
     expect(item.attributes.get("data-synch-storage-warning")).toBe("true");
   });
 
+  it("shows the indicator when a plugin update is required", () => {
+    const plugin = createPlugin();
+    const rootEl = new FakeElement();
+    const indicator = new SynchMobileStatusIndicator(
+      plugin,
+      createState("update_required", 0),
+      rootEl as unknown as HTMLElement,
+    );
+
+    indicator.initialize();
+
+    const item = rootEl.children[0];
+    expect(item.classes).toContain("synch-status-update-required");
+    expect(item.classes.has("synch-mobile-status-indicator-hidden")).toBe(false);
+    expect(item.attributes.get("aria-label")).toBe(
+      "Synch plugin update required. Open Synch settings",
+    );
+    expect(item.attributes.get("data-synch-sync-state")).toBe("update_required");
+    expect(item.children[0].attributes.get("data-icon")).toBe("triangle-alert");
+  });
+
   it("hides the indicator for normal states", () => {
     const plugin = createPlugin();
     const rootEl = new FakeElement();
