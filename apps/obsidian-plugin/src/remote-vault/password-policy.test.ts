@@ -7,10 +7,14 @@ describe("vault password policy", () => {
     expect(validateVaultPassword("correct horse battery staple")).toEqual({ ok: true });
   });
 
+  it("accepts passphrases at the minimum length", () => {
+    expect(validateVaultPassword("twelve chars")).toEqual({ ok: true });
+  });
+
   it("rejects short passwords", () => {
-    expect(validateVaultPassword("vault-password")).toEqual({
+    expect(validateVaultPassword("short word")).toEqual({
       ok: false,
-      message: "Password must be at least 16 characters.",
+      message: "Password must be at least 12 characters.",
     });
   });
 
@@ -24,11 +28,11 @@ describe("vault password policy", () => {
   it("rejects common weak passwords even when decorated", () => {
     expect(validateVaultPassword("vault-password")).toEqual({
       ok: false,
-      message: "Password must be at least 16 characters.",
+      message: "Password is too easy to guess. Use a longer passphrase.",
     });
     expect(validateVaultPassword("obsidian-vault")).toEqual({
       ok: false,
-      message: "Password must be at least 16 characters.",
+      message: "Password is too easy to guess. Use a longer passphrase.",
     });
     expect(validateVaultPassword("obsidian-vault-password")).toEqual({
       ok: false,
@@ -41,11 +45,11 @@ describe("vault password policy", () => {
   });
 
   it("rejects repeated characters and simple sequences", () => {
-    expect(validateVaultPassword("aaaaaaaaaaaaaaaa")).toEqual({
+    expect(validateVaultPassword("aaaaaaaaaaaa")).toEqual({
       ok: false,
       message: "Password cannot be one repeated character.",
     });
-    expect(validateVaultPassword("abcdefghijklmnop")).toEqual({
+    expect(validateVaultPassword("abcdefghijkl")).toEqual({
       ok: false,
       message: "Password cannot be a simple sequence.",
     });

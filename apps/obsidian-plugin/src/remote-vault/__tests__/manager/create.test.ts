@@ -92,6 +92,6 @@ describe("RemoteVaultManager create", () => {
         password: "vault-password",
         confirmPassword: "vault-password",
       }),
-    ).rejects.toThrow("Password must be at least 16 characters.");
+    ).rejects.toThrow("Password is too easy to guess. Use a longer passphrase.");
   });
 });
