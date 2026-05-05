@@ -7,6 +7,7 @@ import type { SynchSettingsController } from "../settings/controller";
 import { SynchSettingsStore } from "../settings/store";
 import { SynchRemoteVaultController } from "./remote-vault-controller";
 import { SynchVersionHistoryController } from "./version-history-controller";
+import type { SynchUiEvent } from "./ui-events";
 import type { VersionHistoryViewState } from "./version-history-view";
 import type {
   SynchDeletedFile,
@@ -41,7 +42,7 @@ const PLUGIN_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 export interface SynchPluginControllerDeps {
   plugin: Plugin;
   refreshUi: () => void;
-  onFileSizeBlockedFilesChange?: () => void;
+  emitUiEvent?: (event: SynchUiEvent) => void;
 }
 
 export class SynchPluginController implements SynchSettingsController {
@@ -106,11 +107,14 @@ export class SynchPluginController implements SynchSettingsController {
     notify: (message, timeout) => {
       new Notice(message, timeout);
     },
-    onStatusChange: () => {
-      this.refreshUi();
+    onSyncStatusChange: () => {
+      this.emitUiEvent({ type: "sync-status-changed" });
+    },
+    onStorageStatusChange: () => {
+      this.emitUiEvent({ type: "storage-status-changed" });
     },
     onFileSizeBlockedFilesChange: () => {
-      this.deps.onFileSizeBlockedFilesChange?.();
+      this.emitUiEvent({ type: "file-size-blocked-changed" });
     },
     onStorageQuotaExceeded: async () => {
       await this.setSyncEnabled(false);
@@ -462,6 +466,15 @@ export class SynchPluginController implements SynchSettingsController {
     this.deps.refreshUi();
   }
 
+  private emitUiEvent(event: SynchUiEvent): void {
+    if (this.deps.emitUiEvent) {
+      this.deps.emitUiEvent(event);
+      return;
+    }
+
+    this.refreshUi();
+  }
+
   private async checkPluginUpdate(): Promise<void> {
     if (this.isPluginUpdateRequired()) {
       return;
@@ -585,6 +598,7 @@ export class SynchPluginController implements SynchSettingsController {
 
     await this.syncController.initializeStore(remoteVaultId);
     this.storedSyncConnection = await this.syncController.readStoredConnection();
+    this.emitUiEvent({ type: "file-size-blocked-changed" });
   }
 
   private async resetSyncConnection(): Promise<void> {

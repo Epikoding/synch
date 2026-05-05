@@ -45,7 +45,8 @@ export interface SyncControllerDeps {
   hasAuthenticatedSession: () => boolean;
   notifyError: (error: unknown, prefix: string) => void;
   notify?: (message: string, timeout?: number) => void;
-  onStatusChange?: () => void;
+  onSyncStatusChange?: () => void;
+  onStorageStatusChange?: () => void;
   onFileSizeBlockedFilesChange?: () => void;
   onStorageQuotaExceeded?: () => void | Promise<void>;
   isOffline?: OfflineDetector;
@@ -356,7 +357,7 @@ export class SyncController {
     }
 
     this.syncStatus = status;
-    this.deps.onStatusChange?.();
+    this.deps.onSyncStatusChange?.();
   }
 
   private setSyncProgress(progress: UserVisibleSyncProgress | null): void {
@@ -383,7 +384,7 @@ export class SyncController {
     }
 
     this.syncProgress = normalized;
-    this.deps.onStatusChange?.();
+    this.deps.onSyncStatusChange?.();
   }
 
   private setStorageStatus(status: SyncStorageStatus | null): void {
@@ -395,7 +396,7 @@ export class SyncController {
     }
 
     this.storageStatus = status;
-    this.deps.onStatusChange?.();
+    this.deps.onStorageStatusChange?.();
   }
 
   private notify(message: string, timeout?: number): void {

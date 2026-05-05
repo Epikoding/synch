@@ -12,6 +12,7 @@ import {
 } from "../test-stubs/obsidian";
 import { createSettingsTab, nextTask } from "./__tests__/settings-tab-helpers";
 import type { SynchSettingsController } from "./controller";
+import type { SynchSyncState } from "../plugin/view-models";
 
 describe("SynchSettingTab sync status", () => {
   beforeEach(() => {
@@ -121,6 +122,67 @@ describe("SynchSettingTab sync status", () => {
     expect(getSyncSpinnerElements()[0]?.attributes["data-icon"]).toBe("loader-circle");
   });
 
+  it("refreshes sync progress without rerendering the settings tab", () => {
+    let syncState: SynchSyncState = "syncing";
+    let completedEntries = 42;
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncState: () => syncState,
+      getSyncStatusLabel: () => `Sync: syncing ${completedEntries}%`,
+      getSyncProgress: () => ({
+        completedEntries,
+        totalEntries: 100,
+      }),
+    });
+
+    tab.display();
+
+    const settingNamesAfterDisplay = getSettingNames();
+    expect(getSyncSpinnerElements()).toHaveLength(1);
+
+    completedEntries = 57;
+    tab.handleUiEvent({ type: "sync-status-changed" });
+
+    expect(getSettingNames()).toEqual(settingNamesAfterDisplay);
+    expect(getSyncSpinnerElements()).toHaveLength(1);
+
+    syncState = "up_to_date";
+    tab.handleUiEvent({ type: "sync-status-changed" });
+
+    expect(getSettingNames()).toEqual(settingNamesAfterDisplay);
+    expect(getSyncSpinnerElements()).toHaveLength(0);
+  });
+
+  it("refreshes storage status without rerendering the settings tab", () => {
+    let storageStatus: ReturnType<SynchSettingsController["getStorageStatus"]> = {
+      storageUsedBytes: 10,
+      storageLimitBytes: 100,
+    };
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getStorageStatus: () => storageStatus,
+    });
+
+    tab.display();
+
+    const settingNamesAfterDisplay = getSettingNames();
+    expect(getProgressBarComponents()).toHaveLength(1);
+    expect(getProgressBarComponents()[0]?.value).toBe(10);
+
+    storageStatus = {
+      storageUsedBytes: 95,
+      storageLimitBytes: 100,
+    };
+    tab.handleUiEvent({ type: "storage-status-changed" });
+
+    expect(getSettingNames()).toEqual(settingNamesAfterDisplay);
+    expect(getProgressBarComponents()).toHaveLength(1);
+    expect(getProgressBarComponents()[0]?.value).toBe(95);
+    expect(getSettingClasses()[2]).toContain("synch-storage-warning");
+  });
+
   it("shows a stop button while sync is enabled", async () => {
     const setSyncEnabled = vi.fn(async () => {});
     const tab = createSettingsTab({
@@ -195,6 +257,7 @@ describe("SynchSettingTab sync status", () => {
 
     expect(getFileSizeWarningElements()).toEqual([]);
     const settingNamesAfterDisplay = getSettingNames();
+    const settingDescriptionsAfterDisplay = getSettingDescriptions();
 
     blockedFiles = [
       {
@@ -214,6 +277,11 @@ describe("SynchSettingTab sync status", () => {
         }),
       }),
     ]);
+    tab.handleUiEvent({ type: "sync-status-changed" });
+
+    expect(getSettingNames()).toEqual(settingNamesAfterDisplay);
+    expect(getSettingDescriptions()).toEqual(settingDescriptionsAfterDisplay);
+    expect(getFileSizeWarningElements()).toHaveLength(1);
 
     blockedFiles = [];
     tab.refreshFileSizeBlockedWarning();

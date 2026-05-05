@@ -15,7 +15,17 @@ import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
 type RefreshSettings = () => void;
 
 export interface SyncStatusSettingControls {
+  refreshSyncStatus(): void;
+  refreshStorageStatus(): void;
   refreshFileSizeBlockedWarning(): void;
+}
+
+interface FileSizeBlockedWarningControls {
+  refreshFileSizeBlockedWarning(): void;
+}
+
+interface ProgressBarControl {
+  setValue(value: number): ProgressBarControl;
 }
 
 export function renderSettingsHeading(
@@ -109,23 +119,43 @@ export function renderSyncStatusSetting(
     return null;
   }
 
-  const syncProgress = controller.getSyncProgress();
   const storageStatus = controller.getStorageStatus();
+  const getSyncDescription = (): string =>
+    formatSyncDescription(
+      controller.getSyncStatusLabel(),
+      controller.getSyncProgress(),
+    );
+  const initialSyncDescription = getSyncDescription();
   const syncSetting = new Setting(containerEl)
     .setName("Sync")
-    .setDesc(formatSyncDescription(
-      controller.getSyncStatusLabel(),
-      syncProgress,
-    ));
+    .setDesc(initialSyncDescription);
+  syncSetting.descEl.empty();
+  const syncDescriptionEl = syncSetting.descEl.createSpan({
+    text: initialSyncDescription,
+  });
+  const refreshSyncDescription = (): void => {
+    syncDescriptionEl.setText(getSyncDescription());
+  };
   const fileSizeWarning = createFileSizeBlockedWarningControls(syncSetting, controller);
   fileSizeWarning.refreshFileSizeBlockedWarning();
-  if (shouldShowSyncSpinner(controller.getSyncState())) {
-    const spinnerEl = syncSetting.nameEl.createSpan({
-      cls: "synch-sync-spinner",
-    });
-    spinnerEl.setAttribute("aria-hidden", "true");
-    setIcon(spinnerEl, "loader-circle");
-  }
+  let spinnerEl: HTMLElement | null = null;
+  const refreshSyncSpinner = (): void => {
+    const shouldShow = shouldShowSyncSpinner(controller.getSyncState());
+    if (shouldShow && !spinnerEl) {
+      spinnerEl = syncSetting.nameEl.createSpan({
+        cls: "synch-sync-spinner",
+      });
+      spinnerEl.setAttribute("aria-hidden", "true");
+      setIcon(spinnerEl, "loader-circle");
+      return;
+    }
+
+    if (!shouldShow && spinnerEl) {
+      spinnerEl.remove();
+      spinnerEl = null;
+    }
+  };
+  refreshSyncSpinner();
   syncSetting.addButton((button) =>
     button
       .setButtonText(controller.isSyncEnabled() ? "Stop sync" : "Start sync")
@@ -134,23 +164,46 @@ export function renderSyncStatusSetting(
       }),
   );
 
+  let storageProgressBar: ProgressBarControl | null = null;
   const storageSetting = new Setting(containerEl)
     .setName("Storage")
     .setDesc(storageStatus ? formatStorageDescription(storageStatus) : "Checking storage usage...")
     .addProgressBar((progressBar) => {
+      storageProgressBar = progressBar;
       progressBar.setValue(storageStatus ? getStoragePercent(storageStatus) : 0);
     });
   if (isStorageWarningStatus(storageStatus)) {
     storageSetting.settingEl.addClass("synch-storage-warning");
   }
 
-  return fileSizeWarning;
+  return {
+    refreshSyncStatus(): void {
+      refreshSyncDescription();
+      refreshSyncSpinner();
+    },
+    refreshStorageStatus(): void {
+      const nextStorageStatus = controller.getStorageStatus();
+      storageSetting.setDesc(
+        nextStorageStatus
+          ? formatStorageDescription(nextStorageStatus)
+          : "Checking storage usage...",
+      );
+      storageProgressBar?.setValue(
+        nextStorageStatus ? getStoragePercent(nextStorageStatus) : 0,
+      );
+      storageSetting.settingEl.toggleClass(
+        "synch-storage-warning",
+        isStorageWarningStatus(nextStorageStatus),
+      );
+    },
+    refreshFileSizeBlockedWarning: fileSizeWarning.refreshFileSizeBlockedWarning,
+  };
 }
 
 function createFileSizeBlockedWarningControls(
   syncSetting: Setting,
   controller: SynchSettingsController,
-): SyncStatusSettingControls {
+): FileSizeBlockedWarningControls {
   let run = 0;
   let icon: HTMLElement | null = null;
 

@@ -88,6 +88,30 @@ describe("SynchPluginController readiness reconciliation", () => {
     expect(startSync).not.toHaveBeenCalled();
   });
 
+  it("refreshes file-size blocked UI after the stored sync store is initialized", async () => {
+    const plugin = await createConnectedPlugin();
+    mockOnlineReadinessRequests();
+    vi.spyOn(SyncController.prototype, "readStoredConnection").mockResolvedValue(
+      storedConnection(),
+    );
+    vi.spyOn(SyncController.prototype, "initializeStore").mockResolvedValue();
+    vi.spyOn(SyncController.prototype, "ensureAutoSyncState").mockResolvedValue();
+    const emitUiEvent = vi.fn();
+    const controller = new SynchPluginController({
+      plugin,
+      refreshUi: vi.fn(),
+      emitUiEvent,
+    });
+
+    await controller.initialize();
+    emitUiEvent.mockClear();
+    await controller.ensureAutoSyncState();
+
+    expect(emitUiEvent).toHaveBeenCalledWith({
+      type: "file-size-blocked-changed",
+    });
+  });
+
   it("revalidates auth, restores the stored vault, and starts sync after reconnect", async () => {
     let offline = true;
     const plugin = await createConnectedPlugin();

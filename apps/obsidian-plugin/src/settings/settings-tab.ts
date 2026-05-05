@@ -1,5 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 
+import type { SynchUiEvent } from "../plugin/ui-events";
 import type { SynchSettingsController } from "./controller";
 import {
   renderApiBaseUrlSetting,
@@ -39,6 +40,24 @@ export class SynchSettingTab extends PluginSettingTab {
 
   refreshFileSizeBlockedWarning(): void {
     this.syncStatusControls?.refreshFileSizeBlockedWarning();
+  }
+
+  handleUiEvent(event: SynchUiEvent): void {
+    if (!this.isVisible) {
+      return;
+    }
+
+    switch (event.type) {
+      case "sync-status-changed":
+        this.syncStatusControls?.refreshSyncStatus();
+        return;
+      case "storage-status-changed":
+        this.syncStatusControls?.refreshStorageStatus();
+        return;
+      case "file-size-blocked-changed":
+        this.refreshFileSizeBlockedWarning();
+        return;
+    }
   }
 
   hide(): void {

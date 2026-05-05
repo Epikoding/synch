@@ -185,6 +185,45 @@ describe("SynchPluginController sync enabled setting", () => {
       syncEnabled: false,
     });
   });
+
+  it("routes sync runtime updates through granular UI events", async () => {
+    const plugin = createPluginWithSettings({
+      apiBaseUrl: "http://127.0.0.1:8787",
+      fileRules: DEFAULT_SYNC_FILE_RULES,
+      syncEnabled: true,
+    });
+    const refreshUi = vi.fn();
+    const emitUiEvent = vi.fn();
+    const controller = new SynchPluginController({
+      plugin,
+      refreshUi,
+      emitUiEvent,
+    });
+    await controller.initialize();
+    refreshUi.mockClear();
+    emitUiEvent.mockClear();
+
+    const { syncController } = controller as unknown as {
+      syncController: {
+        deps: {
+          onSyncStatusChange: () => void;
+          onStorageStatusChange: () => void;
+          onFileSizeBlockedFilesChange: () => void;
+        };
+      };
+    };
+
+    syncController.deps.onSyncStatusChange();
+    syncController.deps.onStorageStatusChange();
+    syncController.deps.onFileSizeBlockedFilesChange();
+
+    expect(emitUiEvent.mock.calls.map(([event]) => event)).toEqual([
+      { type: "sync-status-changed" },
+      { type: "storage-status-changed" },
+      { type: "file-size-blocked-changed" },
+    ]);
+    expect(refreshUi).not.toHaveBeenCalled();
+  });
 });
 
 function createPluginWithSettings(settings: SynchPluginSettings): Plugin & {

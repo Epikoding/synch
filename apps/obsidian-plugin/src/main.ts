@@ -5,6 +5,7 @@ import { SynchFileSizeBlockedDecorator } from "./plugin/file-size-blocked-decora
 import { SynchMobileStatusIndicator } from "./plugin/mobile-status-indicator";
 import { SynchPluginController } from "./plugin/plugin-controller";
 import { SynchStatusBar } from "./plugin/status-bar";
+import type { SynchUiEvent } from "./plugin/ui-events";
 import {
   SYNCH_VERSION_HISTORY_VIEW_TYPE,
   SynchVersionHistoryView,
@@ -24,9 +25,8 @@ export default class SynchPlugin extends Plugin {
       refreshUi: () => {
         this.refreshUi();
       },
-      onFileSizeBlockedFilesChange: () => {
-        this.fileSizeBlockedDecorator?.queueRefresh();
-        this.settingsTab?.refreshFileSizeBlockedWarning();
+      emitUiEvent: (event) => {
+        this.handleUiEvent(event);
       },
     });
     this.controller = controller;
@@ -89,5 +89,15 @@ export default class SynchPlugin extends Plugin {
     this.settingsTab?.refresh();
     this.mobileStatusIndicator?.refresh();
     this.statusBar?.refresh();
+  }
+
+  private handleUiEvent(event: SynchUiEvent): void {
+    this.settingsTab?.handleUiEvent(event);
+    this.mobileStatusIndicator?.refresh();
+    this.statusBar?.refresh();
+
+    if (event.type === "file-size-blocked-changed") {
+      this.fileSizeBlockedDecorator?.queueRefresh();
+    }
   }
 }

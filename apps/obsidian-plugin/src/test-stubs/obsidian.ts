@@ -349,7 +349,22 @@ export class Setting {
   settingEl = {
     classes: [] as string[],
     addClass: (value: string): void => {
-      this.settingEl.classes.push(value);
+      if (!this.settingEl.classes.includes(value)) {
+        this.settingEl.classes.push(value);
+      }
+    },
+    removeClass: (value: string): void => {
+      this.settingEl.classes = this.settingEl.classes.filter(
+        (className) => className !== value,
+      );
+    },
+    toggleClass: (value: string, enabled: boolean): void => {
+      if (enabled) {
+        this.settingEl.addClass(value);
+        return;
+      }
+
+      this.settingEl.removeClass(value);
     },
   };
   nameEl = new MockElement();
