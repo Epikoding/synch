@@ -351,7 +351,7 @@ describe("vault integration", () => {
 		expect(issued.response.status).toBe(200);
 		expect(issued.json?.vaultId).toBe(primary.vaultId);
 		expect(issued.json?.token).toBeTruthy();
-		expect(issued.json?.syncFormatVersion).toBe(1);
+		expect(issued.json?.syncFormatVersion).toBe(2);
 
 		const bootstrap = await jsonRequest<{
 			wrappers: Array<{ kind: string; userId: string | null }>;

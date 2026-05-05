@@ -1,1 +1,1 @@
-ALTER TABLE `vault` ADD `sync_format_version` integer DEFAULT 1 NOT NULL;
+ALTER TABLE `vault` ADD `sync_format_version` integer DEFAULT 2 NOT NULL;

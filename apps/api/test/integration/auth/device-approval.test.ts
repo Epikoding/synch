@@ -145,6 +145,6 @@ describe("auth device approval integration", () => {
 		expect(syncTokenResponse.response.status).toBe(200);
 		expect(syncTokenResponse.json?.token).toBeTruthy();
 		expect(syncTokenResponse.json?.vaultId).toBe(vaultId);
-		expect(syncTokenResponse.json?.syncFormatVersion).toBe(1);
+		expect(syncTokenResponse.json?.syncFormatVersion).toBe(2);
 	});
 });
