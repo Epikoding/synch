@@ -332,9 +332,12 @@ export class SyncVersionHistoryService {
       token.vaultId,
       version.blobId,
     );
-    const bytes = await decryptSyncBlob(this.deps.getRemoteVaultKey(), encryptedBytes, {
-      blobId: version.blobId,
-    });
+    const bytes = await decryptSyncBlob(
+      this.deps.getRemoteVaultKey(),
+      encryptedBytes,
+      { blobId: version.blobId },
+      { syncFormatVersion: token.syncFormatVersion },
+    );
     const actualHash = await hashBytes(bytes);
     if (metadata.hash !== actualHash) {
       throw new Error("Version preview hash does not match metadata.");

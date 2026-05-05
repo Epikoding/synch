@@ -5,6 +5,7 @@ import { decodeBase64, encodeBase64, randomBytes, toArrayBuffer } from "../../ut
 const ENVELOPE_VERSION = 1;
 const AES_GCM_NONCE_BYTES = 12;
 const KEY_USAGE_SALT = new Uint8Array();
+const SUPPORTED_SYNC_BLOB_FORMAT_VERSION = 1;
 
 export type SyncMetadataCryptoContext = {
   entryId: string;
@@ -15,6 +16,10 @@ export type SyncMetadataCryptoContext = {
 
 export type SyncBlobCryptoContext = {
   blobId: string;
+};
+
+export type SyncBlobEnvelopeOptions = {
+  syncFormatVersion: number;
 };
 
 type EncryptedEnvelope = {
@@ -54,7 +59,9 @@ export async function encryptSyncBlob(
   remoteVaultKey: Uint8Array,
   plaintext: Uint8Array,
   context: SyncBlobCryptoContext,
+  options: SyncBlobEnvelopeOptions,
 ): Promise<Uint8Array> {
+  assertSupportedSyncBlobFormatVersion(options.syncFormatVersion);
   const envelope = await encryptEnvelope(
     remoteVaultKey,
     "sync-blob",
@@ -68,7 +75,9 @@ export async function decryptSyncBlob(
   remoteVaultKey: Uint8Array,
   encryptedBlob: Uint8Array,
   context: SyncBlobCryptoContext,
+  options: SyncBlobEnvelopeOptions,
 ): Promise<Uint8Array> {
+  assertSupportedSyncBlobFormatVersion(options.syncFormatVersion);
   return await decryptEnvelope(
     remoteVaultKey,
     "sync-blob",
@@ -166,6 +175,12 @@ function encodeBlobAad(context: SyncBlobCryptoContext): Uint8Array {
   return new TextEncoder().encode(
     ["synch.sync-blob", `v${ENVELOPE_VERSION}`, context.blobId].join("\n"),
   );
+}
+
+function assertSupportedSyncBlobFormatVersion(syncFormatVersion: number): void {
+  if (syncFormatVersion !== SUPPORTED_SYNC_BLOB_FORMAT_VERSION) {
+    throw new Error(`Unsupported sync blob format version: ${syncFormatVersion}.`);
+  }
 }
 
 function parseEncryptedEnvelope(value: string): EncryptedEnvelope {

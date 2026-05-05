@@ -13,6 +13,7 @@ import {
 } from "./version-history-service";
 
 const TEST_VAULT_KEY = new Uint8Array(Array.from({ length: 32 }, (_, index) => index + 1));
+const TEST_BLOB_OPTIONS = { syncFormatVersion: 1 };
 
 describe("SyncVersionHistoryService", () => {
   it("does not request remote history for local-only entries", async () => {
@@ -319,7 +320,7 @@ describe("SyncVersionHistoryService", () => {
     const pullClient = createPullClient({
       "blob-old": await encryptSyncBlob(TEST_VAULT_KEY, new TextEncoder().encode(body), {
         blobId: "blob-old",
-      }),
+      }, TEST_BLOB_OPTIONS),
     });
     const service = createService(store, { pullClient });
 
@@ -362,7 +363,7 @@ describe("SyncVersionHistoryService", () => {
     const pullClient = createPullClient({
       "blob-old": await encryptSyncBlob(TEST_VAULT_KEY, bytes, {
         blobId: "blob-old",
-      }),
+      }, TEST_BLOB_OPTIONS),
     });
     const service = createService(store, { pullClient });
 
@@ -424,7 +425,7 @@ describe("SyncVersionHistoryService", () => {
       pullClient: createPullClient({
         "blob-old": await encryptSyncBlob(TEST_VAULT_KEY, new TextEncoder().encode(body), {
           blobId: "blob-old",
-        }),
+        }, TEST_BLOB_OPTIONS),
       }),
       withRealtimeSession: async (work) => await work(session),
     });
@@ -551,6 +552,7 @@ describe("SyncVersionHistoryService", () => {
           TEST_VAULT_KEY,
           new TextEncoder().encode("different body"),
           { blobId: "blob-old" },
+          TEST_BLOB_OPTIONS,
         ),
       }),
     });

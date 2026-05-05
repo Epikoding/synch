@@ -79,9 +79,12 @@ export class PullBlobPreparer {
   ): Promise<Uint8Array> {
     const blobId = requireBlobId(plan.state);
     const encryptedBytes = await this.downloadEntryBlob(token, plan.state);
-    const bytes = await decryptSyncBlob(this.deps.getRemoteVaultKey(), encryptedBytes, {
-      blobId,
-    });
+    const bytes = await decryptSyncBlob(
+      this.deps.getRemoteVaultKey(),
+      encryptedBytes,
+      { blobId },
+      { syncFormatVersion: token.syncFormatVersion },
+    );
     const actualHash = await hashBytes(bytes);
     if (actualHash !== plan.hash) {
       throw new Error(

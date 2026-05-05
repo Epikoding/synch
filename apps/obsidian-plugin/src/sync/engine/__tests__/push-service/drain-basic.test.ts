@@ -126,7 +126,7 @@ describe("SyncPushService drain: basic queue", () => {
     await expect(
       decryptSyncBlob(TEST_VAULT_KEY, uploaded[0]?.bytes ?? new Uint8Array(), {
         blobId: uploaded[0]?.blobId ?? "",
-      }),
+      }, { syncFormatVersion: 1 }),
     ).resolves.toEqual(new TextEncoder().encode("new body"));
     await expect(
       decryptSyncMetadata(

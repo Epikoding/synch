@@ -18,6 +18,9 @@ const TEST_METADATA_CONTEXT = {
 const TEST_BLOB_CONTEXT = {
   blobId: "blob-1",
 };
+const TEST_BLOB_OPTIONS = {
+  syncFormatVersion: 1,
+};
 
 describe("sync crypto", () => {
   it("round-trips encrypted metadata", async () => {
@@ -35,10 +38,28 @@ describe("sync crypto", () => {
 
   it("round-trips encrypted blobs", async () => {
     const plaintext = new Uint8Array([1, 2, 3, 4, 5, 6]);
-    const encrypted = await encryptSyncBlob(TEST_VAULT_KEY, plaintext, TEST_BLOB_CONTEXT);
+    const encrypted = await encryptSyncBlob(
+      TEST_VAULT_KEY,
+      plaintext,
+      TEST_BLOB_CONTEXT,
+      TEST_BLOB_OPTIONS,
+    );
 
     expect(encrypted).not.toEqual(plaintext);
-    await expect(decryptSyncBlob(TEST_VAULT_KEY, encrypted, TEST_BLOB_CONTEXT)).resolves.toEqual(plaintext);
+    await expect(
+      decryptSyncBlob(TEST_VAULT_KEY, encrypted, TEST_BLOB_CONTEXT, TEST_BLOB_OPTIONS),
+    ).resolves.toEqual(plaintext);
+  });
+
+  it("rejects unsupported sync blob format versions", async () => {
+    await expect(
+      encryptSyncBlob(
+        TEST_VAULT_KEY,
+        new Uint8Array([1, 2, 3]),
+        TEST_BLOB_CONTEXT,
+        { syncFormatVersion: 2 },
+      ),
+    ).rejects.toThrow("Unsupported sync blob format version: 2.");
   });
 
   it("rejects the wrong vault key", async () => {
@@ -75,10 +96,16 @@ describe("sync crypto", () => {
       TEST_VAULT_KEY,
       new Uint8Array([1, 2, 3]),
       TEST_BLOB_CONTEXT,
+      TEST_BLOB_OPTIONS,
     );
 
     await expect(
-      decryptSyncBlob(TEST_VAULT_KEY, encrypted, { blobId: "blob-2" }),
+      decryptSyncBlob(
+        TEST_VAULT_KEY,
+        encrypted,
+        { blobId: "blob-2" },
+        TEST_BLOB_OPTIONS,
+      ),
     ).rejects.toThrow();
   });
 });

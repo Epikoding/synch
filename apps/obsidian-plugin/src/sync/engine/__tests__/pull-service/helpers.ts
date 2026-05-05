@@ -114,7 +114,9 @@ export async function encryptPendingMetadata(input: {
 }
 
 export async function encryptTestBlob(blobId: string, bytes: Uint8Array) {
-  return await encryptSyncBlob(TEST_VAULT_KEY, bytes, { blobId });
+  return await encryptSyncBlob(TEST_VAULT_KEY, bytes, { blobId }, {
+    syncFormatVersion: 1,
+  });
 }
 
 export async function hashText(value: string): Promise<string> {
