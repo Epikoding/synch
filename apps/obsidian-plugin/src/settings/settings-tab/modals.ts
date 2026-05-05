@@ -77,6 +77,7 @@ export class DeletedFilesModal extends Modal {
   private nextBefore: SynchDeletedFileCursor | null = null;
   private hasMore = false;
   private loading = false;
+  private previewingEntryId: string | null = null;
   private error: string | null = null;
 
   constructor(
@@ -152,39 +153,50 @@ export class DeletedFilesModal extends Modal {
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
-    new Setting(contentEl).setName("Deleted files").setHeading();
+    contentEl.addClass("synch-deleted-files-modal");
+    const headerEl = contentEl.createEl("div", {
+      cls: "synch-deleted-files-header",
+    });
+    const listEl = contentEl.createEl("div", {
+      cls: "synch-deleted-files-list",
+    });
+    const footerEl = contentEl.createEl("div", {
+      cls: "synch-deleted-files-footer",
+    });
+    new Setting(headerEl).setName("Deleted files").setHeading();
 
     if (this.error) {
-      contentEl.createEl("p", {
+      headerEl.createEl("p", {
         cls: "synch-modal-error",
         text: this.error,
       });
     } else {
-      contentEl.createEl("p", {
+      headerEl.createEl("p", {
         cls: "synch-modal-hint",
         text: "Select synced deleted files to restore.",
       });
     }
 
     if (this.loading) {
-      contentEl.createEl("p", {
+      listEl.createEl("p", {
         cls: "synch-modal-empty",
         text: "Loading deleted files...",
       });
     } else if (!this.error && this.deletedFiles.length === 0) {
-      contentEl.createEl("p", {
+      listEl.createEl("p", {
         cls: "synch-modal-empty",
         text: "No synced deleted files are available to restore.",
       });
     } else {
       for (const file of this.deletedFiles) {
-        const setting = new Setting(contentEl)
+        const previewing = this.previewingEntryId === file.entryId;
+        const setting = new Setting(listEl)
           .setName(file.path)
           .setDesc(`Deleted ${formatDeletedFileTimestamp(file.deletedAt)}`);
         setting.addButton((button) => {
           button
-            .setButtonText("Preview")
-            .setDisabled(this.loading)
+            .setButtonText(previewing ? "Loading preview..." : "Preview")
+            .setDisabled(this.loading || previewing)
             .onClick(() => {
               void this.previewDeletedFile(file);
             });
@@ -206,7 +218,7 @@ export class DeletedFilesModal extends Modal {
     }
 
     const selectedCount = this.selectedEntryIds.size;
-    const actions = new Setting(contentEl).addButton((button) =>
+    const actions = new Setting(footerEl).addButton((button) =>
       button.setButtonText("Refresh").setDisabled(this.loading).onClick(() => {
         void this.loadDeletedFiles();
       }),
@@ -274,6 +286,13 @@ export class DeletedFilesModal extends Modal {
   }
 
   private async previewDeletedFile(file: SynchDeletedFile): Promise<void> {
+    if (this.previewingEntryId !== null) {
+      return;
+    }
+
+    this.previewingEntryId = file.entryId;
+    this.render();
+
     try {
       const preview = await this.options.previewDeletedFile(file.entryId, file.path);
       new VersionPreviewModal(this.app, preview).open();
@@ -281,6 +300,9 @@ export class DeletedFilesModal extends Modal {
       new Notice(
         `Deleted file preview failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+    } finally {
+      this.previewingEntryId = null;
+      this.render();
     }
   }
 }

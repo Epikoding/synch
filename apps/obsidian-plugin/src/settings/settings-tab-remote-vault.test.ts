@@ -8,6 +8,7 @@ import {
   getToggleComponents,
   resetObsidianMocks,
 } from "../test-stubs/obsidian";
+import type { SynchVersionPreview } from "../plugin/view-models";
 import { createSettingsTab, nextTask } from "./__tests__/settings-tab-helpers";
 
 describe("SynchSettingTab remote vault settings", () => {
@@ -243,6 +244,62 @@ describe("SynchSettingTab remote vault settings", () => {
       "entry-ready",
       "Notes/ready.md",
     );
+    expect(getMarkdownRenderCalls()).toEqual([
+      expect.objectContaining({
+        markdown: "previous content",
+        sourcePath: "Notes/ready.md",
+      }),
+    ]);
+  });
+
+  it("shows a loading state while previewing a deleted file", async () => {
+    let resolvePreview: (preview: SynchVersionPreview) => void = () => {};
+    const previewPromise = new Promise<SynchVersionPreview>((resolve) => {
+      resolvePreview = resolve;
+    });
+    const previewDeletedFile = vi.fn(() => previewPromise);
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      listDeletedFiles: vi.fn(async () => ({
+        files: [
+          {
+            entryId: "entry-ready",
+            path: "Notes/ready.md",
+            revision: 3,
+            deletedAt: 1,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      })),
+      previewDeletedFile,
+    });
+
+    tab.display();
+    await getButtonComponents()
+      .find((button) => button.text === "View deleted files")
+      ?.click();
+    await nextTask();
+    await getButtonComponents()
+      .find((button) => button.text === "Preview")
+      ?.click();
+    await nextTask();
+
+    expect(
+      getButtonComponents().find((button) => button.text === "Loading preview...")
+        ?.disabled,
+    ).toBe(true);
+
+    resolvePreview({
+      status: "text",
+      path: "Notes/ready.md",
+      reason: "before_delete",
+      capturedAt: 1,
+      text: "previous content",
+    });
+    await nextTask();
+
     expect(getMarkdownRenderCalls()).toEqual([
       expect.objectContaining({
         markdown: "previous content",

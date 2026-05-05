@@ -7,6 +7,7 @@
 ## Changed
 
 - Load deleted files from the server in pages and show only files that still have restorable version history.
+- Keep deleted file restore actions visible while browsing long deleted-file lists, and show when a preview is loading.
 
 ## Fixed
 
