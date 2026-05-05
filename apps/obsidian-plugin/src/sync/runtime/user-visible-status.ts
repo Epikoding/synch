@@ -1,3 +1,5 @@
+import { t } from "../../i18n";
+
 export type UserVisibleSyncState =
   | "not_ready"
   | "paused"
@@ -43,21 +45,8 @@ export function formatUserVisibleSyncState(
   progress: UserVisibleSyncProgress | null = null,
 ): string {
   const percent = getUserVisibleSyncDisplayPercent(state, progress);
-
-  switch (state) {
-    case "not_ready":
-      return `Sync: not ready ${percent}%`;
-    case "paused":
-      return `Sync: paused ${percent}%`;
-    case "syncing":
-      return `Sync: syncing ${percent}%`;
-    case "offline":
-      return `Sync: offline ${percent}%`;
-    case "reconnecting":
-      return `Sync: reconnecting ${percent}%`;
-    case "up_to_date":
-      return `Sync: up to date ${percent}%`;
-    case "attention_needed":
-      return `Sync: attention needed ${percent}%`;
-  }
+  return t("sync.status", {
+    label: t(`sync.state.${state}`),
+    percent,
+  });
 }

@@ -2,6 +2,7 @@ import {
   createPasswordWrappedRemoteVaultKey,
   unwrapRemoteVaultKeyWithPassword,
 } from "./crypto";
+import { t } from "../i18n";
 import type { StoredRemoteVaultKeySecret } from "./device-storage";
 import { validateVaultPassword } from "./password-policy";
 import { RemoteVaultClient } from "./client";
@@ -48,15 +49,15 @@ export class RemoteVaultManager {
 
   getRemoteVaultStatusLabel(): string {
     if (this.session) {
-      return `Vault ${formatVaultLabel(this.session.summary)} loaded on this device.`;
+      return t("vault.loaded", { label: formatVaultLabel(this.session.summary) });
     }
 
     const storedVaultId = this.deps.getStoredRemoteVaultId();
     if (storedVaultId && this.deps.getStoredRemoteVaultKeySecret()) {
-      return "A vault is stored on this device but not active.";
+      return t("vault.notActive");
     }
 
-    return "No vault is configured on this device.";
+    return t("vault.notConfigured");
   }
 
   getActiveSession(): RemoteVaultSession | null {
@@ -87,7 +88,7 @@ export class RemoteVaultManager {
     this.deps.refreshUi();
 
     if (vault) {
-      this.notify(`Vault ${formatStoredVaultLabel(vault)} disconnected from this device.`);
+      this.notify(t("vault.disconnected", { label: formatStoredVaultLabel(vault) }));
     }
   }
 

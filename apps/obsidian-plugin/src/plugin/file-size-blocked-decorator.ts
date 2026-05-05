@@ -1,5 +1,6 @@
 import { setIcon, setTooltip, type Plugin } from "obsidian";
 
+import { getSynchLocale } from "../i18n";
 import type { SynchFileSizeBlockedFile } from "./view-models";
 
 const FILE_EXPLORER_VIEW_TYPE = "file-explorer";
@@ -111,6 +112,14 @@ export function decorateFileExplorerElement(
 }
 
 export function formatFileSizeBlockedTooltip(file: SynchFileSizeBlockedFile): string {
+  if (getSynchLocale() === "ko") {
+    return [
+      "암호화된 크기가 파일 크기 제한을 초과하여 Synch가 이 파일을 동기화할 수 없습니다.",
+      `암호화 후: ${formatBytes(file.encryptedSizeBytes)}.`,
+      `제한: ${formatBytes(file.maxFileSizeBytes)}.`,
+    ].join(" ");
+  }
+
   return [
     "Synch cannot sync this file because its encrypted size exceeds the file size limit.",
     `Encrypted: ${formatBytes(file.encryptedSizeBytes)}.`,

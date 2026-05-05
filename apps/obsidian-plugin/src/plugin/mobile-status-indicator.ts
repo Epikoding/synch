@@ -1,5 +1,6 @@
 import { setIcon, type Plugin } from "obsidian";
 
+import { t } from "../i18n";
 import { isStorageWarningStatus } from "../utils/storage-warning";
 import {
   getStatusBarStateClass,
@@ -30,7 +31,7 @@ export class SynchMobileStatusIndicator {
     });
     this.indicator.setAttribute("type", "button");
     this.indicator.setAttribute("role", "button");
-    this.indicator.setAttribute("aria-label", "Open Synch settings");
+    this.indicator.setAttribute("aria-label", t("status.openSettings"));
     this.icon = this.indicator.createEl("span", {
       cls: "synch-mobile-status-indicator-icon",
     });
@@ -68,10 +69,10 @@ export class SynchMobileStatusIndicator {
     this.indicator.setAttribute(
       "aria-label",
       hasStorageWarning
-        ? "Synch storage is almost full. Open Synch settings"
+        ? t("status.storageAlmostFull")
         : state === "update_required"
-          ? "Synch plugin update required. Open Synch settings"
-        : "Synch needs attention. Open Synch settings",
+          ? t("status.pluginUpdateRequired")
+        : t("status.attention"),
     );
     this.indicator.setAttribute("data-synch-sync-state", state);
     this.indicator.setAttribute("data-synch-sync-percent", String(this.state.getSyncPercent()));

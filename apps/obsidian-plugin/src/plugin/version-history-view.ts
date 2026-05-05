@@ -1,5 +1,6 @@
 import { ItemView, Notice, Setting, type WorkspaceLeaf } from "obsidian";
 
+import { t } from "../i18n";
 import type {
   SynchEntryVersion,
   SynchEntryVersionCursor,
@@ -49,7 +50,7 @@ export class SynchVersionHistoryView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Synch version history";
+    return t("version.displayText");
   }
 
   getIcon(): string {
@@ -111,11 +112,11 @@ export class SynchVersionHistoryView extends ItemView {
     root.empty();
     root.addClass("synch-history-view");
 
-    new Setting(root).setName("Version history").setHeading();
+    new Setting(root).setName(t("version.header")).setHeading();
 
     if (this.loading && !this.state) {
       root.createEl("p", {
-        text: "Loading history...",
+        text: t("version.loadingHistory"),
         cls: "synch-history-muted",
       });
       return;
@@ -123,7 +124,7 @@ export class SynchVersionHistoryView extends ItemView {
 
     if (!this.state) {
       root.createEl("p", {
-        text: "Open a synced file to view its history.",
+        text: t("version.openSyncedFile"),
         cls: "synch-history-muted",
       });
       return;
@@ -150,14 +151,14 @@ export class SynchVersionHistoryView extends ItemView {
     });
     if (this.state.dirty) {
       root.createEl("p", {
-        text: "Sync local changes before restoring.",
+        text: t("version.dirty"),
         cls: "synch-history-warning",
       });
     }
 
     if (this.versions.length === 0) {
       root.createEl("p", {
-        text: this.loading ? "Loading history..." : "No version history for this file.",
+        text: this.loading ? t("version.loadingHistory") : t("version.empty"),
         cls: "synch-history-muted",
       });
       this.renderRefreshButton(root);
@@ -172,7 +173,7 @@ export class SynchVersionHistoryView extends ItemView {
     const actions = root.createDiv({ cls: "synch-history-actions" });
     if (this.nextBefore) {
       const more = actions.createEl("button", {
-        text: this.loading ? "Loading..." : "Load more",
+        text: this.loading ? t("loading") : t("loadMore"),
         cls: "mod-cta",
       });
       more.disabled = this.loading;
@@ -201,7 +202,7 @@ export class SynchVersionHistoryView extends ItemView {
 
     const buttons = row.createDiv({ cls: "synch-history-row-actions" });
     const preview = buttons.createEl("button", {
-      text: "Preview",
+      text: t("preview"),
       cls: "synch-history-preview",
     });
     preview.disabled = this.loading;
@@ -210,7 +211,7 @@ export class SynchVersionHistoryView extends ItemView {
     });
 
     const button = buttons.createEl("button", {
-      text: restoreDisabled ? "Sync first" : "Restore",
+      text: restoreDisabled ? t("version.syncFirst") : t("version.restore"),
       cls: "synch-history-restore",
     });
     button.disabled = restoreDisabled || this.loading;
@@ -221,7 +222,7 @@ export class SynchVersionHistoryView extends ItemView {
 
   private renderRefreshButton(container: HTMLElement): void {
     const refresh = container.createEl("button", {
-      text: this.loading ? "Refreshing..." : "Refresh",
+      text: this.loading ? t("refreshing") : t("refresh"),
       cls: "synch-history-refresh",
     });
     refresh.disabled = this.loading;
@@ -233,7 +234,7 @@ export class SynchVersionHistoryView extends ItemView {
   private async restoreVersion(version: SynchEntryVersion): Promise<void> {
     if (
       !confirm(
-        `Restore version from ${formatCapturedAt(version.capturedAt)}?`,
+        t("version.restoreConfirm", { capturedAt: formatCapturedAt(version.capturedAt) }),
       )
     ) {
       return;
@@ -243,11 +244,13 @@ export class SynchVersionHistoryView extends ItemView {
     this.render();
     try {
       await this.controller.restoreActiveFileVersion(version.versionId);
-      new Notice("Version restored.");
+      new Notice(t("version.restored"));
       await this.refresh();
     } catch (error) {
       new Notice(
-        `Version restore failed: ${error instanceof Error ? error.message : String(error)}`,
+        t("version.restoreFailed", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
       );
       this.loading = false;
       this.render();
@@ -272,13 +275,13 @@ function formatCapturedAt(value: number): string {
 
 function formatReason(reason: SynchEntryVersion["reason"]): string {
   if (reason === "before_delete") {
-    return "Before delete";
+    return t("version.beforeDelete");
   }
   if (reason === "before_restore") {
-    return "Before restore";
+    return t("version.beforeRestore");
   }
   if (reason === "manual") {
-    return "Manual";
+    return t("version.manual");
   }
   return "Auto";
 }

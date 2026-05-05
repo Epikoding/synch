@@ -1,5 +1,7 @@
 import { Notice, type Plugin } from "obsidian";
 
+import { t } from "../i18n";
+
 export interface SynchCommandController {
   getAuthStatusLabel(): string;
   getRemoteVaultStatusLabel(): string;
@@ -17,7 +19,7 @@ export function registerSynchCommands(
 ): void {
   plugin.addCommand({
     id: "sign-in-on-this-device",
-    name: "Sign in on this device",
+    name: t("auth.signInOnThisDevice"),
     callback: async () => {
       await controller.beginDeviceLogin();
     },
@@ -25,7 +27,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "sign-out-on-this-device",
-    name: "Sign out on this device",
+    name: t("auth.signOut"),
     callback: async () => {
       await controller.signOutDevice();
     },
@@ -33,7 +35,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "show-auth-status",
-    name: "Show auth status",
+    name: t("auth.showStatus"),
     callback: () => {
       new Notice(controller.getAuthStatusLabel());
     },
@@ -41,7 +43,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "create-vault",
-    name: "Create vault",
+    name: t("vault.create"),
     callback: async () => {
       await controller.createRemoteVaultFromPrompt();
     },
@@ -49,7 +51,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "connect-vault",
-    name: "Connect vault",
+    name: t("vault.connect"),
     callback: async () => {
       await controller.connectRemoteVaultFromPrompt();
     },
@@ -57,7 +59,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "disconnect-vault",
-    name: "Disconnect vault",
+    name: t("vault.disconnect"),
     callback: async () => {
       await controller.disconnectRemoteVault();
     },
@@ -65,7 +67,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "show-vault-status",
-    name: "Show vault status",
+    name: t("vault.showStatus"),
     callback: () => {
       new Notice(controller.getRemoteVaultStatusLabel());
     },
@@ -73,7 +75,7 @@ export function registerSynchCommands(
 
   plugin.addCommand({
     id: "open-version-history",
-    name: "Open version history",
+    name: t("version.header"),
     callback: async () => {
       await controller.openVersionHistoryPane();
     },

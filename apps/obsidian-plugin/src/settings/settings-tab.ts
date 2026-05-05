@@ -1,5 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 
+import { t } from "../i18n";
 import type { SynchUiEvent } from "../plugin/ui-events";
 import type { SynchSettingsController } from "./controller";
 import {
@@ -94,7 +95,7 @@ export class SynchSettingTab extends PluginSettingTab {
         hasConnectedRemoteVault,
       );
     } else {
-      new Setting(containerEl).setName("Account").setHeading();
+      new Setting(containerEl).setName(t("account")).setHeading();
     }
 
     renderAuthenticationSetting(
@@ -105,7 +106,7 @@ export class SynchSettingTab extends PluginSettingTab {
     );
 
     if (!hasAuthenticatedSession) {
-      new Setting(containerEl).setName("Self-hosted server").setHeading();
+      new Setting(containerEl).setName(t("server.heading")).setHeading();
       renderApiBaseUrlSetting(containerEl, this.controller, {
         canChangeApiBaseUrl,
         hasConnectedRemoteVault,

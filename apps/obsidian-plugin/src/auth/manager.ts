@@ -7,6 +7,7 @@ import {
   isOfflineLikeError,
   type OfflineDetector,
 } from "../http/network-status";
+import { t } from "../i18n";
 import {
   AuthClient,
   type AuthenticatedUserSession,
@@ -67,21 +68,21 @@ export class AuthManager {
   getAuthStatusLabel(): string {
     if (!this.hasAuthenticatedSession()) {
       if (this.authPendingNetworkVerification) {
-        return "Connect to the internet to check sign-in.";
+        return t("network.requiredDesc");
       }
 
       if (this.authNeedsRelogin) {
-        return "Sign in again to sync.";
+        return t("auth.signInAgain");
       }
 
-      return "Not signed in.";
+      return t("auth.notSignedIn");
     }
 
     if (this.authDisplayName) {
-      return `Signed in as ${this.authDisplayName}.`;
+      return t("auth.signedIn", { name: this.authDisplayName });
     }
 
-    return "Signed in on this device.";
+    return t("auth.signedInDevice");
   }
 
   hasAuthenticatedSession(): boolean {

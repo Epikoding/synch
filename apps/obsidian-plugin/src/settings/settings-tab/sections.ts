@@ -1,6 +1,7 @@
 import { App, Notice, setIcon, setTooltip, Setting } from "obsidian";
 
 import { getDefaultApiBaseUrl } from "../../config";
+import { t } from "../../i18n";
 import type { SynchFileRules } from "../../plugin/view-models";
 import { isStorageWarningStatus } from "../../utils/storage-warning";
 import type { SynchSettingsController } from "../controller";
@@ -38,7 +39,7 @@ export function renderSettingsHeading(
     heading.settingEl.addClass("synch-plugin-update-available");
     heading.controlEl.createSpan({
       cls: "synch-plugin-update-badge",
-      text: "Update required",
+      text: t("plugin.updateRequired"),
     });
     return;
   }
@@ -50,7 +51,7 @@ export function renderSettingsHeading(
   heading.settingEl.addClass("synch-plugin-update-available");
   heading.controlEl.createSpan({
     cls: "synch-plugin-update-badge",
-    text: "Latest version available",
+    text: t("plugin.latestAvailable"),
   });
 }
 
@@ -67,17 +68,17 @@ export function renderApiBaseUrlSetting(
   const visibleApiBaseUrl = apiBaseUrl === getDefaultApiBaseUrl() ? "" : apiBaseUrl;
   let apiBaseUrlInput = visibleApiBaseUrl;
   new Setting(containerEl)
-    .setName("Server URL")
+    .setName(t("server.url"))
     .setDesc(
       options.isDeviceLoginInProgress
-        ? "Finish or cancel sign-in before changing servers."
+        ? t("server.descFinishSignIn")
         : options.hasConnectedRemoteVault
-          ? "Disconnect the current vault before changing servers."
-          : "Synch Cloud is used by default. Change this only for a self-hosted server.",
+          ? t("server.descDisconnectVault")
+          : t("server.descDefault"),
     )
     .addText((text) =>
       text
-        .setPlaceholder("Synch Cloud")
+        .setPlaceholder(t("server.default"))
         .setValue(visibleApiBaseUrl)
         .setDisabled(!options.canChangeApiBaseUrl)
         .onChange((value) => {
@@ -86,7 +87,7 @@ export function renderApiBaseUrlSetting(
     )
     .addButton((button) =>
       button
-        .setButtonText("Save")
+        .setButtonText(t("save"))
         .setDisabled(!options.canChangeApiBaseUrl)
         .onClick(async () => {
           try {
@@ -107,15 +108,15 @@ export function renderSyncStatusSetting(
   const updateStatus = controller.getPluginUpdateStatus();
   if (updateStatus.state === "update_required") {
     new Setting(containerEl)
-      .setName("Sync paused")
+      .setName(t("sync.paused"))
       .setDesc(updateStatus.message);
     return null;
   }
 
   if (!hasConnectedRemoteVault) {
     new Setting(containerEl)
-      .setName("Sync")
-      .setDesc("Connect a remote vault to start syncing.");
+      .setName(t("sync.label"))
+      .setDesc(t("sync.connectRemoteVault"));
     return null;
   }
 
@@ -127,7 +128,7 @@ export function renderSyncStatusSetting(
     );
   const initialSyncDescription = getSyncDescription();
   const syncSetting = new Setting(containerEl)
-    .setName("Sync")
+    .setName(t("sync.label"))
     .setDesc(initialSyncDescription);
   syncSetting.descEl.empty();
   const syncDescriptionEl = syncSetting.descEl.createSpan({
@@ -158,7 +159,7 @@ export function renderSyncStatusSetting(
   refreshSyncSpinner();
   syncSetting.addButton((button) =>
     button
-      .setButtonText(controller.isSyncEnabled() ? "Stop sync" : "Start sync")
+      .setButtonText(controller.isSyncEnabled() ? t("sync.stop") : t("sync.start"))
       .onClick(async () => {
         await controller.setSyncEnabled(!controller.isSyncEnabled());
       }),
@@ -166,8 +167,8 @@ export function renderSyncStatusSetting(
 
   let storageProgressBar: ProgressBarControl | null = null;
   const storageSetting = new Setting(containerEl)
-    .setName("Storage")
-    .setDesc(storageStatus ? formatStorageDescription(storageStatus) : "Checking storage usage...")
+    .setName(t("storage.label"))
+    .setDesc(storageStatus ? formatStorageDescription(storageStatus) : t("storage.checking"))
     .addProgressBar((progressBar) => {
       storageProgressBar = progressBar;
       progressBar.setValue(storageStatus ? getStoragePercent(storageStatus) : 0);
@@ -186,7 +187,7 @@ export function renderSyncStatusSetting(
       storageSetting.setDesc(
         nextStorageStatus
           ? formatStorageDescription(nextStorageStatus)
-          : "Checking storage usage...",
+          : t("storage.checking"),
       );
       storageProgressBar?.setValue(
         nextStorageStatus ? getStoragePercent(nextStorageStatus) : 0,
@@ -244,15 +245,15 @@ function createFileSizeBlockedWarningControls(
 }
 
 function formatFileSizeBlockedTooltip(blockedFileCount: number): string {
-  return `${blockedFileCount} ${blockedFileCount === 1 ? "file exceeds" : "files exceed"} the sync size limit.`;
+  return t("sync.fileSizeBlocked", { count: blockedFileCount });
 }
 
 export function renderNetworkConnectionRequiredSetting(
   containerEl: HTMLElement,
 ): void {
   new Setting(containerEl)
-    .setName("Network connection required")
-    .setDesc("Connect to the internet to check sign-in.");
+    .setName(t("network.required"))
+    .setDesc(t("network.requiredDesc"));
 }
 
 export function renderAuthenticationSetting(
@@ -262,7 +263,7 @@ export function renderAuthenticationSetting(
   refresh: RefreshSettings,
 ): void {
   const authSetting = new Setting(containerEl)
-    .setName("Authentication")
+    .setName(t("authentication"))
     .setDesc(controller.getAuthStatusLabel());
 
   if (!controller.hasAuthenticatedSession()) {
@@ -270,8 +271,8 @@ export function renderAuthenticationSetting(
       button
         .setButtonText(
           isDeviceLoginInProgress
-            ? "Open sign-in page again"
-            : "Sign in on this device",
+            ? t("auth.openSignInAgain")
+            : t("auth.signInOnThisDevice"),
         )
         .onClick(async () => {
           await controller.beginDeviceLogin();
@@ -281,7 +282,7 @@ export function renderAuthenticationSetting(
   } else {
     authSetting.addButton((button) =>
       button
-        .setButtonText("Sign out")
+        .setButtonText(t("auth.signOut"))
         .onClick(async () => {
           await controller.signOutDevice();
           refresh();
@@ -298,31 +299,31 @@ export function renderRemoteVaultSettings(
   refresh: RefreshSettings,
 ): void {
   new Setting(containerEl)
-    .setName("Vault management")
-    .setDesc("Manage remote vaults for your account.")
+    .setName(t("vault.manage"))
+    .setDesc(t("vault.manageDesc"))
     .addButton((button) =>
-      button.setButtonText("Manage remote vaults").onClick(() => {
+      button.setButtonText(t("vault.manageRemote")).onClick(() => {
         controller.openRemoteVaultManagementPage();
       }),
     );
 
   const vaultSetting = new Setting(containerEl)
-    .setName("Vault")
+    .setName(t("vault.setting"))
     .setDesc(controller.getRemoteVaultStatusLabel());
 
   if (hasConnectedRemoteVault) {
     vaultSetting.addButton((button) =>
-      button.setButtonText("Disconnect vault").onClick(async () => {
+      button.setButtonText(t("vault.disconnect")).onClick(async () => {
         await controller.disconnectRemoteVault();
         refresh();
       }),
     );
 
     new Setting(containerEl)
-      .setName("Deleted files")
-      .setDesc("Review synced files that were deleted from this vault.")
+      .setName(t("deleted.header"))
+      .setDesc(t("vault.deletedFilesDesc"))
       .addButton((button) =>
-        button.setButtonText("View deleted files").onClick(() => {
+        button.setButtonText(t("vault.viewDeletedFiles")).onClick(() => {
           new DeletedFilesModal(app, {
             listDeletedFiles: async (before, limit) =>
               await controller.listDeletedFiles(before, limit),
@@ -341,13 +342,13 @@ export function renderRemoteVaultSettings(
 
   vaultSetting
     .addButton((button) =>
-      button.setButtonText("Create vault").onClick(async () => {
+      button.setButtonText(t("vault.create")).onClick(async () => {
         await controller.createRemoteVaultFromPrompt();
         refresh();
       }),
     )
     .addButton((button) =>
-      button.setButtonText("Connect vault").onClick(async () => {
+      button.setButtonText(t("vault.connect")).onClick(async () => {
         await controller.connectRemoteVaultFromPrompt();
         refresh();
       }),
@@ -362,12 +363,12 @@ export function renderFileSyncSettings(
 ): void {
   const fileRules = controller.getSyncFileRules();
 
-  new Setting(containerEl).setName("File sync").setHeading();
+  new Setting(containerEl).setName(t("fileSync.header")).setHeading();
 
   addFileRuleToggle(
     containerEl,
-    "Images",
-    "Sync image attachments on this device.",
+    t("images"),
+    t("fileSync.imagesDesc"),
     fileRules,
     "includeImages",
     controller,
@@ -375,8 +376,8 @@ export function renderFileSyncSettings(
   );
   addFileRuleToggle(
     containerEl,
-    "Audio",
-    "Sync audio attachments on this device.",
+    t("audio"),
+    t("fileSync.audioDesc"),
     fileRules,
     "includeAudio",
     controller,
@@ -384,8 +385,8 @@ export function renderFileSyncSettings(
   );
   addFileRuleToggle(
     containerEl,
-    "Videos",
-    "Sync video attachments on this device.",
+    t("videos"),
+    t("fileSync.videosDesc"),
     fileRules,
     "includeVideos",
     controller,
@@ -394,7 +395,7 @@ export function renderFileSyncSettings(
   addFileRuleToggle(
     containerEl,
     "PDF",
-    "Sync PDF attachments on this device.",
+    t("fileSync.pdfDesc"),
     fileRules,
     "includePdf",
     controller,
@@ -402,8 +403,8 @@ export function renderFileSyncSettings(
   );
   addFileRuleToggle(
     containerEl,
-    "Other file types",
-    "Sync additional non-markdown file types on this device.",
+    t("fileSync.other"),
+    t("fileSync.otherDesc"),
     fileRules,
     "includeOtherFiles",
     controller,
@@ -411,14 +412,14 @@ export function renderFileSyncSettings(
   );
 
   new Setting(containerEl)
-    .setName("Excluded folders")
+    .setName(t("excluded.header"))
     .setDesc(
       fileRules.excludedFolders.length > 0
-        ? `${fileRules.excludedFolders.length} folder${fileRules.excludedFolders.length === 1 ? "" : "s"} excluded on this device.`
-        : "No excluded folders on this device.",
+        ? t("excluded.count", { count: fileRules.excludedFolders.length })
+        : t("excluded.none"),
     )
     .addButton((button) =>
-      button.setButtonText("Manage").onClick(() => {
+      button.setButtonText(t("manage")).onClick(() => {
         new ExcludedFoldersModal(app, {
           availableFolders: controller.listSelectableExcludedFolderPaths(),
           initialSelection: fileRules.excludedFolders,
@@ -433,9 +434,9 @@ export function renderFileSyncSettings(
   for (const folder of fileRules.excludedFolders) {
     new Setting(containerEl)
       .setName(folder)
-      .setDesc("Excluded from sync on this device.")
+      .setDesc(t("excluded.folderDesc"))
       .addButton((button) =>
-        button.setButtonText("Remove").onClick(async () => {
+        button.setButtonText(t("excluded.remove")).onClick(async () => {
           await controller.updateExcludedFolders(
             fileRules.excludedFolders.filter((value) => value !== folder),
           );
@@ -446,8 +447,7 @@ export function renderFileSyncSettings(
 
   containerEl.createEl("p", {
     cls: "synch-setting-hint",
-    text:
-      "File sync rules apply only to this device. Files already uploaded to the server are not removed automatically when you exclude them here.",
+    text: t("fileSync.hint"),
   });
 }
 

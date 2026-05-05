@@ -1,5 +1,6 @@
 import { Component, MarkdownRenderer, Modal, Setting, type App } from "obsidian";
 
+import { t } from "../i18n";
 import type { SynchVersionPreview } from "./view-models";
 
 export class VersionPreviewModal extends Modal {
@@ -17,7 +18,7 @@ export class VersionPreviewModal extends Modal {
     this.renderComponent.load();
     const { contentEl } = this;
     contentEl.empty();
-    new Setting(contentEl).setName("Version preview").setHeading();
+    new Setting(contentEl).setName(t("version.previewHeader")).setHeading();
     contentEl.createEl("div", {
       cls: "synch-preview-path",
       text: this.preview.path,
@@ -118,13 +119,13 @@ function formatPreviewMeta(preview: SynchVersionPreview): string {
 
 function formatReason(reason: NonNullable<SynchVersionPreview["reason"]>): string {
   if (reason === "before_delete") {
-    return "Before delete";
+    return t("version.beforeDelete");
   }
   if (reason === "before_restore") {
-    return "Before restore";
+    return t("version.beforeRestore");
   }
   if (reason === "manual") {
-    return "Manual";
+    return t("version.manual");
   }
   return "Auto";
 }

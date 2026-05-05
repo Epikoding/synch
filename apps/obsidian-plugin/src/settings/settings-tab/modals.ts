@@ -1,5 +1,6 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 
+import { t } from "../../i18n";
 import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
@@ -31,14 +32,14 @@ export class ExcludedFoldersModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    new Setting(contentEl).setName("Excluded folders").setHeading();
+    new Setting(contentEl).setName(t("excluded.header")).setHeading();
     contentEl.createEl("p", {
-      text: "Select folders that should never sync from this device.",
+      text: t("excluded.selectHint"),
     });
 
     if (this.options.availableFolders.length === 0) {
       contentEl.createEl("p", {
-        text: "No folders are currently available to exclude.",
+        text: t("excluded.availableEmpty"),
       });
     } else {
       for (const folder of this.options.availableFolders) {
@@ -58,12 +59,12 @@ export class ExcludedFoldersModal extends Modal {
 
     new Setting(contentEl)
       .addButton((button) =>
-        button.setButtonText("Cancel").onClick(() => {
+        button.setButtonText(t("cancel")).onClick(() => {
           this.close();
         }),
       )
       .addButton((button) =>
-        button.setButtonText("Done").setCta().onClick(() => {
+        button.setButtonText(t("done")).setCta().onClick(() => {
           void this.options.onSubmit(
             [...this.selectedFolders].sort((a, b) => a.localeCompare(b)),
           );
@@ -167,7 +168,7 @@ export class DeletedFilesModal extends Modal {
     const footerEl = contentEl.createEl("div", {
       cls: "synch-deleted-files-footer",
     });
-    new Setting(headerEl).setName("Deleted files").setHeading();
+    new Setting(headerEl).setName(t("deleted.header")).setHeading();
 
     if (this.error) {
       headerEl.createEl("p", {
@@ -180,7 +181,7 @@ export class DeletedFilesModal extends Modal {
       });
       hintRowEl.createEl("p", {
         cls: "synch-modal-hint",
-        text: "Select synced deleted files to restore.",
+        text: t("deleted.hint"),
       });
       if (this.deletedFiles.length > 0) {
         const allLoadedSelected = this.deletedFiles.every((file) =>
@@ -218,22 +219,26 @@ export class DeletedFilesModal extends Modal {
     if (this.loading) {
       listEl.createEl("p", {
         cls: "synch-modal-empty",
-        text: "Loading deleted files...",
+        text: t("deleted.loading"),
       });
     } else if (!this.error && this.deletedFiles.length === 0) {
       listEl.createEl("p", {
         cls: "synch-modal-empty",
-        text: "No synced deleted files are available to restore.",
+        text: t("deleted.empty"),
       });
     } else {
       for (const file of this.deletedFiles) {
         const previewing = this.previewingEntryId === file.entryId;
         const setting = new Setting(listEl)
           .setName(file.path)
-          .setDesc(`Deleted ${formatDeletedFileTimestamp(file.deletedAt)}`);
+          .setDesc(
+            t("deleted.deletedAt", {
+              deletedAt: formatDeletedFileTimestamp(file.deletedAt),
+            }),
+          );
         setting.addButton((button) => {
           button
-            .setButtonText(previewing ? "Loading preview..." : "Preview")
+            .setButtonText(previewing ? t("preview.loading") : t("preview"))
             .setDisabled(this.loading || previewing)
             .onClick(() => {
               void this.previewDeletedFile(file);
@@ -271,7 +276,7 @@ export class DeletedFilesModal extends Modal {
         loadMore.settingEl.addClass("synch-deleted-files-load-more");
         loadMore.addButton((button) =>
           button
-            .setButtonText("Load more")
+            .setButtonText(t("loadMore"))
             .setDisabled(this.loading)
             .onClick(() => {
               void this.loadMoreDeletedFiles();
@@ -282,7 +287,7 @@ export class DeletedFilesModal extends Modal {
 
     const selectedCount = this.selectedEntryIds.size;
     const actions = new Setting(footerEl).addButton((button) =>
-      button.setButtonText("Refresh").setDisabled(this.loading).onClick(() => {
+      button.setButtonText(t("refresh")).setDisabled(this.loading).onClick(() => {
         void this.loadDeletedFiles();
       }),
     );
@@ -291,8 +296,8 @@ export class DeletedFilesModal extends Modal {
         button
           .setButtonText(
             selectedCount > 0
-              ? `Restore selected (${selectedCount})`
-              : "Restore selected",
+              ? t("deleted.restoreSelectedCount", { count: selectedCount })
+              : t("deleted.restoreSelected"),
           )
           .setCta()
           .setDisabled(this.loading || selectedCount === 0)
@@ -301,7 +306,7 @@ export class DeletedFilesModal extends Modal {
           }),
       )
       .addButton((button) =>
-        button.setButtonText("Close").onClick(() => {
+        button.setButtonText(t("close")).onClick(() => {
           this.close();
         }),
       );
@@ -323,7 +328,9 @@ export class DeletedFilesModal extends Modal {
       result = await this.options.restoreDeletedFiles(selectedFiles);
     } catch (error) {
       new Notice(
-        `Deleted file restore failed: ${error instanceof Error ? error.message : String(error)}`,
+        t("deleted.failed", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
       );
       await this.loadDeletedFiles();
       return;
@@ -340,17 +347,17 @@ export class DeletedFilesModal extends Modal {
 
     const failed = result.failures.length;
     const restored = result.restored;
-    const parts = [`${restored} restored`];
+    const parts = [t("deleted.restoredCount", { count: restored })];
     if (failed > 0) {
-      parts.push(`${failed} failed`);
+      parts.push(t("deleted.failedCount", { count: failed }));
     }
-    new Notice(`Deleted file restore finished: ${parts.join(", ")}.`);
+    new Notice(t("deleted.finished", { summary: parts.join(", ") }));
     await this.loadDeletedFiles();
   }
 
   private showRestoreSelectionLimitNotice(): void {
     new Notice(
-      `Restore up to ${MAX_DELETED_FILES_RESTORE_SELECTION} deleted files at a time.`,
+      t("deleted.restoreLimit", { count: MAX_DELETED_FILES_RESTORE_SELECTION }),
     );
   }
 
@@ -367,7 +374,9 @@ export class DeletedFilesModal extends Modal {
       new VersionPreviewModal(this.app, preview).open();
     } catch (error) {
       new Notice(
-        `Deleted file preview failed: ${error instanceof Error ? error.message : String(error)}`,
+        t("deleted.previewFailed", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
       );
     } finally {
       this.previewingEntryId = null;

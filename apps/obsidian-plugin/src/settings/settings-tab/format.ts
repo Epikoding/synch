@@ -1,3 +1,4 @@
+import { getSynchLocale, t } from "../../i18n";
 import type { SynchSyncProgress, SynchSyncState } from "../../plugin/view-models";
 import {
   isStorageFullStatus,
@@ -13,7 +14,7 @@ export function formatSyncDescription(
   statusLabel: string,
   syncProgress: SynchSyncProgress,
 ): string {
-  const label = statusLabel.replace(/^Sync:\s*/, "").replace(/^paused \d+%$/, "paused");
+  const label = formatSyncStatusLabel(statusLabel);
   return `${label} - ${syncProgress.completedEntries} / ${syncProgress.totalEntries}`;
 }
 
@@ -22,13 +23,35 @@ export function formatStorageDescription(
 ): string {
   const usage = formatStorageUsage(storageStatus);
   if (isStorageFullStatus(storageStatus)) {
-    return `Storage full: ${usage}`;
+    return t("storage.full", { usage });
   }
   if (isStorageWarningStatus(storageStatus)) {
-    return `Storage almost full: ${usage}`;
+    return t("storage.warning", { usage });
   }
 
   return usage;
+}
+
+function formatSyncStatusLabel(statusLabel: string): string {
+  const label = statusLabel
+    .replace(/^Sync:\s*/, "")
+    .replace(/^동기화:\s*/, "")
+    .replace(/^paused \d+%$/, "paused")
+    .replace(/^일시 중지됨 \d+%$/, t("sync.state.paused"));
+
+  if (getSynchLocale() !== "ko") {
+    return label;
+  }
+
+  const translated = label
+    .replace(/^not ready/, t("sync.state.not_ready"))
+    .replace(/^paused/, t("sync.state.paused"))
+    .replace(/^syncing/, t("sync.state.syncing"))
+    .replace(/^offline/, t("sync.state.offline"))
+    .replace(/^reconnecting/, t("sync.state.reconnecting"))
+    .replace(/^up to date/, t("sync.state.up_to_date"))
+    .replace(/^attention needed/, t("sync.state.attention_needed"));
+  return translated;
 }
 
 function formatStorageUsage(

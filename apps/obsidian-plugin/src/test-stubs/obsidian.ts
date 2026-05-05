@@ -1,6 +1,7 @@
 type RequestUrlMock = (input: unknown) => Promise<unknown>;
 
 let requestUrlMock: RequestUrlMock | null = null;
+let language = "en";
 const buttonComponents: MockButtonComponent[] = [];
 const textComponents: MockTextComponent[] = [];
 const toggleComponents: MockToggleComponent[] = [];
@@ -465,6 +466,14 @@ export function setRequestUrlMock(mock: RequestUrlMock): void {
   requestUrlMock = mock;
 }
 
+export function getLanguage(): string {
+  return language;
+}
+
+export function setLanguage(value: string): void {
+  language = value;
+}
+
 export function getButtonComponents(): MockButtonComponent[] {
   return [...buttonComponents];
 }
@@ -522,6 +531,7 @@ export function getNotices(): Array<{ message: string; timeout?: number }> {
 
 export function resetObsidianMocks(): void {
   requestUrlMock = null;
+  language = "en";
   buttonComponents.length = 0;
   textComponents.length = 0;
   toggleComponents.length = 0;

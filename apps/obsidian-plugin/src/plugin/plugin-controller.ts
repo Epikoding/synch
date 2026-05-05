@@ -1,6 +1,7 @@
 import { Notice, type Plugin, TFolder } from "obsidian";
 
 import { isOfflineLikeError } from "../http/network-status";
+import { t } from "../i18n";
 import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -254,7 +255,7 @@ export class SynchPluginController implements SynchSettingsController {
 
   getSyncStatusLabel(): string {
     if (this.isPluginUpdateRequired()) {
-      return "Plugin update required.";
+      return t("plugin.updateRequiredStatus");
     }
 
     return this.syncController.getSyncStatusLabel();
