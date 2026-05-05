@@ -5,6 +5,11 @@ import { DEFAULT_SYNC_FILE_RULES } from "../sync/core/file-rules";
 import { SyncController } from "../sync/runtime/controller";
 import { SYNCH_SETTINGS_KEY, type SynchPluginSettings } from "../settings/schema";
 import { SynchPluginController } from "./plugin-controller";
+import {
+  createConnectedPlugin,
+  mockOnlineReadinessRequests,
+  storedConnection,
+} from "./__tests__/readiness-helpers";
 
 const TestPlugin = Plugin as unknown as new () => Plugin;
 
@@ -39,11 +44,14 @@ describe("SynchPluginController sync enabled setting", () => {
   });
 
   it("starts the existing auto sync flow when sync is enabled", async () => {
-    const plugin = createPluginWithSettings({
-      apiBaseUrl: "http://127.0.0.1:8787",
-      fileRules: DEFAULT_SYNC_FILE_RULES,
+    const plugin = await createConnectedPlugin({
       syncEnabled: false,
     });
+    mockOnlineReadinessRequests();
+    vi.spyOn(SyncController.prototype, "readStoredConnection").mockResolvedValue(
+      storedConnection(),
+    );
+    vi.spyOn(SyncController.prototype, "initializeStore").mockResolvedValue();
     const ensureAutoSyncState = vi
       .spyOn(SyncController.prototype, "ensureAutoSyncState")
       .mockResolvedValue();

@@ -1,7 +1,7 @@
 import { Notice, type Plugin, TFolder } from "obsidian";
 
 import { isOfflineLikeError } from "../http/network-status";
-import { AuthManager } from "../auth/manager";
+import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
 import { SynchSettingsStore } from "../settings/store";
@@ -152,7 +152,6 @@ export class SynchPluginController implements SynchSettingsController {
     this.storedRemoteVaultKeySecret = await readStoredRemoteVaultKeySecret(this.plugin);
     this.storedSyncConnection = await this.syncController.readStoredConnection();
     await this.authManager.initialize();
-    await this.tryRestorePersistedRemoteVaultSession();
   }
 
   async stop(): Promise<void> {
@@ -164,14 +163,9 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   ensureAutoSyncState(): Promise<void> {
-    if (!this.isSyncEnabled()) {
-      this.syncController.stopAutoSyncAndMarkPaused();
-      return Promise.resolve();
-    }
-
-    // If sync is paused while startup is in flight, this can still finish and
-    // restart auto sync; gate or cancel the startup before relying on pause.
-    return this.syncController.ensureAutoSyncState();
+    // Startup and reconnect both pass through this readiness pipeline so that
+    // offline auth verification, vault restore, and sync startup stay ordered.
+    return this.reconcileReadiness();
   }
 
   queueAutoSyncResume(): void {
@@ -214,6 +208,10 @@ export class SynchPluginController implements SynchSettingsController {
 
   getAuthStatusLabel(): string {
     return this.authManager.getAuthStatusLabel();
+  }
+
+  getAuthReadiness(): AuthReadiness {
+    return this.authManager.getReadiness();
   }
 
   hasAuthenticatedSession(): boolean {
@@ -265,7 +263,7 @@ export class SynchPluginController implements SynchSettingsController {
     if (changed) {
       this.refreshUi();
     }
-    await this.syncController.ensureAutoSyncState();
+    await this.ensureAutoSyncState();
   }
 
   getStorageStatus(): SynchStorageStatus | null {
@@ -341,9 +339,6 @@ export class SynchPluginController implements SynchSettingsController {
 
     try {
       loginStarted = await this.authManager.beginDeviceLogin();
-      if (loginStarted) {
-        await this.tryRestorePersistedRemoteVaultSession();
-      }
     } finally {
       if (loginStarted) {
         this.syncTokenManager.clear();
@@ -469,35 +464,57 @@ export class SynchPluginController implements SynchSettingsController {
     this.refreshUi();
   }
 
-  private async tryRestorePersistedRemoteVaultSession(): Promise<void> {
-    try {
-      await this.remoteVaultManager.restorePersistedRemoteVaultSession();
-      await this.initializeSyncStoreForActiveRemoteVault();
-    } catch (error) {
-      this.notifyUnlessOffline(error, "Vault restore failed");
-    }
+  private async resumeAutoSyncWhenPossible(): Promise<void> {
+    await this.runReadyAutoSync(() => this.syncController.resumeAutoSync());
   }
 
-  private async resumeAutoSyncWhenPossible(): Promise<void> {
+  private async reconcileReadiness(): Promise<void> {
+    await this.runReadyAutoSync(() => this.syncController.ensureAutoSyncState());
+  }
+
+  private async runReadyAutoSync(startAutoSync: () => Promise<void>): Promise<void> {
+    const authReadiness = await this.authManager.refreshReadiness();
+
+    if (authReadiness.state === "pending_network") {
+      this.syncController.markOffline();
+      return;
+    }
+
+    if (authReadiness.state !== "verified") {
+      if (!this.isSyncEnabled()) {
+        this.syncController.stopAutoSyncAndMarkPaused();
+        return;
+      }
+
+      this.syncController.stopAutoSyncAndMarkNotReady();
+      return;
+    }
+
+    try {
+      await this.ensureActiveRemoteVaultStore();
+    } catch (error) {
+      this.notifyUnlessOffline(error, "Vault restore failed");
+      return;
+    }
+
     if (!this.isSyncEnabled()) {
       this.syncController.stopAutoSyncAndMarkPaused();
       return;
     }
 
-    await this.restoreOfflineSessionBeforeResume();
-    await this.syncController.resumeAutoSync();
+    await startAutoSync();
   }
 
-  private async restoreOfflineSessionBeforeResume(): Promise<void> {
-    if (
-      this.getSyncState() !== "offline" ||
-      this.hasActiveRemoteVaultSession() ||
-      !this.hasConnectedRemoteVault()
-    ) {
+  private async ensureActiveRemoteVaultStore(): Promise<void> {
+    if (!this.hasActiveRemoteVaultSession()) {
+      await this.remoteVaultManager.restoreStoredSessionIfNeeded();
+    }
+
+    if (!this.hasActiveRemoteVaultSession() || this.syncController.hasStore()) {
       return;
     }
 
-    await this.tryRestorePersistedRemoteVaultSession();
+    await this.initializeSyncStoreForActiveRemoteVault();
   }
 
   private notifyUnlessOffline(error: unknown, prefix: string): void {

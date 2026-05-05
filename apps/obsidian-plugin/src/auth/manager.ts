@@ -3,6 +3,11 @@ import { Notice } from "obsidian";
 import type { Plugin } from "obsidian";
 
 import {
+  isOffline as detectOffline,
+  isOfflineLikeError,
+  type OfflineDetector,
+} from "../http/network-status";
+import {
   AuthClient,
   type AuthenticatedUserSession,
   type DeviceAuthorizationPollResult,
@@ -14,6 +19,12 @@ import {
   writeAuthSessionToken,
 } from "./storage";
 
+export type AuthReadiness =
+  | { state: "anonymous" }
+  | { state: "verified"; token: string }
+  | { state: "pending_network"; token: string }
+  | { state: "rejected"; token: string };
+
 export interface AuthManagerDeps {
   plugin: Plugin;
   getApiBaseUrl: () => string;
@@ -22,12 +33,14 @@ export interface AuthManagerDeps {
   notify?: (message: string) => void;
   openExternalUrl?: (url: string) => void;
   delay?: (ms: number) => Promise<void>;
+  isOffline?: OfflineDetector;
 }
 
 export class AuthManager {
   private authSessionToken = "";
   private authSessionVerified = false;
   private authNeedsRelogin = false;
+  private authPendingNetworkVerification = false;
   private authDisplayName = "";
   private readonly authClient: AuthClient;
   private deviceLoginInFlight = false;
@@ -44,7 +57,7 @@ export class AuthManager {
       return;
     }
 
-    await this.refreshIdentity();
+    await this.refreshReadiness();
   }
 
   getAuthSessionToken(): string {
@@ -53,6 +66,10 @@ export class AuthManager {
 
   getAuthStatusLabel(): string {
     if (!this.hasAuthenticatedSession()) {
+      if (this.authPendingNetworkVerification) {
+        return "Connect to the internet to check sign-in.";
+      }
+
       if (this.authNeedsRelogin) {
         return "Sign in again to sync.";
       }
@@ -69,6 +86,54 @@ export class AuthManager {
 
   hasAuthenticatedSession(): boolean {
     return this.authSessionVerified;
+  }
+
+  getReadiness(): AuthReadiness {
+    const token = this.authSessionToken.trim();
+    if (!token) {
+      return { state: "anonymous" };
+    }
+
+    if (this.authSessionVerified) {
+      return { state: "verified", token };
+    }
+
+    if (this.authPendingNetworkVerification) {
+      return { state: "pending_network", token };
+    }
+
+    if (this.authNeedsRelogin) {
+      return { state: "rejected", token };
+    }
+
+    return { state: "pending_network", token };
+  }
+
+  async refreshReadiness(): Promise<AuthReadiness> {
+    const token = this.authSessionToken.trim();
+    if (!token) {
+      this.authSessionVerified = false;
+      this.authNeedsRelogin = false;
+      this.authPendingNetworkVerification = false;
+      this.authDisplayName = "";
+      return { state: "anonymous" };
+    }
+
+    if (this.authSessionVerified) {
+      return { state: "verified", token };
+    }
+
+    if (detectOffline(this.deps.isOffline)) {
+      this.markAuthPendingNetworkVerification();
+      return this.getReadiness();
+    }
+
+    if (this.authNeedsRelogin) {
+      return { state: "rejected", token };
+    }
+
+    await this.refreshIdentity();
+    return this.getReadiness();
   }
 
   isDeviceLoginInProgress(): boolean {
@@ -240,7 +305,12 @@ export class AuthManager {
       }
 
       this.applyVerifiedSession(session);
-    } catch {
+    } catch (error) {
+      if (isOfflineLikeError(error, this.deps.isOffline)) {
+        this.markAuthPendingNetworkVerification();
+        return;
+      }
+
       this.markAuthNeedsRelogin();
     } finally {
       this.deps.refreshUi();
@@ -250,12 +320,21 @@ export class AuthManager {
   private applyVerifiedSession(session: AuthenticatedUserSession): void {
     this.authSessionVerified = true;
     this.authNeedsRelogin = false;
+    this.authPendingNetworkVerification = false;
     this.authDisplayName = session.email || session.name || "";
+  }
+
+  private markAuthPendingNetworkVerification(): void {
+    this.authSessionVerified = false;
+    this.authNeedsRelogin = false;
+    this.authPendingNetworkVerification = true;
+    this.authDisplayName = "";
   }
 
   private markAuthNeedsRelogin(): void {
     this.authSessionVerified = false;
     this.authNeedsRelogin = true;
+    this.authPendingNetworkVerification = false;
     this.authDisplayName = "";
   }
 
@@ -263,6 +342,7 @@ export class AuthManager {
     this.authSessionToken = "";
     this.authSessionVerified = false;
     this.authNeedsRelogin = false;
+    this.authPendingNetworkVerification = false;
     this.authDisplayName = "";
     await clearAuthSessionToken(this.deps.plugin);
   }

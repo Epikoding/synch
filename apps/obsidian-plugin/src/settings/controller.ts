@@ -1,3 +1,4 @@
+import type { AuthReadiness } from "../auth/manager";
 import type {
   SynchDeletedFile,
   SynchFileRules,
@@ -12,6 +13,7 @@ export interface SynchSettingsController {
   getPluginUpdateStatus(): SynchPluginUpdateStatus;
   ensurePluginUpdateCheck(): Promise<void>;
   retryPluginUpdateCheck(): Promise<void>;
+  getAuthReadiness(): AuthReadiness;
   getAuthStatusLabel(): string;
   getSyncState(): SynchSyncState;
   getSyncStatusLabel(): string;

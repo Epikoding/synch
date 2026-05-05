@@ -74,6 +74,93 @@ describe("AuthManager", () => {
     await expect(readAuthSessionToken(plugin)).resolves.toBe("expired-token");
   });
 
+  it("keeps a stored token pending when session lookup fails offline", async () => {
+    const plugin = new Plugin();
+    await writeAuthSessionToken(plugin, "offline-token");
+    const manager = createManager({
+      plugin,
+      authClient: {
+        getAuthenticatedUser: vi.fn(async () => {
+          throw new Error("Failed to fetch");
+        }),
+      } as unknown as AuthClient,
+    });
+
+    await manager.initialize();
+
+    expect(manager.hasAuthenticatedSession()).toBe(false);
+    expect(manager.getReadiness()).toEqual({
+      state: "pending_network",
+      token: "offline-token",
+    });
+    expect(manager.getAuthSessionToken()).toBe("offline-token");
+    expect(manager.getAuthStatusLabel()).toBe(
+      "Connect to the internet to check sign-in.",
+    );
+    await expect(readAuthSessionToken(plugin)).resolves.toBe("offline-token");
+  });
+
+  it("does not look up the stored session while the device is offline", async () => {
+    const plugin = new Plugin();
+    await writeAuthSessionToken(plugin, "offline-token");
+    const getAuthenticatedUser = vi.fn(async () => ({
+      userId: "user-1",
+      email: "user@example.com",
+      name: "User One",
+    }));
+    const manager = createManager({
+      plugin,
+      authClient: {
+        getAuthenticatedUser,
+      } as unknown as AuthClient,
+      isOffline: () => true,
+    });
+
+    await manager.initialize();
+
+    expect(getAuthenticatedUser).not.toHaveBeenCalled();
+    expect(manager.getReadiness()).toEqual({
+      state: "pending_network",
+      token: "offline-token",
+    });
+    expect(manager.getAuthStatusLabel()).toBe(
+      "Connect to the internet to check sign-in.",
+    );
+  });
+
+  it("verifies a pending offline token when readiness refresh succeeds", async () => {
+    const plugin = new Plugin();
+    await writeAuthSessionToken(plugin, "recover-token");
+    const getAuthenticatedUser = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Failed to fetch"))
+      .mockResolvedValueOnce({
+        userId: "user-1",
+        email: "user@example.com",
+        name: "User One",
+      });
+    const manager = createManager({
+      plugin,
+      authClient: {
+        getAuthenticatedUser,
+      } as unknown as AuthClient,
+    });
+
+    await manager.initialize();
+    await expect(manager.refreshReadiness()).resolves.toEqual({
+      state: "verified",
+      token: "recover-token",
+    });
+
+    expect(getAuthenticatedUser).toHaveBeenCalledTimes(2);
+    expect(manager.hasAuthenticatedSession()).toBe(true);
+    expect(manager.getReadiness()).toEqual({
+      state: "verified",
+      token: "recover-token",
+    });
+    expect(manager.getAuthStatusLabel()).toBe("Signed in as user@example.com.");
+  });
+
   it("reopens the active device authorization instead of starting another one", async () => {
     const authorization = createAuthorization();
     const delay = createDeferred<void>();
@@ -210,6 +297,7 @@ function createManager(
     notify: (message: string) => void;
     openExternalUrl: (url: string) => void;
     refreshUi: () => void;
+    isOffline: () => boolean;
   }> = {},
 ): AuthManager {
   return new AuthManager({
@@ -220,6 +308,7 @@ function createManager(
     notify: overrides.notify ?? vi.fn(),
     openExternalUrl: overrides.openExternalUrl ?? vi.fn(),
     delay: overrides.delay,
+    isOffline: overrides.isOffline,
   });
 }
 

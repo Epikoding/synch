@@ -177,6 +177,10 @@ export class SyncController {
     return this.storageStatus;
   }
 
+  hasStore(): boolean {
+    return this.syncEngine.hasStore();
+  }
+
   watchStorageStatus(): void {
     this.syncEngine.setStorageStatusWatching(true);
   }

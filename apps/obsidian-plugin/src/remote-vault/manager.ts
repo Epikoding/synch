@@ -91,7 +91,7 @@ export class RemoteVaultManager {
     }
   }
 
-  async restorePersistedRemoteVaultSession(): Promise<void> {
+  async restoreStoredSessionIfNeeded(): Promise<void> {
     if (this.session || !this.deps.hasAuthenticatedSession()) {
       return;
     }

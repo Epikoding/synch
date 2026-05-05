@@ -122,6 +122,14 @@ export function renderSyncStatusSetting(
   }
 }
 
+export function renderNetworkConnectionRequiredSetting(
+  containerEl: HTMLElement,
+): void {
+  new Setting(containerEl)
+    .setName("Network connection required")
+    .setDesc("Connect to the internet to check sign-in.");
+}
+
 export function renderAuthenticationSetting(
   containerEl: HTMLElement,
   controller: SynchSettingsController,

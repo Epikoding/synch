@@ -5,6 +5,7 @@ import {
   renderApiBaseUrlSetting,
   renderAuthenticationSetting,
   renderFileSyncSettings,
+  renderNetworkConnectionRequiredSetting,
   renderRemoteVaultSettings,
   renderSettingsHeading,
   renderSyncStatusSetting,
@@ -44,6 +45,7 @@ export class SynchSettingTab extends PluginSettingTab {
     containerEl.empty();
     const hasConnectedRemoteVault = this.controller.hasConnectedRemoteVault();
     const hasAuthenticatedSession = this.controller.hasAuthenticatedSession();
+    const authReadiness = this.controller.getAuthReadiness();
     const isDeviceLoginInProgress = this.controller.isDeviceLoginInProgress();
     const canChangeApiBaseUrl =
       !hasAuthenticatedSession &&
@@ -52,6 +54,11 @@ export class SynchSettingTab extends PluginSettingTab {
 
     void this.controller.ensurePluginUpdateCheck();
     renderSettingsHeading(containerEl, this.controller);
+
+    if (authReadiness.state === "pending_network") {
+      renderNetworkConnectionRequiredSetting(containerEl);
+      return;
+    }
 
     if (hasAuthenticatedSession) {
       renderSyncStatusSetting(containerEl, this.controller, hasConnectedRemoteVault);

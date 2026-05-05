@@ -11,6 +11,7 @@ export function createSettingsTab(
   overrides: Partial<SynchSettingsController> = {},
 ): SynchSettingTab {
   const controller: SynchSettingsController = {
+    getAuthReadiness: () => ({ state: "anonymous" }),
     getAuthStatusLabel: () => "Not signed in.",
     getSyncState: () => "not_ready",
     getSyncStatusLabel: () => "Sync: not ready 0%",

@@ -62,6 +62,26 @@ describe("SynchSettingTab", () => {
     expect(getProgressBarComponents()).toEqual([]);
   });
 
+  it("only asks for network connection when stored sign-in needs online verification", () => {
+    const tab = createSettingsTab({
+      getAuthReadiness: () => ({
+        state: "pending_network",
+        token: "stored-token",
+      }),
+      getAuthStatusLabel: () => "Connect to the internet to check sign-in.",
+      hasAuthenticatedSession: () => false,
+    });
+
+    tab.display();
+
+    expect(getSettingNames()).toEqual(["Synch", "Network connection required"]);
+    expect(getSettingDescriptions()).toContain(
+      "Connect to the internet to check sign-in.",
+    );
+    expect(getButtonComponents()).toEqual([]);
+    expect(getTextComponents()).toEqual([]);
+  });
+
   it("checks and shows plugin updates on the right side of the settings heading only when needed", () => {
     const ensurePluginUpdateCheck = vi.fn(async () => {});
     const tab = createSettingsTab({

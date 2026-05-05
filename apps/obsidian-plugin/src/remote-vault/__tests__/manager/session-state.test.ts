@@ -58,7 +58,7 @@ describe("RemoteVaultManager session state", () => {
       },
     });
 
-    await manager.restorePersistedRemoteVaultSession();
+    await manager.restoreStoredSessionIfNeeded();
 
     expect(manager.getActiveSession()?.summary.vaultId).toBe("vault-restored");
     expect(manager.getActiveSession()?.summary.vaultName).toBe("Restored");
