@@ -92,6 +92,14 @@ export type SynchVersionPreview =
       text: string;
     }
   | {
+      status: "image";
+      path: string;
+      reason: SynchEntryVersion["reason"];
+      capturedAt: number;
+      mimeType: string;
+      bytes: Uint8Array;
+    }
+  | {
       status: "unavailable";
       path: string;
       reason: SynchEntryVersion["reason"] | null;

@@ -235,6 +235,50 @@ describe("SyncVersionHistoryService", () => {
     await store.close();
   });
 
+  it("previews an active image version as verified image bytes", async () => {
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    await store.upsertEntry({
+      entryId: "entry-active",
+      path: "Images/photo.png",
+      revision: 3,
+      blobId: "blob-current",
+      hash: "hash-current",
+      deleted: false,
+      updatedAt: 30,
+      localMtime: null,
+      localSize: null,
+    });
+    const bytes = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01,
+    ]);
+    const version = await createEntryVersion({
+      entryId: "entry-active",
+      sourceRevision: 2,
+      versionId: "version-old",
+      path: "Images/photo.png",
+      bytes,
+    });
+    const pullClient = createPullClient({
+      "blob-old": await encryptSyncBlob(TEST_VAULT_KEY, bytes, {
+        blobId: "blob-old",
+      }),
+    });
+    const service = createService(store, { pullClient });
+
+    await expect(
+      service.previewEntryVersionForPath("Images/photo.png", version),
+    ).resolves.toEqual({
+      status: "image",
+      path: "Images/photo.png",
+      reason: "before_delete",
+      capturedAt: 200,
+      mimeType: "image/png",
+      bytes,
+    });
+
+    await store.close();
+  });
+
   it("previews a deleted file from its newest upsert version", async () => {
     const store = await createInitializedTestSyncStore(createTestPlugin());
     await store.upsertEntry({
@@ -596,6 +640,7 @@ async function createEntryVersion(input: {
   versionId: string;
   path?: string;
   body?: string;
+  bytes?: Uint8Array;
 }): Promise<{
   versionId: string;
   sourceRevision: number;
@@ -606,6 +651,7 @@ async function createEntryVersion(input: {
   capturedAt: number;
 }> {
   const body = input.body ?? "old body";
+  const bytes = input.bytes ?? new TextEncoder().encode(body);
   return {
     versionId: input.versionId,
     sourceRevision: input.sourceRevision,
@@ -615,7 +661,7 @@ async function createEntryVersion(input: {
       TEST_VAULT_KEY,
       {
         path: input.path ?? "Folder/active.md",
-        hash: await hashBytes(new TextEncoder().encode(body)),
+        hash: await hashBytes(bytes),
       },
       {
         entryId: input.entryId,

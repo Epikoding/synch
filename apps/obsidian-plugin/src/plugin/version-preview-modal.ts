@@ -4,6 +4,7 @@ import type { SynchVersionPreview } from "./view-models";
 
 export class VersionPreviewModal extends Modal {
   private readonly renderComponent = new Component();
+  private imageObjectUrl: string | null = null;
 
   constructor(
     app: App,
@@ -38,6 +39,24 @@ export class VersionPreviewModal extends Modal {
       return;
     }
 
+    if (this.preview.status === "image") {
+      this.imageObjectUrl = URL.createObjectURL(
+        new Blob([copyToArrayBuffer(this.preview.bytes)], {
+          type: this.preview.mimeType,
+        }),
+      );
+      const previewEl = contentEl.createEl("div", {
+        cls: "synch-preview-content synch-preview-image",
+      });
+      previewEl.createEl("img", {
+        attr: {
+          alt: this.preview.path,
+          src: this.imageObjectUrl,
+        },
+      });
+      return;
+    }
+
     const previewText = this.preview.text;
     if (isMarkdownPath(this.preview.path)) {
       const previewEl = contentEl.createEl("div", {
@@ -68,12 +87,22 @@ export class VersionPreviewModal extends Modal {
 
   onClose(): void {
     this.renderComponent.unload();
+    if (this.imageObjectUrl) {
+      URL.revokeObjectURL(this.imageObjectUrl);
+      this.imageObjectUrl = null;
+    }
   }
 }
 
 function isMarkdownPath(path: string): boolean {
   const lowerPath = path.toLowerCase();
   return lowerPath.endsWith(".md") || lowerPath.endsWith(".markdown");
+}
+
+function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 function formatPreviewMeta(preview: SynchVersionPreview): string {

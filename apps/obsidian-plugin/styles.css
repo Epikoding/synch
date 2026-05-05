@@ -198,6 +198,21 @@
   white-space: pre-wrap;
 }
 
+.synch-preview-image {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.synch-preview-image img {
+  display: block;
+  height: auto;
+  max-height: calc(min(60vh, 34rem) - 1rem);
+  max-width: 100%;
+  object-fit: contain;
+}
+
 .synch-vault-list {
   display: grid;
   gap: 0.5rem;

@@ -2,6 +2,8 @@
 
 ## Added
 
+- Preview image file versions from version history.
+
 ## Changed
 
 ## Fixed
