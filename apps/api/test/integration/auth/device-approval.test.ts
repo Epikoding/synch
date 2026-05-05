@@ -130,6 +130,7 @@ describe("auth device approval integration", () => {
 			expiresAt: number;
 			vaultId: string;
 			localVaultId: string;
+			syncFormatVersion: number;
 		}>("/v1/sync/token", {
 			method: "POST",
 			headers: {
@@ -144,5 +145,6 @@ describe("auth device approval integration", () => {
 		expect(syncTokenResponse.response.status).toBe(200);
 		expect(syncTokenResponse.json?.token).toBeTruthy();
 		expect(syncTokenResponse.json?.vaultId).toBe(vaultId);
+		expect(syncTokenResponse.json?.syncFormatVersion).toBe(1);
 	});
 });

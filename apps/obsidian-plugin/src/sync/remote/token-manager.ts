@@ -2,6 +2,7 @@ import type { SyncTokenResponse } from "./client";
 import { SyncAccessClient } from "./client";
 
 const REFRESH_SKEW_SECONDS = 15;
+const SUPPORTED_SYNC_FORMAT_VERSIONS = new Set([1]);
 
 export interface SyncTokenManagerDeps {
   getApiBaseUrl: () => string;
@@ -48,6 +49,7 @@ export class SyncTokenManager {
         localVaultId,
       },
     );
+    assertSupportedSyncFormatVersion(issued.syncFormatVersion);
 
     this.cachedToken = issued;
     return issued;
@@ -72,5 +74,11 @@ export class SyncTokenManager {
   private nowSeconds(): number {
     const now = this.deps.now ?? Date.now;
     return Math.floor(now() / 1000);
+  }
+}
+
+function assertSupportedSyncFormatVersion(syncFormatVersion: number): void {
+  if (!SUPPORTED_SYNC_FORMAT_VERSIONS.has(syncFormatVersion)) {
+    throw new Error(`Unsupported sync format version: ${syncFormatVersion}.`);
   }
 }

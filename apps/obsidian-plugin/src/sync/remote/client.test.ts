@@ -21,6 +21,7 @@ describe("SyncAccessClient", () => {
           expiresAt: 1_700_000_120,
           vaultId: "vault-1",
           localVaultId: "local-vault-1",
+          syncFormatVersion: 1,
         },
       };
     });
@@ -53,6 +54,7 @@ describe("SyncAccessClient", () => {
       expiresAt: 1_700_000_120,
       vaultId: "vault-1",
       localVaultId: "local-vault-1",
+      syncFormatVersion: 1,
     });
   });
 

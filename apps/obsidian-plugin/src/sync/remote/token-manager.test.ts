@@ -10,6 +10,7 @@ describe("SyncTokenManager", () => {
       expiresAt: 1_000 + 120,
       vaultId: "vault-1",
       localVaultId: "local-vault-1",
+      syncFormatVersion: 1,
     }));
     const manager = createManager({
       now: () => 1_000_000,
@@ -37,6 +38,7 @@ describe("SyncTokenManager", () => {
       expiresAt: 1_120,
       vaultId: "vault-1",
       localVaultId: "local-vault-1",
+      syncFormatVersion: 1,
     }));
     const manager = createManager({
       now: () => 1_000_000,
@@ -59,12 +61,14 @@ describe("SyncTokenManager", () => {
         expiresAt: 1_010,
         vaultId: "vault-1",
         localVaultId: "local-vault-1",
+        syncFormatVersion: 1,
       });
     issueSyncToken.mockResolvedValueOnce({
         token: "sync-token-2",
         expiresAt: 1_120,
         vaultId: "vault-1",
         localVaultId: "local-vault-1",
+        syncFormatVersion: 1,
       });
 
     const manager = createManager({
@@ -93,6 +97,7 @@ describe("SyncTokenManager", () => {
       expiresAt: 1_120,
       vaultId: input.vaultId,
       localVaultId: input.localVaultId,
+      syncFormatVersion: 1,
     }));
     const manager = createManager({
       getRemoteVaultId: () => vaultId,
@@ -122,6 +127,7 @@ describe("SyncTokenManager", () => {
       expiresAt: 1_120,
       vaultId: input.vaultId,
       localVaultId: input.localVaultId,
+      syncFormatVersion: 1,
     }));
     const manager = createManager({
       getLocalVaultId: async () => localVaultId,
@@ -147,6 +153,7 @@ describe("SyncTokenManager", () => {
         expiresAt: 1_120,
         vaultId: "vault-1",
         localVaultId: "local-vault-1",
+        syncFormatVersion: 1,
       });
     const manager = createManager({
       now: () => 1_000_000,
@@ -160,6 +167,24 @@ describe("SyncTokenManager", () => {
     await manager.getTokenForActiveRemoteVault();
 
     expect(issueSyncToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects unsupported sync format versions from issued tokens", async () => {
+    const manager = createManager({
+      syncAccessClient: {
+        issueSyncToken: vi.fn(async (): Promise<SyncTokenResponse> => ({
+          token: "sync-token",
+          expiresAt: 1_120,
+          vaultId: "vault-1",
+          localVaultId: "local-vault-1",
+          syncFormatVersion: 2,
+        })),
+      } as SyncAccessClient,
+    });
+
+    await expect(manager.getTokenForActiveRemoteVault()).rejects.toThrow(
+      "Unsupported sync format version: 2.",
+    );
   });
 
   it("rejects when there is no auth session", async () => {

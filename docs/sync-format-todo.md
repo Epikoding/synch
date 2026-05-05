@@ -19,7 +19,7 @@ binary blob envelope from the start.
 Implementation notes:
 
 - Store the selected sync/crypto format version on the remote vault record.
-- Return that format version when a plugin connects to or issues a sync token for a vault.
+- Return that format version when a plugin issues a sync token for a vault.
 - Branch encryption by vault format, not plugin version.
 - Keep v1 decrypt support so existing vaults and cached blobs remain readable.
 - Start with binary blob envelopes only; metadata envelopes can stay v1 unless there is a separate reason to change them.

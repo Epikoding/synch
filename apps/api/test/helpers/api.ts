@@ -94,6 +94,7 @@ type IssueTokenResponse = {
 	expiresAt: number;
 	vaultId: string;
 	localVaultId: string;
+	syncFormatVersion: number;
 };
 
 const TEST_ORIGIN = process.env.BETTER_AUTH_URL;
@@ -235,6 +236,9 @@ export async function issueSyncToken(
 
 	if (!issued.json?.token) {
 		throw new Error("sync token response is missing token");
+	}
+	if (issued.json.syncFormatVersion !== 1) {
+		throw new Error("sync token response has an unexpected sync format version");
 	}
 
 	return issued.json;

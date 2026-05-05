@@ -4,6 +4,15 @@ import type { SyncTokenClaims } from "./token";
 import { SyncTokenService } from "./token-service";
 
 const DEFAULT_SYNC_TOKEN_TTL_SECONDS = 120;
+const CURRENT_SYNC_FORMAT_VERSION = 1;
+
+export type SyncTokenIssueResponse = {
+	token: string;
+	expiresAt: number;
+	vaultId: string;
+	localVaultId: string;
+	syncFormatVersion: number;
+};
 
 export class SyncService {
 	private readonly syncTokenTtlSeconds: number;
@@ -19,7 +28,7 @@ export class SyncService {
 	async issueSyncToken(
 		session: { userId: string },
 		input: { vaultId: string; localVaultId: string },
-	): Promise<{ token: string; expiresAt: number; vaultId: string; localVaultId: string }> {
+	): Promise<SyncTokenIssueResponse> {
 		if (!(await this.vaultService.userCanAccessVault(session.userId, input.vaultId))) {
 			throw apiError(403, "forbidden", "vault access denied");
 		}
@@ -41,6 +50,7 @@ export class SyncService {
 			expiresAt: claims.exp,
 			vaultId: claims.vaultId,
 			localVaultId: claims.localVaultId,
+			syncFormatVersion: CURRENT_SYNC_FORMAT_VERSION,
 		};
 	}
 }

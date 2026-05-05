@@ -335,6 +335,7 @@ describe("vault integration", () => {
 			expiresAt: number;
 			vaultId: string;
 			localVaultId: string;
+			syncFormatVersion: number;
 		}>("/v1/sync/token", {
 			method: "POST",
 			headers: {
@@ -350,6 +351,7 @@ describe("vault integration", () => {
 		expect(issued.response.status).toBe(200);
 		expect(issued.json?.vaultId).toBe(primary.vaultId);
 		expect(issued.json?.token).toBeTruthy();
+		expect(issued.json?.syncFormatVersion).toBe(1);
 
 		const bootstrap = await jsonRequest<{
 			wrappers: Array<{ kind: string; userId: string | null }>;

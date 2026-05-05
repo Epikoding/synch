@@ -18,6 +18,7 @@ export function createToken(): SyncTokenResponse {
     expiresAt: 1_000,
     vaultId: "vault-1",
     localVaultId: "local-vault-1",
+    syncFormatVersion: 1,
   };
 }
 

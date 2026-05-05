@@ -709,6 +709,7 @@ function createService(
       token: "sync-token",
       vaultId: "vault-1",
       localVaultId: "local-vault-1",
+      syncFormatVersion: 1,
       expiresAt: Date.now() + 60_000,
     }),
     getStore: () => store,

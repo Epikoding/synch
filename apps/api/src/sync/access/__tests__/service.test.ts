@@ -13,6 +13,31 @@ import { SyncService } from "../service";
 import type { SyncTokenService } from "../token-service";
 
 describe("SyncService", () => {
+	it("includes the sync format version in issued token responses", async () => {
+		const vaultService = {
+			userCanAccessVault: vi.fn(async () => true),
+		} as unknown as VaultService;
+		const syncTokenService = {
+			signSyncToken: vi.fn(async () => "token"),
+		} as unknown as SyncTokenService;
+		const service = new SyncService(vaultService, syncTokenService, 120);
+
+		const issued = await service.issueSyncToken(
+			{ userId: "user-1" },
+			{
+				vaultId: "vault-1",
+				localVaultId: "local-vault-1",
+			},
+		);
+
+		expect(issued).toMatchObject({
+			token: "token",
+			vaultId: "vault-1",
+			localVaultId: "local-vault-1",
+			syncFormatVersion: 1,
+		});
+	});
+
 	it("rejects issuing a token for a vault the caller cannot access", async () => {
 		const vaultService = {
 			userCanAccessVault: vi.fn(async () => false),

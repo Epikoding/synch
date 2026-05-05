@@ -81,6 +81,7 @@ describe("auth session integration", () => {
 		const issued = await jsonRequest<{
 			token: string;
 			vaultId: string;
+			syncFormatVersion: number;
 		}>("/v1/sync/token", {
 			method: "POST",
 			headers: {
@@ -97,6 +98,7 @@ describe("auth session integration", () => {
 		expect(issued.response.status, issued.text).toBe(200);
 		expect(issued.json?.token).toBeTruthy();
 		expect(issued.json?.vaultId).toBe(bearerAccount.vaultId);
+		expect(issued.json?.syncFormatVersion).toBe(1);
 	});
 });
 
