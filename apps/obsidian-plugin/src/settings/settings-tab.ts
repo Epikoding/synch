@@ -9,10 +9,12 @@ import {
   renderRemoteVaultSettings,
   renderSettingsHeading,
   renderSyncStatusSetting,
+  type SyncStatusSettingControls,
 } from "./settings-tab/sections";
 
 export class SynchSettingTab extends PluginSettingTab {
   private isVisible = false;
+  private syncStatusControls: SyncStatusSettingControls | null = null;
 
   constructor(
     app: App,
@@ -35,14 +37,20 @@ export class SynchSettingTab extends PluginSettingTab {
     this.render();
   }
 
+  refreshFileSizeBlockedWarning(): void {
+    this.syncStatusControls?.refreshFileSizeBlockedWarning();
+  }
+
   hide(): void {
     this.isVisible = false;
+    this.syncStatusControls = null;
     super.hide();
   }
 
   private render(): void {
     const { containerEl } = this;
     containerEl.empty();
+    this.syncStatusControls = null;
     const hasConnectedRemoteVault = this.controller.hasConnectedRemoteVault();
     const hasAuthenticatedSession = this.controller.hasAuthenticatedSession();
     const authReadiness = this.controller.getAuthReadiness();
@@ -61,7 +69,11 @@ export class SynchSettingTab extends PluginSettingTab {
     }
 
     if (hasAuthenticatedSession) {
-      renderSyncStatusSetting(containerEl, this.controller, hasConnectedRemoteVault);
+      this.syncStatusControls = renderSyncStatusSetting(
+        containerEl,
+        this.controller,
+        hasConnectedRemoteVault,
+      );
     } else {
       new Setting(containerEl).setName("Account").setHeading();
     }

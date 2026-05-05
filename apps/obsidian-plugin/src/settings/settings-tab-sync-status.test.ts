@@ -10,7 +10,8 @@ import {
   getSettingNames,
   resetObsidianMocks,
 } from "../test-stubs/obsidian";
-import { createSettingsTab } from "./__tests__/settings-tab-helpers";
+import { createSettingsTab, nextTask } from "./__tests__/settings-tab-helpers";
+import type { SynchSettingsController } from "./controller";
 
 describe("SynchSettingTab sync status", () => {
   beforeEach(() => {
@@ -136,6 +137,90 @@ describe("SynchSettingTab sync status", () => {
     await getButtonComponents()[0]?.click();
     expect(setSyncEnabled).toHaveBeenCalledWith(false);
     expect(getExtraButtonComponents()).toEqual([]);
+  });
+
+  it("shows a file size warning tooltip when files are blocked by sync limits", async () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncState: () => "up_to_date",
+      getSyncStatusLabel: () => "Sync: up to date 99%",
+      getSyncProgress: () => ({
+        completedEntries: 4000,
+        totalEntries: 4001,
+      }),
+      listFileSizeBlockedFiles: vi.fn(async () => [
+        {
+          path: "large.bin",
+          encryptedSizeBytes: 12_400_000,
+          maxFileSizeBytes: 10_000_000,
+        },
+        {
+          path: "larger.bin",
+          encryptedSizeBytes: 22_400_000,
+          maxFileSizeBytes: 10_000_000,
+        },
+      ]),
+    });
+
+    tab.display();
+    await nextTask();
+
+    expect(getSettingDescriptions()[0]).toBe("up to date 99% - 4000 / 4001");
+    expect(getFileSizeWarningElements()).toEqual([
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          "aria-hidden": "true",
+          "data-icon": "triangle-alert",
+          "data-tooltip": "2 files exceed the sync size limit.",
+          "data-tooltip-delay": "1",
+          "data-tooltip-placement": "right",
+        }),
+      }),
+    ]);
+  });
+
+  it("refreshes the file size warning without rerendering the settings tab", async () => {
+    let blockedFiles: Awaited<ReturnType<SynchSettingsController["listFileSizeBlockedFiles"]>> = [];
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getSyncState: () => "up_to_date",
+      getSyncStatusLabel: () => "Sync: up to date 99%",
+      listFileSizeBlockedFiles: vi.fn(async () => blockedFiles),
+    });
+
+    tab.display();
+    await nextTask();
+
+    expect(getFileSizeWarningElements()).toEqual([]);
+    const settingNamesAfterDisplay = getSettingNames();
+
+    blockedFiles = [
+      {
+        path: "large.bin",
+        encryptedSizeBytes: 12_400_000,
+        maxFileSizeBytes: 10_000_000,
+      },
+    ];
+    tab.refreshFileSizeBlockedWarning();
+    await nextTask();
+
+    expect(getSettingNames()).toEqual(settingNamesAfterDisplay);
+    expect(getFileSizeWarningElements()).toEqual([
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          "data-tooltip": "1 file exceeds the sync size limit.",
+        }),
+      }),
+    ]);
+
+    blockedFiles = [];
+    tab.refreshFileSizeBlockedWarning();
+    await nextTask();
+
+    expect(getSettingNames()).toEqual(settingNamesAfterDisplay);
+    expect(getFileSizeWarningElements()).toEqual([]);
   });
 
   it("shows a start button while sync is disabled", async () => {
@@ -325,5 +410,11 @@ describe("SynchSettingTab sync status", () => {
 function getSyncSpinnerElements() {
   return getCreatedElements().filter((element) =>
     element.classes.includes("synch-sync-spinner"),
+  );
+}
+
+function getFileSizeWarningElements() {
+  return getCreatedElements().filter((element) =>
+    element.classes.includes("synch-sync-file-size-warning-icon"),
   );
 }

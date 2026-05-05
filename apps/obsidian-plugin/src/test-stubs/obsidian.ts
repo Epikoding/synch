@@ -11,7 +11,7 @@ const markdownRenderCalls: MarkdownRenderCall[] = [];
 const settingNames: string[] = [];
 const settingDescriptions: string[] = [];
 const settingClasses: string[][] = [];
-const createdElements: CreatedElementRecord[] = [];
+const createdElements: StoredElementRecord[] = [];
 const notices: Array<{ message: string; timeout?: number }> = [];
 
 interface CreatedElementRecord {
@@ -19,6 +19,10 @@ interface CreatedElementRecord {
   text: string;
   classes: string[];
   attributes: Record<string, string>;
+}
+
+interface StoredElementRecord extends CreatedElementRecord {
+  removed: boolean;
 }
 
 interface MarkdownRenderCall {
@@ -32,7 +36,7 @@ class MockElement {
   text = "";
   private readonly eventListeners = new Map<string, Array<() => void>>();
 
-  constructor(private readonly record: CreatedElementRecord | null = null) {}
+  constructor(private readonly record: StoredElementRecord | null = null) {}
 
   empty(): void {}
 
@@ -41,11 +45,12 @@ class MockElement {
   }
 
   createEl(_tag: string, options?: { text?: string; cls?: string }): MockElement {
-    const record: CreatedElementRecord = {
+    const record: StoredElementRecord = {
       tag: _tag,
       text: options?.text ?? "",
       classes: [],
       attributes: {},
+      removed: false,
     };
     createdElements.push(record);
     const element = new MockElement(record);
@@ -73,6 +78,12 @@ class MockElement {
   setAttribute(name: string, value: string): void {
     if (this.record) {
       this.record.attributes[name] = value;
+    }
+  }
+
+  remove(): void {
+    if (this.record) {
+      this.record.removed = true;
     }
   }
 
@@ -342,6 +353,7 @@ export class Setting {
     },
   };
   nameEl = new MockElement();
+  descEl = new MockElement();
   controlEl = new MockElement();
 
   constructor(_containerEl: unknown) {
@@ -356,6 +368,7 @@ export class Setting {
 
   setDesc(value: string): this {
     settingDescriptions.push(value);
+    this.descEl.setText(value);
     return this;
   }
 
@@ -422,9 +435,15 @@ export function setIcon(
 export function setTooltip(
   parent: { setAttribute(name: string, value: string): void },
   tooltip: string,
-  _options?: unknown,
+  options?: { delay?: number; placement?: string },
 ): void {
   parent.setAttribute("data-tooltip", tooltip);
+  if (options?.delay !== undefined) {
+    parent.setAttribute("data-tooltip-delay", String(options.delay));
+  }
+  if (options?.placement) {
+    parent.setAttribute("data-tooltip-placement", options.placement);
+  }
 }
 
 export function setRequestUrlMock(mock: RequestUrlMock): void {
@@ -456,12 +475,14 @@ export function getCreatedElementTexts(): string[] {
 }
 
 export function getCreatedElements(): CreatedElementRecord[] {
-  return createdElements.map((element) => ({
-    tag: element.tag,
-    text: element.text,
-    classes: [...element.classes],
-    attributes: { ...element.attributes },
-  }));
+  return createdElements
+    .filter((element) => !element.removed)
+    .map((element) => ({
+      tag: element.tag,
+      text: element.text,
+      classes: [...element.classes],
+      attributes: { ...element.attributes },
+    }));
 }
 
 export function getMarkdownRenderCalls(): MarkdownRenderCall[] {

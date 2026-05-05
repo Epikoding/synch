@@ -20,6 +20,7 @@ export function createSettingsTab(
       completedEntries: 0,
       totalEntries: 0,
     }),
+    listFileSizeBlockedFiles: vi.fn(async () => []),
     isSyncEnabled: () => true,
     setSyncEnabled: vi.fn(async () => {}),
     getPluginUpdateStatus: () => ({

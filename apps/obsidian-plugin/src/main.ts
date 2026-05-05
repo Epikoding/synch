@@ -26,6 +26,7 @@ export default class SynchPlugin extends Plugin {
       },
       onFileSizeBlockedFilesChange: () => {
         this.fileSizeBlockedDecorator?.queueRefresh();
+        this.settingsTab?.refreshFileSizeBlockedWarning();
       },
     });
     this.controller = controller;

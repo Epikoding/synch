@@ -3,6 +3,7 @@ import type {
   SynchDeletedFileCursor,
   SynchDeletedFilesPage,
   SynchDeletedFile,
+  SynchFileSizeBlockedFile,
   SynchFileRules,
   SynchPluginUpdateStatus,
   SynchStorageStatus,
@@ -21,6 +22,7 @@ export interface SynchSettingsController {
   getSyncStatusLabel(): string;
   getSyncPercent(): number;
   getSyncProgress(): SynchSyncProgress;
+  listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]>;
   isSyncEnabled(): boolean;
   setSyncEnabled(enabled: boolean): Promise<void>;
   getStorageStatus(): SynchStorageStatus | null;

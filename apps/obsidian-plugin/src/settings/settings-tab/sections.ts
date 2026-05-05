@@ -1,4 +1,4 @@
-import { App, Notice, setIcon, Setting } from "obsidian";
+import { App, Notice, setIcon, setTooltip, Setting } from "obsidian";
 
 import { getDefaultApiBaseUrl } from "../../config";
 import type { SynchFileRules } from "../../plugin/view-models";
@@ -13,6 +13,10 @@ import {
 import { DeletedFilesModal, ExcludedFoldersModal } from "./modals";
 
 type RefreshSettings = () => void;
+
+export interface SyncStatusSettingControls {
+  refreshFileSizeBlockedWarning(): void;
+}
 
 export function renderSettingsHeading(
   containerEl: HTMLElement,
@@ -89,20 +93,20 @@ export function renderSyncStatusSetting(
   containerEl: HTMLElement,
   controller: SynchSettingsController,
   hasConnectedRemoteVault: boolean,
-): void {
+): SyncStatusSettingControls | null {
   const updateStatus = controller.getPluginUpdateStatus();
   if (updateStatus.state === "update_required") {
     new Setting(containerEl)
       .setName("Sync paused")
       .setDesc(updateStatus.message);
-    return;
+    return null;
   }
 
   if (!hasConnectedRemoteVault) {
     new Setting(containerEl)
       .setName("Sync")
       .setDesc("Connect a remote vault to start syncing.");
-    return;
+    return null;
   }
 
   const syncProgress = controller.getSyncProgress();
@@ -113,6 +117,8 @@ export function renderSyncStatusSetting(
       controller.getSyncStatusLabel(),
       syncProgress,
     ));
+  const fileSizeWarning = createFileSizeBlockedWarningControls(syncSetting, controller);
+  fileSizeWarning.refreshFileSizeBlockedWarning();
   if (shouldShowSyncSpinner(controller.getSyncState())) {
     const spinnerEl = syncSetting.nameEl.createSpan({
       cls: "synch-sync-spinner",
@@ -137,6 +143,55 @@ export function renderSyncStatusSetting(
   if (isStorageWarningStatus(storageStatus)) {
     storageSetting.settingEl.addClass("synch-storage-warning");
   }
+
+  return fileSizeWarning;
+}
+
+function createFileSizeBlockedWarningControls(
+  syncSetting: Setting,
+  controller: SynchSettingsController,
+): SyncStatusSettingControls {
+  let run = 0;
+  let icon: HTMLElement | null = null;
+
+  async function refresh(currentRun: number): Promise<void> {
+    let blockedFileCount = 0;
+    try {
+      blockedFileCount = (await controller.listFileSizeBlockedFiles()).length;
+    } catch {
+      return;
+    }
+    if (currentRun !== run) {
+      return;
+    }
+
+    icon?.remove();
+    icon = null;
+    if (blockedFileCount <= 0) {
+      return;
+    }
+
+    icon = syncSetting.descEl.createSpan({
+      cls: "synch-sync-file-size-warning-icon",
+    });
+    icon.setAttribute("aria-hidden", "true");
+    setIcon(icon, "triangle-alert");
+    setTooltip(icon, formatFileSizeBlockedTooltip(blockedFileCount), {
+      delay: 1,
+      placement: "right",
+    });
+  }
+
+  return {
+    refreshFileSizeBlockedWarning(): void {
+      run += 1;
+      void refresh(run);
+    },
+  };
+}
+
+function formatFileSizeBlockedTooltip(blockedFileCount: number): string {
+  return `${blockedFileCount} ${blockedFileCount === 1 ? "file exceeds" : "files exceed"} the sync size limit.`;
 }
 
 export function renderNetworkConnectionRequiredSetting(
