@@ -171,10 +171,35 @@ export class DeletedFilesModal extends Modal {
         text: this.error,
       });
     } else {
-      headerEl.createEl("p", {
+      const hintRowEl = headerEl.createEl("div", {
+        cls: "synch-deleted-files-hint-row",
+      });
+      hintRowEl.createEl("p", {
         cls: "synch-modal-hint",
         text: "Select synced deleted files to restore.",
       });
+      if (this.deletedFiles.length > 0) {
+        const allLoadedSelected = this.deletedFiles.every((file) =>
+          this.selectedEntryIds.has(file.entryId),
+        );
+        const selectAll = new Setting(hintRowEl).setName("Select all");
+        selectAll.settingEl.addClass("synch-deleted-files-select-all");
+        selectAll.addToggle((toggle) => {
+          toggle
+            .setValue(allLoadedSelected)
+            .setDisabled(this.loading)
+            .onChange((value) => {
+              for (const file of this.deletedFiles) {
+                if (value) {
+                  this.selectedEntryIds.add(file.entryId);
+                } else {
+                  this.selectedEntryIds.delete(file.entryId);
+                }
+              }
+              this.render();
+            });
+        });
+      }
     }
 
     if (this.loading) {
@@ -215,6 +240,18 @@ export class DeletedFilesModal extends Modal {
             });
         });
       }
+      if (this.hasMore) {
+        const loadMore = new Setting(listEl);
+        loadMore.settingEl.addClass("synch-deleted-files-load-more");
+        loadMore.addButton((button) =>
+          button
+            .setButtonText("Load more")
+            .setDisabled(this.loading)
+            .onClick(() => {
+              void this.loadMoreDeletedFiles();
+            }),
+        );
+      }
     }
 
     const selectedCount = this.selectedEntryIds.size;
@@ -223,16 +260,6 @@ export class DeletedFilesModal extends Modal {
         void this.loadDeletedFiles();
       }),
     );
-    if (this.hasMore) {
-      actions.addButton((button) =>
-        button
-          .setButtonText("Load more")
-          .setDisabled(this.loading)
-          .onClick(() => {
-            void this.loadMoreDeletedFiles();
-          }),
-      );
-    }
     actions
       .addButton((button) =>
         button

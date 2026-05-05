@@ -4,6 +4,7 @@ import {
   getButtonComponents,
   getCreatedElementTexts,
   getMarkdownRenderCalls,
+  getSettingClasses,
   getSettingNames,
   getToggleComponents,
   resetObsidianMocks,
@@ -15,6 +16,9 @@ describe("SynchSettingTab remote vault settings", () => {
   beforeEach(() => {
     resetObsidianMocks();
   });
+
+  const getLatestButton = (text: string) =>
+    [...getButtonComponents()].reverse().find((button) => button.text === text);
 
   it("shows a remote vault management button after sign-in", () => {
     const tab = createSettingsTab({
@@ -147,6 +151,73 @@ describe("SynchSettingTab remote vault settings", () => {
     ]);
   });
 
+  it("toggles all loaded deleted files from the modal", async () => {
+    const restoreDeletedFiles = vi.fn(async () => {});
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      listDeletedFiles: vi.fn(async () => ({
+        files: [
+          {
+            entryId: "entry-ready",
+            path: "Notes/ready.md",
+            revision: 3,
+            deletedAt: 1,
+          },
+          {
+            entryId: "entry-other",
+            path: "Notes/other.md",
+            revision: 4,
+            deletedAt: 2,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      })),
+      restoreDeletedFiles,
+    });
+
+    tab.display();
+    await getButtonComponents()
+      .find((button) => button.text === "View deleted files")
+      ?.click();
+    await nextTask();
+
+    expect(getSettingNames()).toContain("Select all");
+    await getToggleComponents().slice(-3)[0]?.change(true);
+
+    expect(
+      getLatestButton("Restore selected (2)")?.disabled,
+    ).toBe(false);
+
+    await getToggleComponents().slice(-3)[0]?.change(false);
+
+    expect(
+      getLatestButton("Restore selected")?.disabled,
+    ).toBe(true);
+
+    await getToggleComponents().slice(-3)[0]?.change(true);
+    await getLatestButton("Restore selected (2)")?.click();
+    await nextTask();
+
+    expect(restoreDeletedFiles).toHaveBeenNthCalledWith(1, [
+      {
+        entryId: "entry-ready",
+        path: "Notes/ready.md",
+        revision: 3,
+        deletedAt: 1,
+      },
+    ]);
+    expect(restoreDeletedFiles).toHaveBeenNthCalledWith(2, [
+      {
+        entryId: "entry-other",
+        path: "Notes/other.md",
+        revision: 4,
+        deletedAt: 2,
+      },
+    ]);
+  });
+
   it("loads additional deleted file pages from the modal", async () => {
     const listDeletedFiles = vi
       .fn()
@@ -187,6 +258,9 @@ describe("SynchSettingTab remote vault settings", () => {
     await nextTask();
 
     expect(getSettingNames()).toContain("Notes/first.md");
+    expect(getSettingClasses()).toContainEqual([
+      "synch-deleted-files-load-more",
+    ]);
     await getButtonComponents()
       .filter((button) => button.text === "Load more")
       .at(-1)

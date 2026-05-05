@@ -194,11 +194,34 @@
   flex: 0 0 auto;
 }
 
+.synch-deleted-files-hint-row {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.synch-deleted-files-hint-row .synch-modal-hint {
+  margin-bottom: 0;
+}
+
+.synch-deleted-files-select-all {
+  border-top: 0;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
 .synch-deleted-files-list {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
+}
+
+.synch-deleted-files-load-more {
+  border-top: 0;
+  padding-top: 0.75rem;
 }
 
 .synch-deleted-files-footer {
