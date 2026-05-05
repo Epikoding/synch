@@ -16,7 +16,7 @@
 			}
 		</style>
 	</head>
-	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col font-light text-sm">
+	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col text-sm">
 		<div class="max-w-4xl mx-auto px-6 w-full flex-1 flex flex-col py-12">
 			<div class="flex items-center mb-8">
 				<a href="/" class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity">Synch</a>
@@ -24,21 +24,21 @@
 			
 			<header class="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-8">
 				<div>
-					<h1 class="text-2xl font-light text-zinc-200 tracking-tight mb-2">Remote vaults</h1>
-					<p class="text-zinc-500 text-sm max-w-2xl leading-relaxed">
+					<h1 class="text-2xl text-zinc-200 tracking-tight mb-2" data-i18n="title">Remote vaults</h1>
+					<p class="text-zinc-500 text-sm max-w-2xl leading-relaxed" data-i18n="subtitle">
 						Manage the encrypted vaults attached to this Synch account. Deleting a remote
 						vault does not delete local Obsidian files.
 					</p>
 				</div>
 				<div id="user-container" class="hidden items-center gap-4">
 					<div id="user" class="text-zinc-500 text-xs bg-zinc-900/50 border border-zinc-800 rounded-full px-3 py-1.5 whitespace-nowrap"></div>
-					<button id="logout" type="button" class="shrink-0 text-zinc-500 text-xs hover:text-zinc-300 transition-colors">Sign out</button>
+					<button id="logout" type="button" class="shrink-0 text-zinc-500 text-xs hover:text-zinc-300 transition-colors" data-i18n="signOut">Sign out</button>
 				</div>
 			</header>
 
 			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-				<div id="status" class="text-zinc-400 text-sm" aria-live="polite">Loading vaults...</div>
-				<button id="refresh" type="button" class="w-full sm:w-auto py-1.5 px-4 text-xs bg-transparent border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+				<div id="status" class="text-zinc-400 text-sm" aria-live="polite" data-i18n="loading">Loading vaults...</div>
+				<button id="refresh" type="button" class="w-full sm:w-auto py-1.5 px-4 text-xs bg-transparent border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="refresh">
 					Refresh
 				</button>
 			</div>
@@ -49,26 +49,83 @@
 		<dialog id="delete-dialog" class="w-[calc(100%-2rem)] sm:w-[480px] bg-[#0a0a0a] text-zinc-200 border border-zinc-800 rounded-xl p-0 shadow-2xl">
 			<form method="dialog">
 				<div class="p-6">
-					<h2 class="text-lg font-medium mb-3">Delete remote vault</h2>
+					<h2 class="text-lg font-medium mb-3" data-i18n="deleteTitle">Delete remote vault</h2>
 					<p id="delete-copy" class="text-zinc-400 text-sm mb-6 leading-relaxed"></p>
 					
 					<div class="space-y-2">
-						<label for="confirm-name" class="block text-xs text-zinc-500">Type the vault name to confirm</label>
+						<label for="confirm-name" class="block text-xs text-zinc-500" data-i18n="confirmLabel">Type the vault name to confirm</label>
 						<input id="confirm-name" autocomplete="off" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" />
 					</div>
 				</div>
 				<div class="flex justify-end gap-3 px-6 py-4 border-t border-zinc-800/50 bg-white/[0.01]">
 					<button id="cancel-delete" value="cancel" type="submit" class="py-2 px-4 text-xs bg-transparent border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded transition-colors font-medium">
-						Cancel
+						<span data-i18n="cancel">Cancel</span>
 					</button>
 					<button id="confirm-delete" value="delete" type="button" disabled class="py-2 px-4 text-xs bg-transparent border border-red-900/50 text-red-400 hover:bg-red-900/20 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-						Delete permanently
+						<span data-i18n="deletePermanently">Delete permanently</span>
 					</button>
 				</div>
 			</form>
 		</dialog>
 
 		<script>
+			const messages = {
+				en: {
+					title: "Remote vaults",
+					subtitle: "Manage the encrypted vaults attached to this Synch account. Deleting a remote vault does not delete local Obsidian files.",
+					signOut: "Sign out",
+					signedIn: "Signed in",
+					loading: "Loading vaults...",
+					refresh: "Refresh",
+					deleteTitle: "Delete remote vault",
+					confirmLabel: "Type the vault name to confirm",
+					cancel: "Cancel",
+					deletePermanently: "Delete permanently",
+					unableToSignOut: "Unable to sign out.",
+					apiUnavailable: "Unable to reach the API.",
+					unableToLoadVaults: "Unable to load vaults.",
+					countOne: "1 remote vault",
+					countMany: "{count} remote vaults",
+					empty: "No remote vaults are attached to this account.",
+					deleting: "Deleting",
+					delete: "Delete",
+					deleteCopy: "This permanently removes remote vault \"{name}\" from this account. Local Obsidian files are not deleted.",
+					deletingVault: "Deleting {name}...",
+					unableToDeleteVault: "Unable to delete vault.",
+					queuedForDeletion: "{name} queued for deletion.",
+					unknown: "unknown",
+					created: "Created {date}",
+					deletionStatus: "Deletion {status}",
+				},
+				ko: {
+					title: "원격 vault",
+					subtitle: "이 Synch 계정에 연결된 암호화 vault를 관리합니다. 원격 vault를 삭제해도 로컬 Obsidian 파일은 삭제되지 않습니다.",
+					signOut: "로그아웃",
+					signedIn: "로그인됨",
+					loading: "Vault 불러오는 중...",
+					refresh: "새로고침",
+					deleteTitle: "원격 vault 삭제",
+					confirmLabel: "확인하려면 vault 이름을 입력하세요",
+					cancel: "취소",
+					deletePermanently: "영구 삭제",
+					unableToSignOut: "로그아웃할 수 없습니다.",
+					apiUnavailable: "API에 연결할 수 없습니다.",
+					unableToLoadVaults: "Vault를 불러올 수 없습니다.",
+					countOne: "원격 vault 1개",
+					countMany: "원격 vault {count}개",
+					empty: "이 계정에 연결된 원격 vault가 없습니다.",
+					deleting: "삭제 중",
+					delete: "삭제",
+					deleteCopy: "이 계정에서 원격 vault \"{name}\"을 영구적으로 제거합니다. 로컬 Obsidian 파일은 삭제되지 않습니다.",
+					deletingVault: "{name} 삭제 중...",
+					unableToDeleteVault: "Vault를 삭제할 수 없습니다.",
+					queuedForDeletion: "{name} 삭제가 대기열에 추가되었습니다.",
+					unknown: "알 수 없음",
+					created: "생성일 {date}",
+					deletionStatus: "삭제 {status}",
+				},
+			};
+			const locale = getLocale();
 			const statusEl = document.querySelector("#status");
 			const userContainerEl = document.querySelector("#user-container");
 			const userEl = document.querySelector("#user");
@@ -98,6 +155,7 @@
 				void signOut();
 			});
 
+			applyTranslations();
 			void initialize();
 
 			async function initialize() {
@@ -107,7 +165,7 @@
 					return;
 				}
 
-				userEl.textContent = session.user.email || session.user.name || "Signed in";
+				userEl.textContent = session.user.email || session.user.name || t("signedIn");
 				userContainerEl.classList.remove("hidden");
 				userContainerEl.classList.add("flex");
 				await loadVaults();
@@ -125,13 +183,13 @@
 						body: JSON.stringify({}),
 					});
 					if (!response.ok) {
-						setStatus(await readErrorMessage(response, "Unable to sign out."));
+						setStatus(await readErrorMessage(response, t("unableToSignOut")));
 						logoutButton.disabled = false;
 						return;
 					}
 					redirectToLogin();
 				} catch {
-					setStatus("Unable to reach the API.");
+					setStatus(t("apiUnavailable"));
 					logoutButton.disabled = false;
 				}
 			}
@@ -154,8 +212,37 @@
 				window.location.assign(loginUrl.toString());
 			}
 
+			function getLocale() {
+				const supportedLocales = ["en", "ko"];
+				const params = new URLSearchParams(window.location.search);
+				const candidates = [
+					params.get("lang"),
+					navigator.language?.split("-")[0],
+				];
+				const selected = candidates.find((candidate) =>
+					supportedLocales.includes(candidate),
+				) || "en";
+				document.documentElement.lang = selected;
+				return selected;
+			}
+
+			function t(key, params = {}) {
+				const template = messages[locale]?.[key] || messages.en[key] || key;
+				return Object.entries(params).reduce(
+					(text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+					template,
+				);
+			}
+
+			function applyTranslations() {
+				for (const element of document.querySelectorAll("[data-i18n]")) {
+					element.textContent = t(element.dataset.i18n);
+				}
+				document.title = `Synch ${t("title")}`;
+			}
+
 			async function loadVaults() {
-				setStatus("Loading vaults...");
+				setStatus(t("loading"));
 				refreshButton.disabled = true;
 				try {
 					const response = await fetch("/v1/vaults?includeDeleting=true", {
@@ -166,13 +253,13 @@
 						return;
 					}
 					if (!response.ok) {
-						setStatus(await readErrorMessage(response, "Unable to load vaults."));
+						setStatus(await readErrorMessage(response, t("unableToLoadVaults")));
 						return;
 					}
 					const json = await response.json();
 					renderVaults(Array.isArray(json.vaults) ? json.vaults : []);
 				} catch {
-					setStatus("Unable to reach the API.");
+					setStatus(t("apiUnavailable"));
 				} finally {
 					refreshButton.disabled = false;
 				}
@@ -180,12 +267,12 @@
 
 			function renderVaults(vaults) {
 				listEl.replaceChildren();
-				setStatus(`${vaults.length} remote vault${vaults.length === 1 ? "" : "s"}`);
+				setStatus(vaults.length === 1 ? t("countOne") : t("countMany", { count: vaults.length }));
 
 				if (vaults.length === 0) {
 					const empty = document.createElement("div");
 					empty.className = "py-12 px-8 border border-dashed border-zinc-800 rounded-xl text-center text-zinc-500 text-sm";
-					empty.textContent = "No remote vaults are attached to this account.";
+					empty.textContent = t("empty");
 					listEl.append(empty);
 					return;
 				}
@@ -208,7 +295,7 @@
 					const button = document.createElement("button");
 					button.className = "w-full sm:w-auto py-2 px-4 text-xs bg-transparent border border-red-900/50 text-red-400 hover:bg-red-900/20 rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed";
 					button.type = "button";
-					button.textContent = isDeleting ? "Deleting" : "Delete";
+					button.textContent = isDeleting ? t("deleting") : t("delete");
 					button.disabled = isDeleting;
 					button.addEventListener("click", () => {
 						openDeleteDialog(vault);
@@ -232,9 +319,7 @@
 
 			function openDeleteDialog(vault) {
 				selectedVault = vault;
-				deleteCopy.textContent =
-					`This permanently removes remote vault "${vault.name}" from this account. ` +
-					"Local Obsidian files are not deleted.";
+				deleteCopy.textContent = t("deleteCopy", { name: vault.name });
 				confirmInput.value = "";
 				confirmDeleteButton.disabled = true;
 				deleteDialog.showModal();
@@ -247,22 +332,22 @@
 				}
 
 				confirmDeleteButton.disabled = true;
-				setStatus(`Deleting ${selectedVault.name}...`);
+				setStatus(t("deletingVault", { name: selectedVault.name }));
 				try {
 					const response = await fetch(`/v1/vaults/${encodeURIComponent(selectedVault.id)}`, {
 						method: "DELETE",
 						credentials: "include",
 					});
 					if (!response.ok) {
-						setStatus(await readErrorMessage(response, "Unable to delete vault."));
+						setStatus(await readErrorMessage(response, t("unableToDeleteVault")));
 						return;
 					}
 					deleteDialog.close();
-					setStatus(`${selectedVault.name} queued for deletion.`);
+					setStatus(t("queuedForDeletion", { name: selectedVault.name }));
 					selectedVault = null;
 					await loadVaults();
 				} catch {
-					setStatus("Unable to reach the API.");
+					setStatus(t("apiUnavailable"));
 				} finally {
 					confirmDeleteButton.disabled = false;
 				}
@@ -271,19 +356,19 @@
 			function formatDate(value) {
 				const date = new Date(value);
 				if (Number.isNaN(date.getTime())) {
-					return "unknown";
+					return t("unknown");
 				}
-				return date.toLocaleDateString(undefined, {
+				return new Intl.DateTimeFormat(locale, {
 					year: "numeric",
 					month: "short",
 					day: "numeric",
-				});
+				}).format(date);
 			}
 
 			function formatVaultMeta(vault) {
-				const parts = [vault.id, `Created ${formatDate(vault.createdAt)}`];
+				const parts = [vault.id, t("created", { date: formatDate(vault.createdAt) })];
 				if (vault.deletionStatus) {
-					parts.push(`Deletion ${vault.deletionStatus}`);
+					parts.push(t("deletionStatus", { status: vault.deletionStatus }));
 				}
 				if (vault.deletionError) {
 					parts.push(vault.deletionError);

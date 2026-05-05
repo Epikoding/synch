@@ -13,39 +13,39 @@
 			}
 		</style>
 	</head>
-	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col font-light text-sm">
+	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col text-sm">
 		<div class="max-w-md mx-auto px-6 w-full flex-1 flex flex-col justify-center py-24">
 			<div class="mb-8 text-center">
 				<a href="/" class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity inline-block mb-8">Synch</a>
-				<h1 class="text-2xl font-light text-zinc-200 tracking-tight mb-2">Welcome back</h1>
-				<p class="text-zinc-500 text-xs">Sign in to your account to continue</p>
+				<h1 class="text-2xl text-zinc-200 tracking-tight mb-2" data-i18n="title">Welcome back</h1>
+				<p class="text-zinc-500 text-xs" data-i18n="subtitle">Sign in to your account to continue</p>
 			</div>
 
 			<form id="sign-in-form" class="space-y-4">
 				<div class="space-y-2">
-					<label for="email" class="block text-xs text-zinc-400">Email</label>
+					<label for="email" class="block text-xs text-zinc-400" data-i18n="email">Email</label>
 					<input type="email" id="email" name="email" required autocomplete="email" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="you@example.com" />
 				</div>
 				
 				<div class="space-y-2">
 					<div class="flex items-center justify-between">
-						<label for="password" class="block text-xs text-zinc-400">Password</label>
+						<label for="password" class="block text-xs text-zinc-400" data-i18n="password">Password</label>
 					</div>
 					<input type="password" id="password" name="password" required autocomplete="current-password" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="••••••••" />
 				</div>
 
 				<div id="status" class="text-zinc-400 text-xs text-center min-h-6" aria-live="polite"></div>
 
-				<button type="submit" class="w-full py-2 px-4 mt-4 text-center text-xs bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+				<button type="submit" class="w-full py-2 px-4 mt-4 text-center text-xs bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="submit">
 					Sign In
 				</button>
 
 				<div id="success-container" class="hidden mt-6 p-4 bg-zinc-900/50 border border-zinc-800/80 rounded-lg text-center flex-col items-center">
-					<div class="text-zinc-200 text-sm mb-1">Email verification required</div>
-					<div class="text-zinc-400 text-xs mb-4">Please check your inbox for the verification link.</div>
+					<div class="text-zinc-200 text-sm mb-1" data-i18n="verificationRequired">Email verification required</div>
+					<div class="text-zinc-400 text-xs mb-4" data-i18n="checkInbox">Please check your inbox for the verification link.</div>
 					
 					<div id="resend-container" class="text-center flex-col items-center w-full">
-						<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
+						<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed" data-i18n="resendVerification">
 							Resend verification email
 						</button>
 						<div id="resend-message" class="text-xs mt-2 text-zinc-400 hidden"></div>
@@ -54,11 +54,60 @@
 			</form>
 
 			<div class="mt-8 text-center text-xs text-zinc-500">
-				Don't have an account? <a id="signup-link" href="/signup" class="text-zinc-300 hover:text-zinc-100 transition-colors">Sign up</a>
+				<span data-i18n="noAccount">Don't have an account?</span> <a id="signup-link" href="/signup" class="text-zinc-300 hover:text-zinc-100 transition-colors" data-i18n="signUp">Sign up</a>
 			</div>
 		</div>
 
 		<script>
+			const messages = {
+				en: {
+					title: "Welcome back",
+					subtitle: "Sign in to your account to continue",
+					email: "Email",
+					password: "Password",
+					submit: "Sign In",
+					verificationRequired: "Email verification required",
+					checkInbox: "Please check your inbox for the verification link.",
+					resendVerification: "Resend verification email",
+					noAccount: "Don't have an account?",
+					signUp: "Sign up",
+					resendAvailableIn: "Resend available in {seconds}s",
+					sending: "Sending...",
+					failedToResend: "Failed to resend",
+					resent: "Verification email resent.",
+					apiUnavailable: "Unable to reach the API.",
+					apiUnavailableWithHint: "Unable to reach the API. Check the server URL and try again.",
+					loggingIn: "Logging in...",
+					authFailed: "Authentication failed.",
+					verificationRequiredButton: "Verification Required",
+					loggedInRedirecting: "Logged in. Redirecting...",
+					requestFailed: "Request failed.",
+				},
+				ko: {
+					title: "다시 오신 것을 환영합니다",
+					subtitle: "계속하려면 계정에 로그인하세요",
+					email: "이메일",
+					password: "비밀번호",
+					submit: "로그인",
+					verificationRequired: "이메일 인증이 필요합니다",
+					checkInbox: "인증 링크가 담긴 이메일을 확인하세요.",
+					resendVerification: "인증 이메일 다시 보내기",
+					noAccount: "계정이 없으신가요?",
+					signUp: "가입하기",
+					resendAvailableIn: "{seconds}초 후 다시 보낼 수 있습니다",
+					sending: "보내는 중...",
+					failedToResend: "다시 보내지 못했습니다",
+					resent: "인증 이메일을 다시 보냈습니다.",
+					apiUnavailable: "API에 연결할 수 없습니다.",
+					apiUnavailableWithHint: "API에 연결할 수 없습니다. 서버 URL을 확인한 뒤 다시 시도하세요.",
+					loggingIn: "로그인 중...",
+					authFailed: "인증에 실패했습니다.",
+					verificationRequiredButton: "인증 필요",
+					loggedInRedirecting: "로그인되었습니다. 이동 중...",
+					requestFailed: "요청에 실패했습니다.",
+				},
+			};
+			const locale = getLocale();
 			const form = document.querySelector("#sign-in-form");
 			const status = document.querySelector("#status");
 			const signupLink = document.querySelector("#signup-link");
@@ -72,6 +121,7 @@
 			let resendInterval;
 			let currentEmail = "";
 
+			applyTranslations();
 			void initializePage();
 
 			function startResendCooldown() {
@@ -86,9 +136,9 @@
 					if (resendCooldown <= 0) {
 						clearInterval(resendInterval);
 						resendButton.disabled = false;
-						resendButton.textContent = "Resend verification email";
+						resendButton.textContent = t("resendVerification");
 					} else {
-						resendButton.textContent = `Resend available in ${resendCooldown}s`;
+						resendButton.textContent = t("resendAvailableIn", { seconds: resendCooldown });
 					}
 				}, 1000);
 			}
@@ -98,7 +148,7 @@
 				
 				resendButton.disabled = true;
 				if (resendMessage) {
-					resendMessage.textContent = "Sending...";
+					resendMessage.textContent = t("sending");
 					resendMessage.classList.remove("hidden", "text-red-400");
 					resendMessage.classList.add("text-zinc-400");
 				}
@@ -118,7 +168,7 @@
 
 					if (!response.ok) {
 						if (resendMessage) {
-							resendMessage.textContent = await readErrorMessage(response, "Failed to resend");
+							resendMessage.textContent = await readErrorMessage(response, t("failedToResend"));
 							resendMessage.classList.remove("text-zinc-400");
 							resendMessage.classList.add("text-red-400");
 						}
@@ -127,14 +177,14 @@
 					}
 
 					if (resendMessage) {
-						resendMessage.textContent = "Verification email resent.";
+						resendMessage.textContent = t("resent");
 						resendMessage.classList.remove("text-red-400");
 						resendMessage.classList.add("text-zinc-400");
 					}
 					startResendCooldown();
 				} catch {
 					if (resendMessage) {
-						resendMessage.textContent = "Unable to reach the API.";
+						resendMessage.textContent = t("apiUnavailable");
 						resendMessage.classList.remove("text-zinc-400");
 						resendMessage.classList.add("text-red-400");
 					}
@@ -146,6 +196,35 @@
 				event.preventDefault();
 				void submitAuth();
 			});
+
+			function getLocale() {
+				const supportedLocales = ["en", "ko"];
+				const params = new URLSearchParams(window.location.search);
+				const candidates = [
+					params.get("lang"),
+					navigator.language?.split("-")[0],
+				];
+				const selected = candidates.find((candidate) =>
+					supportedLocales.includes(candidate),
+				) || "en";
+				document.documentElement.lang = selected;
+				return selected;
+			}
+
+			function t(key, params = {}) {
+				const template = messages[locale]?.[key] || messages.en[key] || key;
+				return Object.entries(params).reduce(
+					(text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+					template,
+				);
+			}
+
+			function applyTranslations() {
+				for (const element of document.querySelectorAll("[data-i18n]")) {
+					element.textContent = t(element.dataset.i18n);
+				}
+				document.title = `${t("submit")} - Synch`;
+			}
 
 			async function initializePage() {
 				returnTo = loadReturnTo();
@@ -186,7 +265,7 @@
 				const body = Object.fromEntries(new FormData(form).entries());
 				body.callbackURL = returnTo || "/";
 				setSubmitting(true);
-				setStatus("Logging in...");
+				setStatus(t("loggingIn"));
 				try {
 					const response = await fetch("/api/auth/sign-in/email", {
 						method: "POST",
@@ -198,7 +277,7 @@
 					});
 
 					if (!response.ok) {
-						const msg = await readErrorMessage(response, "Authentication failed.");
+						const msg = await readErrorMessage(response, t("authFailed"));
 						
 						if (msg.toLowerCase().includes("verify") || msg.toLowerCase().includes("verified")) {
 							isSuccessState = true;
@@ -213,7 +292,7 @@
 							
 							const submitBtn = form.querySelector('button[type="submit"]');
 							if (submitBtn) {
-								submitBtn.textContent = "Verification Required";
+								submitBtn.textContent = t("verificationRequiredButton");
 								submitBtn.classList.remove("bg-zinc-200", "text-[#0a0a0a]", "hover:bg-white");
 								submitBtn.classList.add("bg-zinc-800", "text-zinc-400");
 							}
@@ -231,10 +310,10 @@
 						return;
 					}
 
-					setStatus("Logged in. Redirecting...");
+					setStatus(t("loggedInRedirecting"));
 					window.location.assign(returnTo || "/");
 				} catch {
-					setStatus("Unable to reach the API. Check the server URL and try again.");
+					setStatus(t("apiUnavailableWithHint"));
 				} finally {
 					setSubmitting(false);
 				}
@@ -246,7 +325,7 @@
 					status.classList.add("text-zinc-400");
 				}
 				status.textContent = message;
-				if (message.includes("failed") || message.includes("Unable")) {
+				if (message.includes("failed") || message.includes("Unable") || message.includes("실패") || message.includes("할 수 없습니다")) {
 					status.classList.remove("text-zinc-400");
 					status.classList.add("text-red-400");
 				}
@@ -262,7 +341,7 @@
 				}
 			}
 
-			async function readErrorMessage(response, fallback = "Request failed.") {
+			async function readErrorMessage(response, fallback = t("requestFailed")) {
 				try {
 					const json = await response.json();
 					return json.message || json.error_description || json.error || fallback;

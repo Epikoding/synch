@@ -13,42 +13,42 @@
 			}
 		</style>
 	</head>
-	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col font-light text-sm">
+	<body class="bg-[#0a0a0a] text-zinc-400 font-sans antialiased min-h-screen flex flex-col text-sm">
 		<div class="max-w-md mx-auto px-6 w-full flex-1 flex flex-col justify-center py-24">
 			<div class="mb-8 text-center">
 				<a href="/" class="text-zinc-200 font-normal tracking-wider text-xs uppercase hover:opacity-80 transition-opacity inline-block mb-8">Synch</a>
-				<h1 class="text-2xl font-light text-zinc-200 tracking-tight mb-2">Create an account</h1>
-				<p class="text-zinc-500 text-xs">Your vault stays end-to-end encrypted. This account only coordinates sync.</p>
+				<h1 class="text-2xl text-zinc-200 tracking-tight mb-2" data-i18n="title">Create an account</h1>
+				<p class="text-zinc-500 text-xs" data-i18n="subtitle">Your vault stays end-to-end encrypted. This account only coordinates sync.</p>
 			</div>
 
 			<form id="sign-up-form" class="space-y-4">
 				<div class="space-y-2">
-					<label for="name" class="block text-xs text-zinc-400">Name</label>
+					<label for="name" class="block text-xs text-zinc-400" data-i18n="name">Name</label>
 					<input type="text" id="name" name="name" required autocomplete="name" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="John Doe" />
 				</div>
 
 				<div class="space-y-2">
-					<label for="email" class="block text-xs text-zinc-400">Email</label>
+					<label for="email" class="block text-xs text-zinc-400" data-i18n="email">Email</label>
 					<input type="email" id="email" name="email" required autocomplete="email" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="you@example.com" />
 				</div>
 				
 				<div class="space-y-2">
-					<label for="password" class="block text-xs text-zinc-400">Password</label>
+					<label for="password" class="block text-xs text-zinc-400" data-i18n="password">Password</label>
 					<input type="password" id="password" name="password" required autocomplete="new-password" class="w-full bg-zinc-900/50 border border-zinc-800 rounded px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors" placeholder="••••••••" />
 				</div>
 
 				<div id="status" class="text-zinc-400 text-xs text-center min-h-6" aria-live="polite"></div>
 
-				<button type="submit" class="w-full py-2 px-4 mt-4 text-center text-xs bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+				<button type="submit" class="w-full py-2 px-4 mt-4 text-center text-xs bg-zinc-200 text-[#0a0a0a] hover:bg-white rounded transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="submit">
 					Create Account
 				</button>
 
 				<div id="success-container" class="hidden mt-6 p-4 bg-zinc-900/50 border border-zinc-800/80 rounded-lg text-center flex-col items-center">
-					<div class="text-zinc-200 text-sm mb-1">Check your email</div>
-					<div class="text-zinc-400 text-xs mb-4">We've sent a verification link to <span id="sent-email-display" class="font-medium text-zinc-300"></span>.</div>
+					<div class="text-zinc-200 text-sm mb-1" data-i18n="checkEmail">Check your email</div>
+					<div class="text-zinc-400 text-xs mb-4"><span data-i18n="sentPrefix">We've sent a verification link to</span> <span id="sent-email-display" class="font-medium text-zinc-300"></span><span data-i18n="sentSuffix">.</span></div>
 					
 					<div id="resend-container" class="text-center flex-col items-center w-full">
-						<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed">
+						<button id="resend-button" type="button" class="text-xs text-zinc-300 hover:text-white underline transition-colors disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed" data-i18n="resendVerification">
 							Resend verification email
 						</button>
 						<div id="resend-message" class="text-xs mt-2 text-zinc-400 hidden"></div>
@@ -57,11 +57,64 @@
 			</form>
 
 			<div class="mt-8 text-center text-xs text-zinc-500">
-				Already have an account? <a id="signin-link" href="/signin" class="text-zinc-300 hover:text-zinc-100 transition-colors">Sign in</a>
+				<span data-i18n="hasAccount">Already have an account?</span> <a id="signin-link" href="/signin" class="text-zinc-300 hover:text-zinc-100 transition-colors" data-i18n="signIn">Sign in</a>
 			</div>
 		</div>
 
 		<script>
+			const messages = {
+				en: {
+					title: "Create an account",
+					subtitle: "Your vault stays end-to-end encrypted. This account only coordinates sync.",
+					name: "Name",
+					email: "Email",
+					password: "Password",
+					submit: "Create Account",
+					checkEmail: "Check your email",
+					sentPrefix: "We've sent a verification link to",
+					sentSuffix: ".",
+					resendVerification: "Resend verification email",
+					hasAccount: "Already have an account?",
+					signIn: "Sign in",
+					resendAvailableIn: "Resend available in {seconds}s",
+					sending: "Sending...",
+					failedToResend: "Failed to resend",
+					resent: "Verification email resent.",
+					apiUnavailable: "Unable to reach the API.",
+					apiUnavailableWithHint: "Unable to reach the API. Check the server URL and try again.",
+					creatingAccount: "Creating account...",
+					accountCreationFailed: "Account creation failed.",
+					emailSent: "Email Sent",
+					createdRedirecting: "Account created. Redirecting...",
+					requestFailed: "Request failed.",
+				},
+				ko: {
+					title: "계정 만들기",
+					subtitle: "Vault는 종단간 암호화 상태로 유지됩니다. 이 계정은 동기화만 조율합니다.",
+					name: "이름",
+					email: "이메일",
+					password: "비밀번호",
+					submit: "계정 만들기",
+					checkEmail: "이메일을 확인하세요",
+					sentPrefix: "인증 링크를 보냈습니다:",
+					sentSuffix: "",
+					resendVerification: "인증 이메일 다시 보내기",
+					hasAccount: "이미 계정이 있으신가요?",
+					signIn: "로그인",
+					resendAvailableIn: "{seconds}초 후 다시 보낼 수 있습니다",
+					sending: "보내는 중...",
+					failedToResend: "다시 보내지 못했습니다",
+					resent: "인증 이메일을 다시 보냈습니다.",
+					apiUnavailable: "API에 연결할 수 없습니다.",
+					apiUnavailableWithHint: "API에 연결할 수 없습니다. 서버 URL을 확인한 뒤 다시 시도하세요.",
+					creatingAccount: "계정 만드는 중...",
+					accountCreationFailed: "계정을 만들지 못했습니다.",
+					emailSent: "이메일 전송됨",
+					createdRedirecting: "계정이 생성되었습니다. 이동 중...",
+					requestFailed: "요청에 실패했습니다.",
+				},
+			};
+			const locale = getLocale();
 			const form = document.querySelector("#sign-up-form");
 			const status = document.querySelector("#status");
 			const signinLink = document.querySelector("#signin-link");
@@ -76,6 +129,7 @@
 			let resendInterval;
 			let currentEmail = "";
 
+			applyTranslations();
 			void initializePage();
 
 			function startResendCooldown() {
@@ -90,9 +144,9 @@
 					if (resendCooldown <= 0) {
 						clearInterval(resendInterval);
 						resendButton.disabled = false;
-						resendButton.textContent = "Resend verification email";
+						resendButton.textContent = t("resendVerification");
 					} else {
-						resendButton.textContent = `Resend available in ${resendCooldown}s`;
+						resendButton.textContent = t("resendAvailableIn", { seconds: resendCooldown });
 					}
 				}, 1000);
 			}
@@ -102,7 +156,7 @@
 				
 				resendButton.disabled = true;
 				if (resendMessage) {
-					resendMessage.textContent = "Sending...";
+					resendMessage.textContent = t("sending");
 					resendMessage.classList.remove("hidden", "text-red-400");
 					resendMessage.classList.add("text-zinc-400");
 				}
@@ -122,7 +176,7 @@
 
 					if (!response.ok) {
 						if (resendMessage) {
-							resendMessage.textContent = await readErrorMessage(response, "Failed to resend");
+							resendMessage.textContent = await readErrorMessage(response, t("failedToResend"));
 							resendMessage.classList.remove("text-zinc-400");
 							resendMessage.classList.add("text-red-400");
 						}
@@ -131,14 +185,14 @@
 					}
 
 					if (resendMessage) {
-						resendMessage.textContent = "Verification email resent.";
+						resendMessage.textContent = t("resent");
 						resendMessage.classList.remove("text-red-400");
 						resendMessage.classList.add("text-zinc-400");
 					}
 					startResendCooldown();
 				} catch {
 					if (resendMessage) {
-						resendMessage.textContent = "Unable to reach the API.";
+						resendMessage.textContent = t("apiUnavailable");
 						resendMessage.classList.remove("text-zinc-400");
 						resendMessage.classList.add("text-red-400");
 					}
@@ -150,6 +204,35 @@
 				event.preventDefault();
 				void submitAuth();
 			});
+
+			function getLocale() {
+				const supportedLocales = ["en", "ko"];
+				const params = new URLSearchParams(window.location.search);
+				const candidates = [
+					params.get("lang"),
+					navigator.language?.split("-")[0],
+				];
+				const selected = candidates.find((candidate) =>
+					supportedLocales.includes(candidate),
+				) || "en";
+				document.documentElement.lang = selected;
+				return selected;
+			}
+
+			function t(key, params = {}) {
+				const template = messages[locale]?.[key] || messages.en[key] || key;
+				return Object.entries(params).reduce(
+					(text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+					template,
+				);
+			}
+
+			function applyTranslations() {
+				for (const element of document.querySelectorAll("[data-i18n]")) {
+					element.textContent = t(element.dataset.i18n);
+				}
+				document.title = `${t("submit")} - Synch`;
+			}
 
 			async function initializePage() {
 				returnTo = loadReturnTo();
@@ -180,7 +263,7 @@
 				const body = Object.fromEntries(new FormData(form).entries());
 				body.callbackURL = returnTo || "/";
 				setSubmitting(true);
-				setStatus("Creating account...");
+				setStatus(t("creatingAccount"));
 				try {
 					const response = await fetch("/api/auth/sign-up/email", {
 						method: "POST",
@@ -192,7 +275,7 @@
 					});
 
 					if (!response.ok) {
-						setStatus(await readErrorMessage(response, "Account creation failed."));
+						setStatus(await readErrorMessage(response, t("accountCreationFailed")));
 						return;
 					}
 
@@ -210,7 +293,7 @@
 						
 						const submitBtn = form.querySelector('button[type="submit"]');
 						if (submitBtn) {
-							submitBtn.textContent = "Email Sent";
+							submitBtn.textContent = t("emailSent");
 							submitBtn.classList.remove("bg-zinc-200", "text-[#0a0a0a]", "hover:bg-white");
 							submitBtn.classList.add("bg-zinc-800", "text-zinc-400");
 						}
@@ -226,10 +309,10 @@
 						return;
 					}
 
-					setStatus("Account created. Redirecting...");
+					setStatus(t("createdRedirecting"));
 					window.location.assign(returnTo || "/");
 				} catch {
-					setStatus("Unable to reach the API. Check the server URL and try again.");
+					setStatus(t("apiUnavailableWithHint"));
 				} finally {
 					setSubmitting(false);
 				}
@@ -241,7 +324,7 @@
 					status.classList.add("text-zinc-400");
 				}
 				status.textContent = message;
-				if (message.includes("failed") || message.includes("Unable")) {
+				if (message.includes("failed") || message.includes("Unable") || message.includes("실패") || message.includes("할 수 없습니다") || message.includes("못했습니다")) {
 					status.classList.remove("text-zinc-400");
 					status.classList.add("text-red-400");
 				}
@@ -257,7 +340,7 @@
 				}
 			}
 
-			async function readErrorMessage(response, fallback = "Request failed.") {
+			async function readErrorMessage(response, fallback = t("requestFailed")) {
 				try {
 					const json = await response.json();
 					return json.message || json.error_description || json.error || fallback;
