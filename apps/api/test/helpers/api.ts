@@ -43,7 +43,26 @@ export const DEFAULT_VAULT_WRAPPER = {
 	},
 };
 
-export async function initializeCoordinatorState(vaultId: string): Promise<void> {
+type CoordinatorStateLimits = {
+	storageLimitBytes?: number;
+	maxFileSizeBytes?: number;
+	versionHistoryRetentionDays?: number;
+};
+
+const DEFAULT_COORDINATOR_STATE_LIMITS = {
+	storageLimitBytes: 1_000_000_000,
+	maxFileSizeBytes: 10_000_000,
+	versionHistoryRetentionDays: 1,
+};
+
+export async function initializeCoordinatorState(
+	vaultId: string,
+	limits: CoordinatorStateLimits = {},
+): Promise<void> {
+	const resolvedLimits = {
+		...DEFAULT_COORDINATOR_STATE_LIMITS,
+		...limits,
+	};
 	const stub = env.SYNC_COORDINATOR.getByName(vaultId);
 	await runInDurableObject(stub, async (_instance, state) => {
 		state.storage.sql.exec(
@@ -55,11 +74,17 @@ export async function initializeCoordinatorState(vaultId: string): Promise<void>
 				max_file_size_bytes,
 				version_history_retention_days
 			)
-			VALUES (1, ?, 1000000000, 10000000, 1)
+			VALUES (1, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
-				vault_id = excluded.vault_id
+				vault_id = excluded.vault_id,
+				storage_limit_bytes = excluded.storage_limit_bytes,
+				max_file_size_bytes = excluded.max_file_size_bytes,
+				version_history_retention_days = excluded.version_history_retention_days
 			`,
 			vaultId,
+			resolvedLimits.storageLimitBytes,
+			resolvedLimits.maxFileSizeBytes,
+			resolvedLimits.versionHistoryRetentionDays,
 		);
 	});
 }

@@ -2,6 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
+import { getSubscriptionPlanPolicy } from "../../src/subscription/policy";
 import {
 	apiRequest,
 	initializeCoordinatorState,
@@ -71,7 +72,10 @@ describe("blob integration", () => {
 
 	it("rejects uploads that would exceed the vault storage quota", async () => {
 		const primary = await signUpAndCreateVault();
-		await initializeCoordinatorState(primary.vaultId);
+		const storageLimitBytes = 1_000_000_000;
+		await initializeCoordinatorState(primary.vaultId, {
+			storageLimitBytes,
+		});
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "quota-device");
 		const firstBlobId = uniqueId("blob");
 		const firstPayload = new TextEncoder().encode("1234");
@@ -93,7 +97,7 @@ describe("blob integration", () => {
 		await runInDurableObject(stub, async (_instance, state) => {
 			state.storage.sql.exec(
 				"UPDATE coordinator_state SET storage_used_bytes = ? WHERE id = 1",
-				1_000_000_000 - 1,
+				storageLimitBytes - 1,
 			);
 		});
 
@@ -125,7 +129,8 @@ describe("blob integration", () => {
 
 	it("rejects uploads above the free plan file size limit", async () => {
 		const primary = await signUpAndCreateVault();
-		await initializeCoordinatorState(primary.vaultId);
+		const freePolicy = getSubscriptionPlanPolicy("free");
+		await initializeCoordinatorState(primary.vaultId, freePolicy.limits);
 		const token = await issueSyncToken(primary.sessionCookie, primary.vaultId, "size-limit-device");
 		const blobId = uniqueId("blob");
 		const payload = new TextEncoder().encode("small body");
@@ -134,9 +139,7 @@ describe("blob integration", () => {
 			method: "PUT",
 			headers: {
 				authorization: `Bearer ${token.token}`,
-					"x-blob-size": String(
-					10_000_000 + 1,
-				),
+				"x-blob-size": String(freePolicy.limits.maxFileSizeBytes + 1),
 			},
 			body: payload,
 		});
