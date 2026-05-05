@@ -21,6 +21,9 @@ const TEST_BLOB_CONTEXT = {
 const TEST_BLOB_OPTIONS = {
   syncFormatVersion: 1,
 };
+const TEST_BLOB_V2_OPTIONS = {
+  syncFormatVersion: 2,
+};
 
 describe("sync crypto", () => {
   it("round-trips encrypted metadata", async () => {
@@ -51,15 +54,32 @@ describe("sync crypto", () => {
     ).resolves.toEqual(plaintext);
   });
 
+  it("round-trips encrypted v2 binary blobs", async () => {
+    const plaintext = new Uint8Array([1, 2, 3, 4, 5, 6]);
+    const encrypted = await encryptSyncBlob(
+      TEST_VAULT_KEY,
+      plaintext,
+      TEST_BLOB_CONTEXT,
+      TEST_BLOB_V2_OPTIONS,
+    );
+
+    expect(new TextDecoder().decode(encrypted.slice(0, 4))).toBe("SYNB");
+    expect(encrypted[4]).toBe(2);
+    expect(() => JSON.parse(new TextDecoder().decode(encrypted))).toThrow();
+    await expect(
+      decryptSyncBlob(TEST_VAULT_KEY, encrypted, TEST_BLOB_CONTEXT, TEST_BLOB_V2_OPTIONS),
+    ).resolves.toEqual(plaintext);
+  });
+
   it("rejects unsupported sync blob format versions", async () => {
     await expect(
       encryptSyncBlob(
         TEST_VAULT_KEY,
         new Uint8Array([1, 2, 3]),
         TEST_BLOB_CONTEXT,
-        { syncFormatVersion: 2 },
+        { syncFormatVersion: 3 },
       ),
-    ).rejects.toThrow("Unsupported sync blob format version: 2.");
+    ).rejects.toThrow("Unsupported sync blob format version: 3.");
   });
 
   it("rejects the wrong vault key", async () => {
@@ -105,6 +125,24 @@ describe("sync crypto", () => {
         encrypted,
         { blobId: "blob-2" },
         TEST_BLOB_OPTIONS,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("rejects v2 blobs served under the wrong blob id", async () => {
+    const encrypted = await encryptSyncBlob(
+      TEST_VAULT_KEY,
+      new Uint8Array([1, 2, 3]),
+      TEST_BLOB_CONTEXT,
+      TEST_BLOB_V2_OPTIONS,
+    );
+
+    await expect(
+      decryptSyncBlob(
+        TEST_VAULT_KEY,
+        encrypted,
+        { blobId: "blob-2" },
+        TEST_BLOB_V2_OPTIONS,
       ),
     ).rejects.toThrow();
   });

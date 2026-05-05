@@ -3,9 +3,13 @@ import { parseSyncedEntryMetadata, serializeSyncedEntryMetadata } from "./conten
 import { decodeBase64, encodeBase64, randomBytes, toArrayBuffer } from "../../utils/bytes";
 
 const ENVELOPE_VERSION = 1;
+const SYNC_BLOB_BINARY_ENVELOPE_VERSION = 2;
 const AES_GCM_NONCE_BYTES = 12;
 const KEY_USAGE_SALT = new Uint8Array();
-const SUPPORTED_SYNC_BLOB_FORMAT_VERSION = 1;
+const SYNC_BLOB_V2_MAGIC = new Uint8Array([0x53, 0x59, 0x4e, 0x42]);
+const SYNC_BLOB_V2_VERSION_OFFSET = SYNC_BLOB_V2_MAGIC.byteLength;
+const SYNC_BLOB_V2_NONCE_OFFSET = SYNC_BLOB_V2_VERSION_OFFSET + 1;
+const SYNC_BLOB_V2_CIPHERTEXT_OFFSET = SYNC_BLOB_V2_NONCE_OFFSET + AES_GCM_NONCE_BYTES;
 
 export type SyncMetadataCryptoContext = {
   entryId: string;
@@ -61,14 +65,22 @@ export async function encryptSyncBlob(
   context: SyncBlobCryptoContext,
   options: SyncBlobEnvelopeOptions,
 ): Promise<Uint8Array> {
-  assertSupportedSyncBlobFormatVersion(options.syncFormatVersion);
-  const envelope = await encryptEnvelope(
-    remoteVaultKey,
-    "sync-blob",
-    plaintext,
-    encodeBlobAad(context),
-  );
-  return new TextEncoder().encode(envelope);
+  switch (options.syncFormatVersion) {
+    case ENVELOPE_VERSION: {
+      const envelope = await encryptEnvelope(
+        remoteVaultKey,
+        "sync-blob",
+        plaintext,
+        encodeBlobAad(context, ENVELOPE_VERSION),
+        ENVELOPE_VERSION,
+      );
+      return new TextEncoder().encode(envelope);
+    }
+    case SYNC_BLOB_BINARY_ENVELOPE_VERSION:
+      return await encryptBinaryBlobEnvelope(remoteVaultKey, plaintext, context);
+    default:
+      throwUnsupportedSyncBlobFormatVersion(options.syncFormatVersion);
+  }
 }
 
 export async function decryptSyncBlob(
@@ -77,13 +89,20 @@ export async function decryptSyncBlob(
   context: SyncBlobCryptoContext,
   options: SyncBlobEnvelopeOptions,
 ): Promise<Uint8Array> {
-  assertSupportedSyncBlobFormatVersion(options.syncFormatVersion);
-  return await decryptEnvelope(
-    remoteVaultKey,
-    "sync-blob",
-    new TextDecoder().decode(encryptedBlob),
-    encodeBlobAad(context),
-  );
+  switch (options.syncFormatVersion) {
+    case ENVELOPE_VERSION:
+      return await decryptEnvelope(
+        remoteVaultKey,
+        "sync-blob",
+        new TextDecoder().decode(encryptedBlob),
+        encodeBlobAad(context, ENVELOPE_VERSION),
+        ENVELOPE_VERSION,
+      );
+    case SYNC_BLOB_BINARY_ENVELOPE_VERSION:
+      return await decryptBinaryBlobEnvelope(remoteVaultKey, encryptedBlob, context);
+    default:
+      throwUnsupportedSyncBlobFormatVersion(options.syncFormatVersion);
+  }
 }
 
 async function encryptEnvelope(
@@ -91,8 +110,9 @@ async function encryptEnvelope(
   usage: string,
   plaintext: Uint8Array,
   additionalData: Uint8Array,
+  envelopeVersion = ENVELOPE_VERSION,
 ): Promise<string> {
-  const key = await deriveUsageKey(remoteVaultKey, usage);
+  const key = await deriveUsageKey(remoteVaultKey, usage, envelopeVersion);
   const nonce = randomBytes(AES_GCM_NONCE_BYTES);
   const ciphertext = await crypto.subtle.encrypt(
     {
@@ -105,7 +125,7 @@ async function encryptEnvelope(
   );
 
   return JSON.stringify({
-    version: ENVELOPE_VERSION,
+    version: envelopeVersion,
     nonce: encodeBase64(nonce),
     ciphertext: encodeBase64(new Uint8Array(ciphertext)),
   } satisfies EncryptedEnvelope);
@@ -116,9 +136,10 @@ async function decryptEnvelope(
   usage: string,
   serializedEnvelope: string,
   additionalData: Uint8Array,
+  envelopeVersion = ENVELOPE_VERSION,
 ): Promise<Uint8Array> {
-  const envelope = parseEncryptedEnvelope(serializedEnvelope);
-  const key = await deriveUsageKey(remoteVaultKey, usage);
+  const envelope = parseEncryptedEnvelope(serializedEnvelope, envelopeVersion);
+  const key = await deriveUsageKey(remoteVaultKey, usage, envelopeVersion);
   const plaintext = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",
@@ -132,7 +153,92 @@ async function decryptEnvelope(
   return new Uint8Array(plaintext);
 }
 
-async function deriveUsageKey(remoteVaultKey: Uint8Array, usage: string): Promise<CryptoKey> {
+async function encryptBinaryBlobEnvelope(
+  remoteVaultKey: Uint8Array,
+  plaintext: Uint8Array,
+  context: SyncBlobCryptoContext,
+): Promise<Uint8Array> {
+  const nonce = randomBytes(AES_GCM_NONCE_BYTES);
+  const ciphertext = await encryptAesGcm(
+    remoteVaultKey,
+    "sync-blob",
+    plaintext,
+    nonce,
+    encodeBlobAad(context, SYNC_BLOB_BINARY_ENVELOPE_VERSION),
+    SYNC_BLOB_BINARY_ENVELOPE_VERSION,
+  );
+  const envelope = new Uint8Array(SYNC_BLOB_V2_CIPHERTEXT_OFFSET + ciphertext.byteLength);
+  envelope.set(SYNC_BLOB_V2_MAGIC, 0);
+  envelope[SYNC_BLOB_V2_VERSION_OFFSET] = SYNC_BLOB_BINARY_ENVELOPE_VERSION;
+  envelope.set(nonce, SYNC_BLOB_V2_NONCE_OFFSET);
+  envelope.set(ciphertext, SYNC_BLOB_V2_CIPHERTEXT_OFFSET);
+  return envelope;
+}
+
+async function decryptBinaryBlobEnvelope(
+  remoteVaultKey: Uint8Array,
+  encryptedBlob: Uint8Array,
+  context: SyncBlobCryptoContext,
+): Promise<Uint8Array> {
+  const { nonce, ciphertext } = parseBinaryBlobEnvelope(encryptedBlob);
+  const plaintext = await decryptAesGcm(
+    remoteVaultKey,
+    "sync-blob",
+    ciphertext,
+    nonce,
+    encodeBlobAad(context, SYNC_BLOB_BINARY_ENVELOPE_VERSION),
+    SYNC_BLOB_BINARY_ENVELOPE_VERSION,
+  );
+  return plaintext;
+}
+
+async function encryptAesGcm(
+  remoteVaultKey: Uint8Array,
+  usage: string,
+  plaintext: Uint8Array,
+  nonce: Uint8Array,
+  additionalData: Uint8Array,
+  envelopeVersion: number,
+): Promise<Uint8Array> {
+  const key = await deriveUsageKey(remoteVaultKey, usage, envelopeVersion);
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: toArrayBuffer(nonce),
+      additionalData: toArrayBuffer(additionalData),
+    },
+    key,
+    toArrayBuffer(plaintext),
+  );
+  return new Uint8Array(ciphertext);
+}
+
+async function decryptAesGcm(
+  remoteVaultKey: Uint8Array,
+  usage: string,
+  ciphertext: Uint8Array,
+  nonce: Uint8Array,
+  additionalData: Uint8Array,
+  envelopeVersion: number,
+): Promise<Uint8Array> {
+  const key = await deriveUsageKey(remoteVaultKey, usage, envelopeVersion);
+  const plaintext = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: toArrayBuffer(nonce),
+      additionalData: toArrayBuffer(additionalData),
+    },
+    key,
+    toArrayBuffer(ciphertext),
+  );
+  return new Uint8Array(plaintext);
+}
+
+async function deriveUsageKey(
+  remoteVaultKey: Uint8Array,
+  usage: string,
+  envelopeVersion: number,
+): Promise<CryptoKey> {
   const imported = await crypto.subtle.importKey(
     "raw",
     toArrayBuffer(remoteVaultKey),
@@ -146,7 +252,7 @@ async function deriveUsageKey(remoteVaultKey: Uint8Array, usage: string): Promis
       name: "HKDF",
       hash: "SHA-256",
       salt: toArrayBuffer(KEY_USAGE_SALT),
-      info: new TextEncoder().encode(`${usage}:v${ENVELOPE_VERSION}`),
+      info: new TextEncoder().encode(`${usage}:v${envelopeVersion}`),
     },
     imported,
     {
@@ -171,19 +277,40 @@ function encodeMetadataAad(context: SyncMetadataCryptoContext): Uint8Array {
   );
 }
 
-function encodeBlobAad(context: SyncBlobCryptoContext): Uint8Array {
+function encodeBlobAad(context: SyncBlobCryptoContext, envelopeVersion: number): Uint8Array {
   return new TextEncoder().encode(
-    ["synch.sync-blob", `v${ENVELOPE_VERSION}`, context.blobId].join("\n"),
+    ["synch.sync-blob", `v${envelopeVersion}`, context.blobId].join("\n"),
   );
 }
 
-function assertSupportedSyncBlobFormatVersion(syncFormatVersion: number): void {
-  if (syncFormatVersion !== SUPPORTED_SYNC_BLOB_FORMAT_VERSION) {
-    throw new Error(`Unsupported sync blob format version: ${syncFormatVersion}.`);
+function parseBinaryBlobEnvelope(value: Uint8Array): {
+  nonce: Uint8Array;
+  ciphertext: Uint8Array;
+} {
+  if (value.byteLength < SYNC_BLOB_V2_CIPHERTEXT_OFFSET) {
+    throw new Error("Encrypted sync blob v2 payload is too short.");
   }
+  for (let index = 0; index < SYNC_BLOB_V2_MAGIC.byteLength; index += 1) {
+    if (value[index] !== SYNC_BLOB_V2_MAGIC[index]) {
+      throw new Error("Encrypted sync blob v2 payload has an invalid magic header.");
+    }
+  }
+  if (value[SYNC_BLOB_V2_VERSION_OFFSET] !== SYNC_BLOB_BINARY_ENVELOPE_VERSION) {
+    throw new Error(
+      `Unsupported sync blob binary envelope version: ${value[SYNC_BLOB_V2_VERSION_OFFSET] ?? "unknown"}.`,
+    );
+  }
+  return {
+    nonce: value.slice(SYNC_BLOB_V2_NONCE_OFFSET, SYNC_BLOB_V2_CIPHERTEXT_OFFSET),
+    ciphertext: value.slice(SYNC_BLOB_V2_CIPHERTEXT_OFFSET),
+  };
 }
 
-function parseEncryptedEnvelope(value: string): EncryptedEnvelope {
+function throwUnsupportedSyncBlobFormatVersion(syncFormatVersion: number): never {
+  throw new Error(`Unsupported sync blob format version: ${syncFormatVersion}.`);
+}
+
+function parseEncryptedEnvelope(value: string, envelopeVersion = ENVELOPE_VERSION): EncryptedEnvelope {
   let parsed: unknown;
   try {
     parsed = JSON.parse(value) as unknown;
@@ -196,7 +323,7 @@ function parseEncryptedEnvelope(value: string): EncryptedEnvelope {
   }
 
   const record = parsed as Partial<EncryptedEnvelope>;
-  if (record.version !== ENVELOPE_VERSION) {
+  if (record.version !== envelopeVersion) {
     throw new Error(`Unsupported sync payload version: ${record.version ?? "unknown"}.`);
   }
   if (typeof record.nonce !== "string" || !record.nonce.trim()) {

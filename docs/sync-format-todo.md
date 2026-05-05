@@ -24,7 +24,8 @@ Implementation notes:
 - Keep v1 decrypt support so existing vaults and cached blobs remain readable.
 - Start with binary blob envelopes only; metadata envelopes can stay v1 unless there is a separate reason to change them.
 - Reject or clearly block old plugin versions from connecting to v2 vaults if they cannot read the new envelope.
-- Define the v2 binary byte layout before enabling v2 vault creation.
+- Use the v2 binary byte layout: `SYNB` magic bytes, one version byte (`0x02`),
+  12 nonce bytes, then ciphertext bytes.
 
 The expected rollout shape is:
 

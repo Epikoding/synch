@@ -177,13 +177,13 @@ describe("SyncTokenManager", () => {
           expiresAt: 1_120,
           vaultId: "vault-1",
           localVaultId: "local-vault-1",
-          syncFormatVersion: 2,
+          syncFormatVersion: 3,
         })),
       } as SyncAccessClient,
     });
 
     await expect(manager.getTokenForActiveRemoteVault()).rejects.toThrow(
-      "Unsupported sync format version: 2.",
+      "Unsupported sync format version: 3.",
     );
   });
 

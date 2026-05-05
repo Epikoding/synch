@@ -2,7 +2,7 @@ import type { SyncTokenResponse } from "./client";
 import { SyncAccessClient } from "./client";
 
 const REFRESH_SKEW_SECONDS = 15;
-const SUPPORTED_SYNC_FORMAT_VERSIONS = new Set([1]);
+const SUPPORTED_SYNC_FORMAT_VERSIONS = new Set([1, 2]);
 
 export interface SyncTokenManagerDeps {
   getApiBaseUrl: () => string;

@@ -69,7 +69,10 @@ describe("SyncPushService drain: basic queue", () => {
     });
     const service = new SyncPushService({
       getApiBaseUrl: () => "http://127.0.0.1:8787",
-      getSyncToken: async () => createToken(),
+      getSyncToken: async () => ({
+        ...createToken(),
+        syncFormatVersion: 2,
+      }),
       getSyncStore: () => store,
       getRemoteVaultKey: () => TEST_VAULT_KEY,
       fileReader: {
@@ -123,10 +126,11 @@ describe("SyncPushService drain: basic queue", () => {
     );
     expect(uploaded).toHaveLength(1);
     expect(new TextDecoder().decode(uploaded[0]?.bytes ?? new Uint8Array())).not.toBe("new body");
+    expect(new TextDecoder().decode(uploaded[0]?.bytes.slice(0, 4))).toBe("SYNB");
     await expect(
       decryptSyncBlob(TEST_VAULT_KEY, uploaded[0]?.bytes ?? new Uint8Array(), {
         blobId: uploaded[0]?.blobId ?? "",
-      }, { syncFormatVersion: 1 }),
+      }, { syncFormatVersion: 2 }),
     ).resolves.toEqual(new TextEncoder().encode("new body"));
     await expect(
       decryptSyncMetadata(
