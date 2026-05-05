@@ -61,6 +61,7 @@ export class SynchPluginController implements SynchSettingsController {
   };
   private storedRemoteVaultKeySecret: StoredRemoteVaultKeySecret | null = null;
   private storedSyncConnection: SyncConnection | null = null;
+  private remoteVaultSyncFormatVersion: number | null = null;
   private resumeAutoSyncPromise: Promise<void> | null = null;
   private readonly authManager = new AuthManager({
     plugin: this.plugin,
@@ -96,7 +97,7 @@ export class SynchPluginController implements SynchSettingsController {
     getApiBaseUrl: () => this.getApiBaseUrl(),
     getSyncToken: async () => await this.getSyncTokenForActiveRemoteVault(),
     invalidateSyncToken: () => {
-      this.syncTokenManager.clear();
+      this.clearSyncTokenState();
     },
     getRemoteVaultKey: () => this.getActiveRemoteVaultKey(),
     getSyncFileRules: () => this.getSyncFileRules(),
@@ -135,7 +136,9 @@ export class SynchPluginController implements SynchSettingsController {
     plugin: this.plugin,
     remoteVaultManager: this.remoteVaultManager,
     syncController: this.syncController,
-    syncTokenManager: this.syncTokenManager,
+    clearSyncTokenState: () => {
+      this.clearSyncTokenState();
+    },
     getApiBaseUrl: () => this.getApiBaseUrl(),
     getSyncFileRules: () => this.getSyncFileRules(),
     getStoredRemoteVaultId: () => this.storedSyncConnection?.remoteVaultId ?? null,
@@ -247,6 +250,10 @@ export class SynchPluginController implements SynchSettingsController {
 
   getRemoteVaultStatusLabel(): string {
     return this.remoteVaultManager.getRemoteVaultStatusLabel();
+  }
+
+  getRemoteVaultSyncFormatVersion(): number | null {
+    return this.remoteVaultSyncFormatVersion;
   }
 
   hasConnectedRemoteVault(): boolean {
@@ -369,7 +376,12 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async getSyncTokenForActiveRemoteVault(): Promise<SyncTokenResponse> {
-    return await this.syncTokenManager.getTokenForActiveRemoteVault();
+    const token = await this.syncTokenManager.getTokenForActiveRemoteVault();
+    if (this.remoteVaultSyncFormatVersion !== token.syncFormatVersion) {
+      this.remoteVaultSyncFormatVersion = token.syncFormatVersion;
+      this.refreshUi();
+    }
+    return token;
   }
 
   async beginDeviceLogin(): Promise<void> {
@@ -379,7 +391,7 @@ export class SynchPluginController implements SynchSettingsController {
       loginStarted = await this.authManager.beginDeviceLogin();
     } finally {
       if (loginStarted) {
-        this.syncTokenManager.clear();
+        this.clearSyncTokenState();
         await this.ensureAutoSyncState();
       }
     }
@@ -389,11 +401,16 @@ export class SynchPluginController implements SynchSettingsController {
     try {
       await this.authManager.signOutDevice();
     } finally {
-      this.syncTokenManager.clear();
+      this.clearSyncTokenState();
       this.remoteVaultManager.clearSession();
       await this.saveStoredRemoteVaultKeySecret(null);
       await this.resetSyncConnection();
     }
+  }
+
+  private clearSyncTokenState(): void {
+    this.syncTokenManager.clear();
+    this.remoteVaultSyncFormatVersion = null;
   }
 
   async createRemoteVaultFromPrompt(): Promise<void> {

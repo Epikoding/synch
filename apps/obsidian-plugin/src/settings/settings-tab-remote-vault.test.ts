@@ -4,6 +4,7 @@ import {
   getButtonComponents,
   getCreatedElementTexts,
   getMarkdownRenderCalls,
+  getSettingDescriptions,
   getNotices,
   getSettingClasses,
   getSettingNames,
@@ -69,6 +70,49 @@ describe("SynchSettingTab remote vault settings", () => {
     expect(getSettingNames()).toContain("Deleted files");
     expect(getButtonComponents().map((button) => button.text)).toContain(
       "View deleted files",
+    );
+  });
+
+  it("shows the storage-efficient vault hint below deleted files for format v1 vaults", () => {
+    const openRemoteVaultManagementPage = vi.fn();
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getRemoteVaultSyncFormatVersion: () => 1,
+      openRemoteVaultManagementPage,
+    });
+
+    tab.display();
+
+    const settingNames = getSettingNames();
+    const deletedFilesIndex = settingNames.indexOf("Deleted files");
+    const hintIndex = settingNames.indexOf(
+      "New vaults can sync faster and use up to 33% less storage",
+    );
+    expect(deletedFilesIndex).toBeGreaterThanOrEqual(0);
+    expect(hintIndex).toBe(deletedFilesIndex + 1);
+    expect(getSettingDescriptions()).toContain(
+      "To use the latest remote vault version, which is faster and more storage-efficient, delete this remote vault from the vault management page, then create it again. Your local Obsidian vault files are not deleted when you remove the remote vault.",
+    );
+
+    getButtonComponents()
+      .find((button) => button.text === "Manage remote vaults")
+      ?.click();
+
+    expect(openRemoteVaultManagementPage).toHaveBeenCalled();
+  });
+
+  it("hides the storage-efficient vault hint for latest-version vaults", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      getRemoteVaultSyncFormatVersion: () => 2,
+    });
+
+    tab.display();
+
+    expect(getSettingNames()).not.toContain(
+      "New vaults can sync faster and use up to 33% less storage",
     );
   });
 

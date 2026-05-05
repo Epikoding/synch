@@ -7,14 +7,13 @@ import {
   openCreateRemoteVaultModal,
 } from "./remote-vault-modals";
 import { shouldSyncPath, type SyncFileRules } from "../sync/core/file-rules";
-import { SyncTokenManager } from "../sync/remote/token-manager";
 import { SyncController } from "../sync/runtime/controller";
 
 export interface SynchRemoteVaultControllerDeps {
   plugin: Plugin;
   remoteVaultManager: RemoteVaultManager;
   syncController: SyncController;
-  syncTokenManager: SyncTokenManager;
+  clearSyncTokenState: () => void;
   getApiBaseUrl: () => string;
   getSyncFileRules: () => SyncFileRules;
   getStoredRemoteVaultId: () => string | null;
@@ -98,7 +97,7 @@ export class SynchRemoteVaultController {
     } catch (error) {
       this.deps.notifyError(error, "Vault disconnect failed");
     } finally {
-      this.deps.syncTokenManager.clear();
+      this.deps.clearSyncTokenState();
       await this.deps.resetSyncConnection();
     }
   }
