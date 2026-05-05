@@ -5,6 +5,7 @@ import * as schema from "../db/d1";
 import {
 	applySubscriptionPlanLimitOverrides,
 	getSubscriptionPlanPolicy,
+	type PaidSubscriptionPlanId,
 	type SubscriptionPlanId,
 	type SubscriptionPlanPolicy,
 } from "./policy";
@@ -17,7 +18,7 @@ const ACTIVE_ACCESS_STATUSES = new Set(["active", "trialing"]);
 const PERIOD_ACCESS_STATUSES = new Set(["canceled", "past_due", "unpaid"]);
 
 export type SubscriptionPolicyServiceConfig = {
-	starterProductId?: string;
+	productIdsByPlanId?: Partial<Record<PaidSubscriptionPlanId, string>>;
 };
 
 export class SubscriptionPolicyService implements SubscriptionPolicyReader {
@@ -49,7 +50,7 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 		const activePlanId = subscriptions
 			.map((subscription) =>
 				subscriptionAccessPlanId(subscription, {
-					starterProductId: this.config.starterProductId,
+					productIdsByPlanId: this.config.productIdsByPlanId,
 				}),
 			)
 			.find((planId) => planId !== null);
@@ -114,9 +115,12 @@ export function subscriptionAccessPlanId(
 		return null;
 	}
 
-	if (!config.starterProductId) {
-		return "starter";
+	const productIdsByPlanId = config.productIdsByPlanId ?? {};
+	for (const [planId, productId] of Object.entries(productIdsByPlanId)) {
+		if (productId && subscription.productId === productId) {
+			return planId as PaidSubscriptionPlanId;
+		}
 	}
 
-	return subscription.productId === config.starterProductId ? "starter" : null;
+	return null;
 }

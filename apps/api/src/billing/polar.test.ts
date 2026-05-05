@@ -33,11 +33,12 @@ describe("createPolarCheckout", () => {
 			createPolarCheckout(
 				{
 					accessToken: "polar-token",
-					productId: "starter-product",
 					wwwBaseUrl: "https://synch.example",
 					sandbox: true,
 				},
 				{
+					planId: "starter",
+					productId: "starter-product",
 					organizationId: "org-1",
 					userId: "user-1",
 					email: "user@example.com",
@@ -70,33 +71,17 @@ describe("createPolarCheckout", () => {
 		await expect(
 			createPolarCheckout(
 				{
-					productId: "starter-product",
 					wwwBaseUrl: "https://synch.example",
 				},
 				{
+					planId: "starter",
+					productId: "starter-product",
 					organizationId: "org-1",
 					userId: "user-1",
 					email: "user@example.com",
 				},
 			),
 		).rejects.toThrow("POLAR_ACCESS_TOKEN is not configured");
-		expect(polarMocks.checkoutsCreate).not.toHaveBeenCalled();
-	});
-
-	it("requires a starter product id", async () => {
-		await expect(
-			createPolarCheckout(
-				{
-					accessToken: "polar-token",
-					wwwBaseUrl: "https://synch.example",
-				},
-				{
-					organizationId: "org-1",
-					userId: "user-1",
-					email: "user@example.com",
-				},
-			),
-		).rejects.toThrow("POLAR_STARTER_PRODUCT_ID is not configured");
 		expect(polarMocks.checkoutsCreate).not.toHaveBeenCalled();
 	});
 
@@ -107,10 +92,11 @@ describe("createPolarCheckout", () => {
 			createPolarCheckout(
 				{
 					accessToken: "polar-token",
-					productId: "starter-product",
 					wwwBaseUrl: "https://synch.example",
 				},
 				{
+					planId: "starter",
+					productId: "starter-product",
 					organizationId: "org-1",
 					userId: "user-1",
 					email: "user@example.com",

@@ -18,7 +18,9 @@ export function createCoordinatorRuntime(ctx: DurableObjectState, env: Env) {
 	const blobRepository = new BlobRepository(env.SYNC_BLOBS);
 	const vaultRepository = new VaultRepository(db);
 	const subscriptionPolicyService = new SubscriptionPolicyService(env.SELF_HOSTED, db, {
-		starterProductId: env.POLAR_STARTER_PRODUCT_ID,
+		productIdsByPlanId: {
+			starter: env.POLAR_STARTER_PRODUCT_ID,
+		},
 	});
 	const syncStatusRepository = new VaultSyncStatusRepository(env.DB);
 	const syncTokenService = new SyncTokenService(env.SYNC_TOKEN_SECRET);

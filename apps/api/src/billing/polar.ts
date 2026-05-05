@@ -7,10 +7,10 @@ import type {
 	BillingRepository,
 	PolarSubscriptionUpsertInput,
 } from "./repository";
+import type { PaidSubscriptionPlanId } from "../subscription/policy";
 
 export type PolarClientConfig = {
 	accessToken?: string;
-	productId?: string;
 	webhookSecret?: string;
 	sandbox?: boolean;
 };
@@ -22,7 +22,7 @@ export function createPolarAuthPlugin(
 		onSubscriptionUpsert?: (organizationId: string) => Promise<void>;
 	} = {},
 ) {
-	if (!config.accessToken || !config.productId || !config.webhookSecret) {
+	if (!config.accessToken || !config.webhookSecret) {
 		return null;
 	}
 
@@ -51,6 +51,8 @@ export function createPolarAuthPlugin(
 export async function createPolarCheckout(
 	config: PolarClientConfig & { wwwBaseUrl: string },
 	input: {
+		planId: PaidSubscriptionPlanId;
+		productId: string;
 		organizationId: string;
 		userId: string;
 		email: string;
@@ -59,17 +61,9 @@ export async function createPolarCheckout(
 	if (!config.accessToken) {
 		throw apiError(500, "billing_not_configured", "POLAR_ACCESS_TOKEN is not configured");
 	}
-	if (!config.productId) {
-		throw apiError(
-			500,
-			"billing_not_configured",
-			"POLAR_STARTER_PRODUCT_ID is not configured",
-		);
-	}
-
 	try {
 		const checkout = await createPolarClient(config).checkouts.create({
-			products: [config.productId],
+			products: [input.productId],
 			externalCustomerId: input.userId,
 			customerEmail: input.email,
 			successUrl: new URL(
@@ -80,7 +74,7 @@ export async function createPolarCheckout(
 				referenceId: input.organizationId,
 				organizationId: input.organizationId,
 				userId: input.userId,
-				planId: "starter",
+				planId: input.planId,
 			},
 		});
 

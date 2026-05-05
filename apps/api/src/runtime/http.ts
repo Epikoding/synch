@@ -37,9 +37,11 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 	);
 	const db = createDb(env.DB);
 	const billingRepository = new BillingRepository(db);
+	const productIdsByPlanId = {
+		starter: env.POLAR_STARTER_PRODUCT_ID,
+	};
 	const polarConfig = {
 		accessToken: env.POLAR_ACCESS_TOKEN,
-		productId: env.POLAR_STARTER_PRODUCT_ID,
 		webhookSecret: env.POLAR_WEBHOOK_SECRET,
 		sandbox: resolveBooleanBinding(env.POLAR_SANDBOX, false),
 		publicBaseUrl: authBaseUrl,
@@ -47,7 +49,7 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 	const vaultRepository = new VaultRepository(db);
 	const coordinatorProxyRepository = new CoordinatorProxyRepository(env.SYNC_COORDINATOR);
 	const subscriptionPolicyService = new SubscriptionPolicyService(env.SELF_HOSTED, db, {
-		starterProductId: env.POLAR_STARTER_PRODUCT_ID,
+		productIdsByPlanId,
 	});
 	const subscriptionPolicyRefreshQueue =
 		new CloudflareSubscriptionPolicyRefreshQueue(env.POLICY_REFRESH_QUEUE);
@@ -73,6 +75,7 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 	const syncTokenService = new SyncTokenService(env.SYNC_TOKEN_SECRET);
 	const billingService = new BillingService(billingRepository, {
 		...polarConfig,
+		productIdsByPlanId,
 		wwwBaseUrl: corsOrigin,
 	});
 	const vaultPurgeQueue = new CloudflareVaultPurgeQueue(env.VAULT_PURGE_QUEUE);

@@ -15,7 +15,9 @@ export function createQueueConsumer(env: Env): QueueConsumer {
 	const db = createDb(env.DB);
 	const vaultRepository = new VaultRepository(db);
 	const subscriptionPolicyService = new SubscriptionPolicyService(env.SELF_HOSTED, db, {
-		starterProductId: env.POLAR_STARTER_PRODUCT_ID,
+		productIdsByPlanId: {
+			starter: env.POLAR_STARTER_PRODUCT_ID,
+		},
 	});
 	const vaultService = new VaultService(vaultRepository, subscriptionPolicyService);
 	const coordinatorProxyRepository = new CoordinatorProxyRepository(env.SYNC_COORDINATOR);

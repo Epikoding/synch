@@ -10,6 +10,7 @@ interface Props {
 
 const { locale } = Astro.props;
 const t = ui[locale];
+const apiUrl = import.meta.env.PUBLIC_API_URL || "";
 const freeFeatures = [
   t.pricing.features.oneVault,
   t.pricing.features.freeStorage,
@@ -102,6 +103,8 @@ const starterFeatures = [
           </ul>
 
           <button
+            id="starter-checkout-button"
+            type="button"
             disabled
             class="w-full py-2 px-4 text-center text-xs bg-zinc-800/50 text-zinc-500 rounded cursor-not-allowed"
           >
@@ -114,3 +117,34 @@ const starterFeatures = [
     <Footer locale={locale} />
   </div>
 </Layout>
+
+<script define:vars={{ apiUrl }}>
+  const starterCheckoutButton = document.getElementById("starter-checkout-button");
+
+  if (starterCheckoutButton instanceof HTMLButtonElement) {
+    starterCheckoutButton.addEventListener("click", async () => {
+      starterCheckoutButton.disabled = true;
+
+      try {
+        const response = await fetch(`${apiUrl}/v1/billing/checkout`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ planId: "starter" }),
+        });
+
+        if (!response.ok) {
+          throw new Error("checkout failed");
+        }
+
+        const checkout = await response.json();
+        window.location.href = checkout.url;
+      } catch {
+        starterCheckoutButton.disabled = false;
+      }
+    });
+  }
+</script>

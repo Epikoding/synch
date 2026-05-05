@@ -4,6 +4,7 @@ export const BYTES_PER_GB = 1_000_000_000;
 export const SUBSCRIPTION_PLAN_IDS = ["free", "starter", "self_hosted"] as const;
 
 export type SubscriptionPlanId = (typeof SUBSCRIPTION_PLAN_IDS)[number];
+export type PaidSubscriptionPlanId = Exclude<SubscriptionPlanId, "free" | "self_hosted">;
 
 export type SubscriptionPlanPolicy = {
 	id: SubscriptionPlanId;

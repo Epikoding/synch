@@ -8,6 +8,7 @@ import {
 import {
 	SubscriptionPolicyService,
 	subscriptionGrantsAccess,
+	subscriptionAccessPlanId,
 } from "./policy-service";
 
 describe("SubscriptionPolicyService", () => {
@@ -52,7 +53,11 @@ describe("SubscriptionPolicyService", () => {
 					},
 				],
 			}),
-			{ starterProductId: "starter-product" },
+			{
+				productIdsByPlanId: {
+					starter: "starter-product",
+				},
+			},
 		).readOrganizationPolicy("org-1");
 
 		expect(policy.id).toBe("starter");
@@ -71,7 +76,11 @@ describe("SubscriptionPolicyService", () => {
 					},
 				],
 			}),
-			{ starterProductId: "starter-product" },
+			{
+				productIdsByPlanId: {
+					starter: "starter-product",
+				},
+			},
 		).readOrganizationPolicy("org-1");
 
 		expect(policy.id).toBe("free");
@@ -136,6 +145,37 @@ describe("SubscriptionPolicyService", () => {
 		expect(subscriptionGrantsAccess({ status: "canceled", periodEnd: null })).toBe(
 			false,
 		);
+	});
+
+	it("maps subscriptions to plan ids through product ids", () => {
+		expect(
+			subscriptionAccessPlanId(
+				{
+					productId: "starter-product",
+					status: "active",
+					periodEnd: new Date(Date.now() + 60_000),
+				},
+				{
+					productIdsByPlanId: {
+						starter: "starter-product",
+					},
+				},
+			),
+		).toBe("starter");
+		expect(
+			subscriptionAccessPlanId(
+				{
+					productId: "other-product",
+					status: "active",
+					periodEnd: new Date(Date.now() + 60_000),
+				},
+				{
+					productIdsByPlanId: {
+						starter: "starter-product",
+					},
+				},
+			),
+		).toBeNull();
 	});
 });
 
