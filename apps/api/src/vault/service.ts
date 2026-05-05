@@ -98,6 +98,10 @@ export class VaultService {
 		return await this.vaultRepository.userCanAccessVault(userId, vaultId);
 	}
 
+	async getAccessibleVault(userId: string, vaultId: string): Promise<VaultRecord | null> {
+		return await this.vaultRepository.readAccessibleVaultForUser(userId, vaultId);
+	}
+
 	async userCanManageVault(userId: string, vaultId: string): Promise<boolean> {
 		return await this.vaultRepository.userCanManageVault(userId, vaultId);
 	}

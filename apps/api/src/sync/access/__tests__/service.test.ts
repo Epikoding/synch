@@ -15,7 +15,17 @@ import type { SyncTokenService } from "../token-service";
 describe("SyncService", () => {
 	it("includes the sync format version in issued token responses", async () => {
 		const vaultService = {
-			userCanAccessVault: vi.fn(async () => true),
+			getAccessibleVault: vi.fn(async () => ({
+				id: "vault-1",
+				organizationId: "org-1",
+				name: "Vault",
+				activeKeyVersion: 1,
+				syncFormatVersion: 2,
+				createdAt: new Date(0),
+				deletedAt: null,
+				purgeStatus: null,
+				purgeError: null,
+			})),
 		} as unknown as VaultService;
 		const syncTokenService = {
 			signSyncToken: vi.fn(async () => "token"),
@@ -34,13 +44,13 @@ describe("SyncService", () => {
 			token: "token",
 			vaultId: "vault-1",
 			localVaultId: "local-vault-1",
-			syncFormatVersion: 1,
+			syncFormatVersion: 2,
 		});
 	});
 
 	it("rejects issuing a token for a vault the caller cannot access", async () => {
 		const vaultService = {
-			userCanAccessVault: vi.fn(async () => false),
+			getAccessibleVault: vi.fn(async () => null),
 		} as unknown as VaultService;
 		const syncTokenService = {
 			signSyncToken: vi.fn(async () => "token"),

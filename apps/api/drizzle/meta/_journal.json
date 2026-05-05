@@ -22,6 +22,13 @@
       "when": 1777597832142,
       "tag": "0002_lazy_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1777979797408,
+      "tag": "0003_lively_agent_brand",
+      "breakpoints": true
     }
   ]
 }

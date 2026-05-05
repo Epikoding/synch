@@ -74,6 +74,7 @@ export class VaultRepository {
 				organizationId: schema.vault.organizationId,
 				name: schema.vault.name,
 				activeKeyVersion: schema.vault.activeKeyVersion,
+				syncFormatVersion: schema.vault.syncFormatVersion,
 				createdAt: schema.vault.createdAt,
 				deletedAt: schema.vault.deletedAt,
 				purgeStatus: schema.vault.purgeStatus,
@@ -95,6 +96,14 @@ export class VaultRepository {
 			)
 			.orderBy(asc(schema.vault.createdAt));
 		return rows.map(toVaultRecord);
+	}
+
+	async readAccessibleVaultForUser(
+		userId: string,
+		vaultId: string,
+	): Promise<VaultRecord | null> {
+		const row = await this.readAccessibleVaultRowForUser(userId, vaultId);
+		return row ? toVaultRecord(row) : null;
 	}
 
 	async countVaultsForOrganization(organizationId: string): Promise<number> {
@@ -364,7 +373,7 @@ export class VaultRepository {
 		userId: string,
 		vaultId: string,
 	): Promise<VaultBootstrapRecord | null> {
-		const vault = await this.readAccessibleVaultForUser(userId, vaultId);
+		const vault = await this.readAccessibleVaultRowForUser(userId, vaultId);
 		if (!vault) {
 			return null;
 		}
@@ -435,7 +444,7 @@ export class VaultRepository {
 		return toVaultKeyWrapperRecord(wrapper);
 	}
 
-	private async readAccessibleVaultForUser(
+	private async readAccessibleVaultRowForUser(
 		userId: string,
 		vaultId: string,
 	): Promise<typeof schema.vault.$inferSelect | null> {
@@ -445,6 +454,7 @@ export class VaultRepository {
 				organizationId: schema.vault.organizationId,
 				name: schema.vault.name,
 				activeKeyVersion: schema.vault.activeKeyVersion,
+				syncFormatVersion: schema.vault.syncFormatVersion,
 				createdAt: schema.vault.createdAt,
 				deletedAt: schema.vault.deletedAt,
 				purgeStatus: schema.vault.purgeStatus,
@@ -477,6 +487,7 @@ function toVaultRecord(row: typeof schema.vault.$inferSelect): VaultRecord {
 		organizationId: row.organizationId,
 		name: row.name,
 		activeKeyVersion: row.activeKeyVersion,
+		syncFormatVersion: row.syncFormatVersion,
 		createdAt: row.createdAt,
 		deletedAt: row.deletedAt,
 		purgeStatus: isVaultPurgeStatus(row.purgeStatus) ? row.purgeStatus : null,
