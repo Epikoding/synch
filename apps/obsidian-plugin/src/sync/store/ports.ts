@@ -9,6 +9,8 @@ import type {
   SyncEntryRow,
   SyncEntryStateRow,
   SyncProgressCounts,
+  SyncReconcileEntryState,
+  SyncReconcileEntryUpdate,
 } from "./store";
 
 export interface SyncConnectionStore {
@@ -68,6 +70,11 @@ export interface SyncMutationStore {
   unblockDirtyEntriesByReason(reason: PendingMutationBlockedReason): Promise<void>;
   clearDirtyEntryByMutationId(mutationId: string): Promise<void>;
   markEntryClean(entryId: string): Promise<void>;
+}
+
+export interface SyncReconcileStore {
+  listReconcileEntryStates(): Promise<SyncReconcileEntryState[]>;
+  applyReconcileEntryUpdates(updates: SyncReconcileEntryUpdate[]): Promise<void>;
 }
 
 export interface SyncBlobStore {

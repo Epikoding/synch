@@ -5,6 +5,7 @@ import type {
   SyncEntryStore,
   SyncLocalEntryStore,
   SyncMutationStore,
+  SyncReconcileStore,
   SyncRemoteEntryStore,
   SyncStoreLifecycle,
 } from "./ports";
@@ -86,6 +87,22 @@ export interface MarkEntryDirtyOptions {
   requireBaseBlob?: boolean;
 }
 
+export interface SyncReconcileEntryState {
+  entryId: string;
+  remote: RemoteSyncEntryRow | null;
+  local: LocalSyncEntryRow | null;
+  dirty: PendingMutationRow | null;
+}
+
+export interface SyncReconcileEntryUpdate {
+  entryId: string;
+  local?: LocalSyncEntryRow;
+  dirty?: PendingMutationRow | null;
+  clearDirty?: boolean;
+  deleteEntry?: boolean;
+  requireBaseBlob?: boolean;
+}
+
 export interface SyncConnection {
   localVaultId: string;
   remoteVaultId: string;
@@ -104,5 +121,6 @@ export interface SyncStore
     SyncEntryStore,
     SyncCursorStore,
     SyncMutationStore,
+    SyncReconcileStore,
     SyncBlobStore,
     SyncStoreLifecycle {}

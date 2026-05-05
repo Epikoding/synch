@@ -435,10 +435,16 @@ describe("SyncLocalReconcileService queueing", () => {
     const appliedPaths: Array<string | null> = [];
     const observedStore = new Proxy(store, {
       get(target, property, receiver) {
-        if (property === "applyLocalState") {
-          return async (entry: Parameters<typeof store.applyLocalState>[0]) => {
-            appliedPaths.push(entry.path);
-            await store.applyLocalState(entry);
+        if (property === "applyReconcileEntryUpdates") {
+          return async (
+            updates: Parameters<typeof store.applyReconcileEntryUpdates>[0],
+          ) => {
+            appliedPaths.push(
+              ...updates
+                .filter((update) => update.local)
+                .map((update) => update.local?.path ?? null),
+            );
+            await store.applyReconcileEntryUpdates(updates);
           };
         }
 

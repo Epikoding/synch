@@ -1,20 +1,16 @@
 import { hashBytes } from "../core/content";
 import { decryptSyncMetadata } from "../core/crypto";
 import {
-  queueLocalDeleteMutation,
-  queueLocalUpsertMutation,
+  buildLocalDeleteMutation,
+  buildLocalUpsertMutation,
 } from "../core/mutation-queue";
 import type {
   LocalSyncEntryRow,
   RemoteSyncEntryRow,
+  SyncReconcileEntryState,
+  SyncReconcileEntryUpdate,
 } from "../store/store";
-import type {
-  SyncEntryStore,
-  SyncLocalEntryStore,
-  SyncMutationStore,
-  SyncRemoteEntryStore,
-  SyncStoreLifecycle,
-} from "../store/ports";
+import type { SyncReconcileStore, SyncStoreLifecycle } from "../store/ports";
 import { isAutoMergeTextPath } from "./text-merge-policy";
 
 const DEFAULT_RECONCILE_HASH_CONCURRENCY = 8;
@@ -39,16 +35,7 @@ export interface SyncLocalReconcileServiceDeps {
 }
 
 export interface SyncLocalReconcileStore
-  extends Pick<SyncEntryStore, "deleteEntry" | "getEntryByPath" | "getOrCreateEntryId">,
-    Pick<
-      SyncLocalEntryStore,
-      "applyLocalState" | "getLocalStateByPath" | "listLocalStates"
-    >,
-    Pick<SyncRemoteEntryStore, "getRemoteStateById">,
-    Pick<
-      SyncMutationStore,
-      "getDirtyEntryMutation" | "markEntryClean" | "replaceDirtyEntry"
-    >,
+  extends SyncReconcileStore,
     Pick<SyncStoreLifecycle, "flush"> {}
 
 export interface ReconcileOnceResult {
@@ -65,18 +52,22 @@ export class SyncLocalReconcileService {
     const remoteVaultKey = this.deps.getRemoteVaultKey();
     const localFiles = await this.deps.scanner.listFiles();
     const localPaths = new Set(localFiles.map((file) => file.path));
-    const knownEntries = await this.filterKnownEntries(store);
+    const snapshot = await store.listReconcileEntryStates();
+    const { retained, cleanupUpdates } = this.filterKnownEntries(snapshot);
+    const localByPath = indexLocalEntriesByPath(retained);
+    const remoteById = indexRemoteEntriesById(retained);
+    const visibleRemoteByPath = indexVisibleRemoteEntriesByPath(retained);
     const pendingDeleteEntriesByPath = await this.indexPendingDeleteEntriesByPath(
-      store,
       remoteVaultKey,
-      knownEntries,
+      retained,
     );
     const renameCandidates = new Map<string, LocalSyncEntryRow[]>();
     const reusedEntryIds = new Set<string>();
+    const updates: SyncReconcileEntryUpdate[] = [...cleanupUpdates];
     let filesQueuedForUpsert = 0;
     let filesQueuedForDelete = 0;
 
-    for (const entry of knownEntries) {
+    for (const entry of retained.flatMap((state) => state.local ?? [])) {
       if (entry.deleted || !entry.path || localPaths.has(entry.path) || !entry.hash) {
         continue;
       }
@@ -88,7 +79,7 @@ export class SyncLocalReconcileService {
 
     const hashInputs: ReconcileHashInput[] = [];
     for (const file of localFiles) {
-      const existing = await store.getLocalStateByPath(file.path);
+      const existing = localByPath.get(file.path) ?? null;
       const pendingDeleteEntry = pendingDeleteEntriesByPath.get(file.path) ?? null;
       const existingHasPendingDelete =
         !!existing && pendingDeleteEntry?.entryId === existing.entryId;
@@ -127,10 +118,13 @@ export class SyncLocalReconcileService {
         !existing.deleted &&
         existing.hash === hash
       ) {
-        await store.applyLocalState({
-          ...existing,
-          localMtime: file.mtime,
-          localSize: file.size,
+        updates.push({
+          entryId: existing.entryId,
+          local: {
+            ...existing,
+            localMtime: file.mtime,
+            localSize: file.size,
+          },
         });
         continue;
       }
@@ -144,11 +138,11 @@ export class SyncLocalReconcileService {
         reusedEntryIds.add(renameMatch.entryId);
       }
       const remote = entry
-        ? await store.getRemoteStateById(entry.entryId)
-        : await getVisibleRemoteEntryByPath(store, file.path);
-      const entryId = entry?.entryId ?? remote?.entryId ?? (await store.getOrCreateEntryId(file.path));
+        ? remoteById.get(entry.entryId) ?? null
+        : visibleRemoteByPath.get(file.path) ?? null;
+      const entryId = entry?.entryId ?? remote?.entryId ?? crypto.randomUUID();
 
-      const queued = await queueLocalUpsertMutation(store, {
+      const queued = await buildLocalUpsertMutation({
         remoteVaultKey,
         path: file.path,
         entryId,
@@ -157,20 +151,25 @@ export class SyncLocalReconcileService {
         hash,
         requireBaseBlob: shouldRequireBaseBlob(file.path, remote),
       });
-      await store.applyLocalState({
+      updates.push({
         entryId: queued.entryId,
-        path: file.path,
-        blobId: queued.blobId,
-        hash,
-        deleted: false,
-        updatedAt: Date.now(),
-        localMtime: file.mtime,
-        localSize: file.size,
+        dirty: queued.mutation,
+        requireBaseBlob: shouldRequireBaseBlob(file.path, remote),
+        local: {
+          entryId: queued.entryId,
+          path: file.path,
+          blobId: queued.blobId,
+          hash,
+          deleted: false,
+          updatedAt: Date.now(),
+          localMtime: file.mtime,
+          localSize: file.size,
+        },
       });
       filesQueuedForUpsert += 1;
     }
 
-    for (const entry of knownEntries) {
+    for (const entry of retained.flatMap((state) => state.local ?? [])) {
       if (
         entry.deleted ||
         !entry.path ||
@@ -180,33 +179,41 @@ export class SyncLocalReconcileService {
         continue;
       }
 
-      const remote = await store.getRemoteStateById(entry.entryId);
+      const remote = remoteById.get(entry.entryId) ?? null;
       if (!remote || remote.revision === 0) {
-        await store.markEntryClean(entry.entryId);
-        await store.deleteEntry(entry.entryId);
+        updates.push({
+          entryId: entry.entryId,
+          clearDirty: true,
+          deleteEntry: true,
+        });
         continue;
       }
 
       const deletedPath = entry.path;
-      await queueLocalDeleteMutation(store, {
+      const mutation = await buildLocalDeleteMutation({
         remoteVaultKey,
         entryId: entry.entryId,
         base: remote,
         path: deletedPath,
       });
-      await store.applyLocalState({
+      updates.push({
         entryId: entry.entryId,
-        path: null,
-        blobId: null,
-        hash: null,
-        deleted: true,
-        updatedAt: Date.now(),
-        localMtime: null,
-        localSize: null,
+        dirty: mutation,
+        local: {
+          entryId: entry.entryId,
+          path: null,
+          blobId: null,
+          hash: null,
+          deleted: true,
+          updatedAt: Date.now(),
+          localMtime: null,
+          localSize: null,
+        },
       });
       filesQueuedForDelete += 1;
     }
 
+    await applyReconcileUpdatesInChunks(store, updates);
     await store.flush();
 
     return {
@@ -225,38 +232,40 @@ export class SyncLocalReconcileService {
     return store;
   }
 
-  private async filterKnownEntries(
-    store: SyncLocalReconcileStore,
-  ): Promise<LocalSyncEntryRow[]> {
-    const knownEntries = await store.listLocalStates();
-    const retainedEntries: LocalSyncEntryRow[] = [];
+  private filterKnownEntries(
+    entries: SyncReconcileEntryState[],
+  ): {
+    retained: SyncReconcileEntryState[];
+    cleanupUpdates: SyncReconcileEntryUpdate[];
+  } {
+    const retained: SyncReconcileEntryState[] = [];
+    const cleanupUpdates: SyncReconcileEntryUpdate[] = [];
 
-    for (const entry of knownEntries) {
-      if (!entry.path || entry.deleted || this.deps.shouldSyncPath(entry.path)) {
-        retainedEntries.push(entry);
+    for (const entry of entries) {
+      const local = entry.local;
+      if (!local?.path || local.deleted || this.deps.shouldSyncPath(local.path)) {
+        retained.push(entry);
         continue;
       }
 
-      await store.markEntryClean(entry.entryId);
-      const remote = await store.getRemoteStateById(entry.entryId);
-      if (!remote || remote.revision === 0) {
-        await store.deleteEntry(entry.entryId);
-      }
+      cleanupUpdates.push({
+        entryId: entry.entryId,
+        clearDirty: true,
+        deleteEntry: !entry.remote || entry.remote.revision === 0,
+      });
     }
 
-    return retainedEntries;
+    return { retained, cleanupUpdates };
   }
 
   private async indexPendingDeleteEntriesByPath(
-    store: SyncLocalReconcileStore,
     remoteVaultKey: Uint8Array,
-    entries: LocalSyncEntryRow[],
+    entries: SyncReconcileEntryState[],
   ): Promise<Map<string, LocalSyncEntryRow>> {
-    const entriesById = new Map(entries.map((entry) => [entry.entryId, entry]));
     const result = new Map<string, LocalSyncEntryRow>();
 
     for (const entry of entries) {
-      const pending = await store.getDirtyEntryMutation(entry.entryId);
+      const pending = entry.dirty;
       if (!pending || pending.op !== "delete") {
         continue;
       }
@@ -271,7 +280,7 @@ export class SyncLocalReconcileService {
           blobId: pending.blobId,
         },
       );
-      const pendingEntry = entriesById.get(pending.entryId);
+      const pendingEntry = entry.local;
       if (pendingEntry) {
         result.set(metadata.path, pendingEntry);
       }
@@ -280,6 +289,8 @@ export class SyncLocalReconcileService {
     return result;
   }
 }
+
+const RECONCILE_UPDATE_CHUNK_SIZE = 500;
 
 interface ReconcileHashInput {
   file: LocalSyncFile;
@@ -318,12 +329,57 @@ function takeRenameCandidate(
   return match;
 }
 
-async function getVisibleRemoteEntryByPath(
+function indexLocalEntriesByPath(
+  entries: SyncReconcileEntryState[],
+): Map<string, LocalSyncEntryRow> {
+  const result = new Map<string, LocalSyncEntryRow>();
+  for (const entry of entries) {
+    const local = entry.local;
+    if (local?.path && !local.deleted) {
+      result.set(local.path, local);
+    }
+  }
+  return result;
+}
+
+function indexRemoteEntriesById(
+  entries: SyncReconcileEntryState[],
+): Map<string, RemoteSyncEntryRow> {
+  const result = new Map<string, RemoteSyncEntryRow>();
+  for (const entry of entries) {
+    if (entry.remote) {
+      result.set(entry.entryId, entry.remote);
+    }
+  }
+  return result;
+}
+
+function indexVisibleRemoteEntriesByPath(
+  entries: SyncReconcileEntryState[],
+): Map<string, RemoteSyncEntryRow> {
+  const result = new Map<string, RemoteSyncEntryRow>();
+  for (const entry of entries) {
+    const remote = entry.remote;
+    if (!remote?.path || remote.deleted) {
+      continue;
+    }
+    if (entry.local && entry.local.path !== remote.path) {
+      continue;
+    }
+    result.set(remote.path, remote);
+  }
+  return result;
+}
+
+async function applyReconcileUpdatesInChunks(
   store: SyncLocalReconcileStore,
-  path: string,
-): Promise<RemoteSyncEntryRow | null> {
-  const visible = await store.getEntryByPath(path);
-  return visible ? await store.getRemoteStateById(visible.entryId) : null;
+  updates: SyncReconcileEntryUpdate[],
+): Promise<void> {
+  for (let index = 0; index < updates.length; index += RECONCILE_UPDATE_CHUNK_SIZE) {
+    await store.applyReconcileEntryUpdates(
+      updates.slice(index, index + RECONCILE_UPDATE_CHUNK_SIZE),
+    );
+  }
 }
 
 function shouldRequireBaseBlob(

@@ -11,6 +11,8 @@ import type {
   SyncEntryRow,
   SyncEntryStateRow,
   SyncProgressCounts,
+  SyncReconcileEntryState,
+  SyncReconcileEntryUpdate,
   SyncStore,
 } from "../sync/store/store";
 
@@ -276,6 +278,7 @@ class InMemorySyncStore implements SyncStore {
     this.localEntries.delete(entryId);
     this.remoteEntries.delete(entryId);
     this.entries.delete(entryId);
+    await this.markEntryClean(entryId);
   }
 
   async getCursor(): Promise<number> {
@@ -369,6 +372,47 @@ class InMemorySyncStore implements SyncStore {
     for (const mutation of this.pendingMutations.values()) {
       if (mutation.entryId === entryId) {
         this.pendingMutations.delete(mutation.mutationId);
+      }
+    }
+  }
+
+  async listReconcileEntryStates(): Promise<SyncReconcileEntryState[]> {
+    return [...this.entries].sort().map((entryId) => ({
+      entryId,
+      remote: cloneOrNull(this.remoteEntries.get(entryId)),
+      local: cloneOrNull(this.localEntries.get(entryId)),
+      dirty: cloneOrNull(
+        [...this.pendingMutations.values()]
+          .filter((mutation) => mutation.entryId === entryId)
+          .sort(comparePendingMutationsDescending)[0],
+      ),
+    }));
+  }
+
+  async applyReconcileEntryUpdates(
+    updates: SyncReconcileEntryUpdate[],
+  ): Promise<void> {
+    for (const update of updates) {
+      if (update.deleteEntry) {
+        await this.deleteEntry(update.entryId);
+        continue;
+      }
+
+      await this.ensureEntry(update.entryId);
+      if (update.dirty !== undefined) {
+        if (update.dirty === null) {
+          await this.markEntryClean(update.entryId);
+        } else {
+          await this.replaceDirtyEntry(update.dirty, {
+            requireBaseBlob: update.requireBaseBlob,
+          });
+        }
+      } else if (update.clearDirty) {
+        await this.markEntryClean(update.entryId);
+      }
+
+      if (update.local) {
+        await this.applyLocalState(update.local);
       }
     }
   }

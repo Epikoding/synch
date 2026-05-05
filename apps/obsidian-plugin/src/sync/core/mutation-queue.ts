@@ -73,10 +73,22 @@ export async function queueLocalUpsertMutation(
   store: PendingMutationWriter,
   input: QueueLocalUpsertMutationInput,
 ): Promise<QueuedLocalUpsertMutation> {
+  const queued = await buildLocalUpsertMutation(input);
+  await store.replaceDirtyEntry(queued.mutation, {
+    requireBaseBlob: input.requireBaseBlob,
+  });
+
+  return queued;
+}
+
+export async function buildLocalUpsertMutation(
+  input: QueueLocalUpsertMutationInput,
+): Promise<QueuedLocalUpsertMutation> {
   const entryId = input.entryId;
   const baseRevision = input.base?.revision ?? 0;
   const blobId = createNextBlobId(input.previousLocal ?? input.base, input.hash);
-  const mutation = await replacePendingMutationForEntry(store, {
+  const mutation: PendingMutationRow = {
+    mutationId: crypto.randomUUID(),
     entryId,
     op: "upsert",
     baseRevision,
@@ -97,8 +109,8 @@ export async function queueLocalUpsertMutation(
         blobId,
       },
     ),
-    requireBaseBlob: input.requireBaseBlob,
-  });
+    createdAt: Date.now(),
+  };
 
   return {
     entryId,
@@ -118,7 +130,16 @@ export async function queueLocalDeleteMutation(
   store: PendingMutationWriter,
   input: QueueLocalDeleteMutationInput,
 ): Promise<PendingMutationRow> {
-  return await replacePendingMutationForEntry(store, {
+  const mutation = await buildLocalDeleteMutation(input);
+  await store.replaceDirtyEntry(mutation);
+  return mutation;
+}
+
+export async function buildLocalDeleteMutation(
+  input: QueueLocalDeleteMutationInput,
+): Promise<PendingMutationRow> {
+  return {
+    mutationId: crypto.randomUUID(),
     entryId: input.entryId,
     op: "delete",
     baseRevision: input.base.revision,
@@ -139,7 +160,8 @@ export async function queueLocalDeleteMutation(
         blobId: null,
       },
     ),
-  });
+    createdAt: Date.now(),
+  };
 }
 
 export function createNextBlobId(

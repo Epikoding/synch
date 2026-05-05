@@ -9,6 +9,8 @@ import type {
   SyncEntryRow,
   SyncEntryStateRow,
   SyncProgressCounts,
+  SyncReconcileEntryState,
+  SyncReconcileEntryUpdate,
   SyncStore,
 } from "../store";
 import {
@@ -413,6 +415,77 @@ export class DexieSyncStore implements SyncStore {
     }
 
     await this.putEntry(clearPendingMutation(entry));
+  }
+
+  async listReconcileEntryStates(): Promise<SyncReconcileEntryState[]> {
+    return (await this.db.entries.toArray()).map((row) => ({
+      entryId: row.entryId,
+      remote: row.remoteKnown ? toRemoteEntryRow(row) : null,
+      local: row.localKnown ? toLocalEntryRow(row) : null,
+      dirty: toPendingMutationRow(row),
+    }));
+  }
+
+  async applyReconcileEntryUpdates(
+    updates: SyncReconcileEntryUpdate[],
+  ): Promise<void> {
+    if (updates.length === 0) {
+      return;
+    }
+
+    await this.db.transaction("rw", this.db.entries, this.db.blobs, async () => {
+      const existingRows = await this.db.entries.bulkGet(
+        updates.map((update) => update.entryId),
+      );
+      const rowsToPut: EntryRecord[] = [];
+      const entryIdsToDelete: string[] = [];
+
+      for (let index = 0; index < updates.length; index += 1) {
+        const update = updates[index];
+        if (update.deleteEntry) {
+          entryIdsToDelete.push(update.entryId);
+          continue;
+        }
+
+        let row = existingRows[index] ?? createEmptyEntryRecord(update.entryId);
+        if (update.dirty !== undefined) {
+          if (update.dirty === null) {
+            row = clearPendingMutation(row);
+          } else {
+            const mutation = normalizePendingMutation(update.dirty);
+            if (update.requireBaseBlob) {
+              await this.assertRequiredBaseBlob(mutation);
+            }
+            row = toDirtyEntryRecord(row, mutation);
+          }
+        } else if (update.clearDirty) {
+          row = clearPendingMutation(row);
+        }
+
+        if (update.local) {
+          row = {
+            ...row,
+            localKnown: true,
+            localPath: update.local.path,
+            localBlobId: update.local.blobId,
+            localHash: update.local.hash,
+            localDeleted: update.local.deleted,
+            localUpdatedAt: update.local.updatedAt,
+            localMtime: update.local.localMtime,
+            localSize: update.local.localSize,
+          };
+        }
+
+        rowsToPut.push(normalizeEntryRecord(row));
+      }
+
+      if (entryIdsToDelete.length > 0) {
+        await this.db.entries.bulkDelete(entryIdsToDelete);
+      }
+      if (rowsToPut.length > 0) {
+        await this.db.entries.bulkPut(rowsToPut);
+      }
+    });
   }
 
   async getBlob(blobId: string): Promise<CachedSyncBlobRow | null> {
