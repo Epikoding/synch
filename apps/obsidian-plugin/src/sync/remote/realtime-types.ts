@@ -75,6 +75,10 @@ export interface SyncRealtimeSession {
     before: EntryVersionPageCursor | null;
     limit: number;
   }): Promise<EntryVersionsResponse>;
+  listDeletedEntries(input: {
+    before: DeletedEntryPageCursor | null;
+    limit: number;
+  }): Promise<DeletedEntriesResponse>;
 	  restoreEntryVersion(input: {
     entryId: string;
     versionId: string;
@@ -94,6 +98,11 @@ export interface EntryVersionPageCursor {
   versionId: string;
 }
 
+export interface DeletedEntryPageCursor {
+  deletedAt: number;
+  entryId: string;
+}
+
 export interface EntryVersion {
   versionId: string;
   sourceRevision: number;
@@ -109,6 +118,19 @@ export interface EntryVersionsResponse {
   versions: EntryVersion[];
   hasMore: boolean;
   nextBefore: EntryVersionPageCursor | null;
+}
+
+export interface DeletedEntry {
+  entryId: string;
+  revision: number;
+  encryptedMetadata: string;
+  deletedAt: number;
+}
+
+export interface DeletedEntriesResponse {
+  entries: DeletedEntry[];
+  hasMore: boolean;
+  nextBefore: DeletedEntryPageCursor | null;
 }
 
 export interface EntryVersionRestoredResponse {
@@ -217,6 +239,16 @@ export type ServerMessage =
     } & EntryVersionsResponse)
   | {
       type: "entry_versions_list_failed";
+      requestId: string;
+      code: string;
+      message: string;
+    }
+  | ({
+      type: "deleted_entries_listed";
+      requestId: string;
+    } & DeletedEntriesResponse)
+  | {
+      type: "deleted_entries_list_failed";
       requestId: string;
       code: string;
       message: string;

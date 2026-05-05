@@ -58,7 +58,17 @@ export interface SynchDeletedFile {
   path: string;
   revision: number;
   deletedAt: number;
-  dirty: boolean;
+}
+
+export interface SynchDeletedFileCursor {
+  deletedAt: number;
+  entryId: string;
+}
+
+export interface SynchDeletedFilesPage {
+  files: SynchDeletedFile[];
+  hasMore: boolean;
+  nextBefore: SynchDeletedFileCursor | null;
 }
 
 export interface SynchEntryVersionCursor {

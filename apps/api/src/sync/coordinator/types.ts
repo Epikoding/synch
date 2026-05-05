@@ -7,6 +7,7 @@ export type {
 	DetachLocalVaultMessage,
 	HeartbeatMessage,
 	HelloMessage,
+	ListDeletedEntriesMessage,
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
@@ -157,6 +158,11 @@ export type EntryVersionPageCursor = {
 	versionId: string;
 };
 
+export type DeletedEntryPageCursor = {
+	deletedAt: number;
+	entryId: string;
+};
+
 export type EntryVersionsListedMessage = {
 	type: "entry_versions_listed";
 	requestId: string;
@@ -176,6 +182,26 @@ export type EntryVersionsListedMessage = {
 
 export type EntryVersionsListFailedMessage = {
 	type: "entry_versions_list_failed";
+	requestId: string;
+	code: string;
+	message: string;
+};
+
+export type DeletedEntriesListedMessage = {
+	type: "deleted_entries_listed";
+	requestId: string;
+	entries: Array<{
+		entryId: string;
+		revision: number;
+		encryptedMetadata: string;
+		deletedAt: number;
+	}>;
+	hasMore: boolean;
+	nextBefore: DeletedEntryPageCursor | null;
+};
+
+export type DeletedEntriesListFailedMessage = {
+	type: "deleted_entries_list_failed";
 	requestId: string;
 	code: string;
 	message: string;
@@ -220,6 +246,8 @@ export type ServerControlMessage =
 	| EntryStatesListFailedMessage
 	| EntryVersionsListedMessage
 	| EntryVersionsListFailedMessage
+	| DeletedEntriesListedMessage
+	| DeletedEntriesListFailedMessage
 	| EntryVersionRestoredMessage
 	| EntryRestoreFailedMessage
 	| SessionErrorMessage;
@@ -268,6 +296,13 @@ export type EntryStateRow = {
 	deleted: boolean;
 	updated_seq: number;
 	updated_at: number;
+};
+
+export type DeletedEntryListRow = {
+	entry_id: string;
+	revision: number;
+	encrypted_metadata: string;
+	deleted_at: number;
 };
 
 export type BlobState = "staged" | "live" | "pending_delete";

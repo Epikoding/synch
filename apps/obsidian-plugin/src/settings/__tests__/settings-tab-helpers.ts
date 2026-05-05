@@ -51,7 +51,11 @@ export function createSettingsTab(
     updateSyncFileRule: vi.fn(async () => {}),
     updateExcludedFolders: vi.fn(async () => {}),
     listSelectableExcludedFolderPaths: () => [],
-    listDeletedFiles: vi.fn(async () => []),
+    listDeletedFiles: vi.fn(async () => ({
+      files: [],
+      hasMore: false,
+      nextBefore: null,
+    })),
     previewDeletedFile: vi.fn(async () => ({
       status: "unavailable" as const,
       path: "deleted.md",

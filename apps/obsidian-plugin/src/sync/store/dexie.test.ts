@@ -436,16 +436,6 @@ describe("DexieSyncStore", () => {
     expect(await store.getOrCreateEntryId("Notes/deleted.md")).not.toBe(
       "entry-deleted",
     );
-    expect(await store.listDeletedEntries()).toEqual([
-      {
-        entryId: "entry-deleted",
-        path: "Notes/deleted.md",
-        revision: 4,
-        deletedAt: 40,
-        dirty: true,
-      },
-    ]);
-
     await store.close();
   });
 

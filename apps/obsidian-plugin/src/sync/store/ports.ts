@@ -1,6 +1,5 @@
 import type {
   CachedSyncBlobRow,
-  DeletedSyncEntryRow,
   LocalSyncEntryRow,
   MarkEntryDirtyOptions,
   PendingMutationBlockedReason,
@@ -40,7 +39,6 @@ export interface SyncEntryStore {
   getEntryByPath(path: string): Promise<SyncEntryRow | null>;
   getEntryStateById(entryId: string): Promise<SyncEntryStateRow | null>;
   listEntries(): Promise<SyncEntryRow[]>;
-  listDeletedEntries(): Promise<DeletedSyncEntryRow[]>;
   countSyncProgress(): Promise<SyncProgressCounts>;
   getOrCreateEntryId(path: string): Promise<string>;
   upsertEntry(entry: SyncEntryRow): Promise<void>;

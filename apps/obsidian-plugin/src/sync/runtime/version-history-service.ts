@@ -3,14 +3,11 @@ import { decryptSyncBlob, decryptSyncMetadata, encryptSyncMetadata } from "../co
 import type { SyncTokenResponse } from "../remote/client";
 import type { SyncPullClient } from "../remote/pull-client";
 import type {
+  DeletedEntryPageCursor,
   EntryVersion,
   EntryVersionPageCursor,
   SyncRealtimeSession,
 } from "../remote/realtime-client";
-import type {
-  DeletedSyncEntryRow,
-  SyncEntryRow,
-} from "../store/store";
 import type {
   SyncEntryStore,
   SyncMutationStore,
@@ -35,7 +32,7 @@ export interface SyncVersionHistoryServiceDeps {
 export interface SyncVersionHistoryStore
   extends Pick<
       SyncEntryStore,
-      "getEntryById" | "getEntryByPath" | "listDeletedEntries"
+      "getEntryByPath"
     >,
     Pick<SyncMutationStore, "getDirtyEntryMutation"> {}
 
@@ -102,80 +99,109 @@ export class SyncVersionHistoryService {
     return await this.previewEntryVersion(entry.entryId, version, path);
   }
 
-  async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
-    return await this.deps.getStore().listDeletedEntries();
+  async listDeletedEntries(
+    before: DeletedEntryPageCursor | null,
+    limit: number,
+  ): Promise<SyncDeletedEntriesPage> {
+    return await this.deps.withRealtimeSession(async (session) => {
+      const page = await session.listDeletedEntries({ before, limit });
+      const entries: SyncDeletedEntry[] = [];
+      for (const entry of page.entries) {
+        const metadata = await decryptSyncMetadata(
+          this.deps.getRemoteVaultKey(),
+          entry.encryptedMetadata,
+          {
+            entryId: entry.entryId,
+            revision: entry.revision,
+            op: "delete",
+            blobId: null,
+          },
+        );
+        entries.push({
+          entryId: entry.entryId,
+          path: metadata.path,
+          revision: entry.revision,
+          deletedAt: entry.deletedAt,
+        });
+      }
+      return {
+        entries,
+        hasMore: page.hasMore,
+        nextBefore: page.nextBefore,
+      };
+    });
   }
 
-  async restoreDeletedEntry(entryId: string): Promise<void> {
+  async restoreDeletedEntry(entryId: string, baseRevision: number): Promise<void> {
     await this.deps.runLocalMutationWork(async () => {
       const store = this.deps.getStore();
-      const entry = await store.getEntryById(entryId);
-      if (!entry || !entry.deleted || entry.revision <= 0) {
-        throw new Error("Deleted file is not synced.");
-      }
-      const dirty = await store.getDirtyEntryMutation(entry.entryId);
+      const dirty = await store.getDirtyEntryMutation(entryId);
       if (dirty) {
         throw new Error("Sync local changes before restoring this deleted file.");
       }
 
-      const version = await this.findLatestRestorableEntryVersion(entry.entryId);
+      const version = await this.findLatestRestorableEntryVersion(entryId);
       if (!version) {
         throw new Error("No restorable version exists for this deleted file.");
       }
 
-      await this.restoreEntryVersion(entry, version);
+      await this.restoreEntryVersion({ entryId, revision: baseRevision }, version);
     });
   }
 
-  async previewDeletedEntry(entryId: string): Promise<SyncEntryVersionPreview> {
-    const store = this.deps.getStore();
-    const entry = await store.getEntryById(entryId);
-    if (!entry || !entry.deleted || entry.revision <= 0) {
-      throw new Error("Deleted file is not synced.");
-    }
-
-    const version = await this.findLatestRestorableEntryVersion(entry.entryId);
-    const path = entry.path ?? entry.entryId;
+  async previewDeletedEntry(
+    entryId: string,
+    fallbackPath: string,
+  ): Promise<SyncEntryVersionPreview> {
+    const version = await this.findLatestRestorableEntryVersion(entryId);
     if (!version) {
       return {
         status: "unavailable",
-        path,
+        path: fallbackPath,
         reason: null,
         capturedAt: null,
         message: VERSION_PREVIEW_UNAVAILABLE_MESSAGE,
       };
     }
 
-    return await this.previewEntryVersion(entry.entryId, version, path);
+    return await this.previewEntryVersion(entryId, version, fallbackPath);
   }
 
   private async findLatestRestorableEntryVersion(
     entryId: string,
   ): Promise<EntryVersion | null> {
+    return await this.deps.withRealtimeSession(
+      async (session) =>
+        await this.findLatestRestorableEntryVersionInSession(session, entryId),
+    );
+  }
+
+  private async findLatestRestorableEntryVersionInSession(
+    session: Pick<SyncRealtimeSession, "listEntryVersions">,
+    entryId: string,
+  ): Promise<EntryVersion | null> {
     let before: EntryVersionPageCursor | null = null;
 
-    return await this.deps.withRealtimeSession(async (session) => {
-      do {
-        const page = await session.listEntryVersions({
-          entryId,
-          before,
-          limit: VERSION_RESTORE_PAGE_SIZE,
-        });
-        const version = page.versions.find(
-          (candidate) => candidate.op === "upsert" && candidate.blobId,
-        );
-        if (version) {
-          return version;
-        }
-        before = page.nextBefore;
-      } while (before);
+    do {
+      const page = await session.listEntryVersions({
+        entryId,
+        before,
+        limit: VERSION_RESTORE_PAGE_SIZE,
+      });
+      const version = page.versions.find(
+        (candidate) => candidate.op === "upsert" && candidate.blobId,
+      );
+      if (version) {
+        return version;
+      }
+      before = page.nextBefore;
+    } while (before);
 
-      return null;
-    });
+    return null;
   }
 
   private async restoreEntryVersion(
-    entry: SyncEntryRow,
+    entry: RestorableEntry,
     version: EntryVersion,
   ): Promise<void> {
     const metadata = await decryptSyncMetadata(
@@ -292,6 +318,24 @@ export interface SyncEntryVersionsPage {
   hasMore: boolean;
   nextBefore: EntryVersionPageCursor | null;
 }
+
+export interface SyncDeletedEntriesPage {
+  entries: SyncDeletedEntry[];
+  hasMore: boolean;
+  nextBefore: DeletedEntryPageCursor | null;
+}
+
+export interface SyncDeletedEntry {
+  entryId: string;
+  path: string;
+  revision: number;
+  deletedAt: number;
+}
+
+type RestorableEntry = {
+  entryId: string;
+  revision: number;
+};
 
 export type SyncEntryVersionPreview =
   | {

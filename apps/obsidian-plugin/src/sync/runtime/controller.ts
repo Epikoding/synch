@@ -7,6 +7,7 @@ import {
 } from "../../http/network-status";
 import type { SyncTokenResponse } from "../remote/client";
 import type {
+  DeletedEntryPageCursor,
   EntryVersion,
   EntryVersionPageCursor,
   SyncStorageStatus,
@@ -17,7 +18,8 @@ import {
   createDexieSyncStore,
   readDexieSyncStoreConnection,
 } from "../store/dexie";
-import type { DeletedSyncEntryRow, SyncConnection } from "../store/store";
+import type { SyncConnection } from "../store/store";
+import type { SyncDeletedEntriesPage } from "./version-history-service";
 import {
   SyncEngine,
   type SyncEngineEntryVersionsPage,
@@ -321,27 +323,31 @@ export class SyncController {
     await this.syncEngine.restoreEntryVersionForPath(path, version);
   }
 
-  async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
+  async listDeletedEntries(
+    before: DeletedEntryPageCursor | null,
+    limit: number,
+  ): Promise<SyncDeletedEntriesPage> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
       throw new Error("Connect and sign in before viewing deleted files.");
     }
-    return await this.syncEngine.listDeletedEntries();
+    return await this.syncEngine.listDeletedEntries(before, limit);
   }
 
-  async restoreDeletedEntry(entryId: string): Promise<void> {
+  async restoreDeletedEntry(entryId: string, baseRevision: number): Promise<void> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
       throw new Error("Connect and sign in before restoring deleted files.");
     }
-    await this.syncEngine.restoreDeletedEntry(entryId);
+    await this.syncEngine.restoreDeletedEntry(entryId, baseRevision);
   }
 
   async previewDeletedEntry(
     entryId: string,
+    fallbackPath: string,
   ): Promise<SyncEntryVersionPreview> {
     if (!this.deps.hasActiveRemoteVaultSession() || !this.deps.hasAuthenticatedSession()) {
       throw new Error("Connect and sign in before previewing deleted files.");
     }
-    return await this.syncEngine.previewDeletedEntry(entryId);
+    return await this.syncEngine.previewDeletedEntry(entryId, fallbackPath);
   }
 
   private setSyncStatus(status: UserVisibleSyncState): void {

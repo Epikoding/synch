@@ -4,7 +4,6 @@ import {
   getButtonComponents,
   getCreatedElementTexts,
   getMarkdownRenderCalls,
-  getSettingDescriptions,
   getSettingNames,
   getToggleComponents,
   resetObsidianMocks,
@@ -71,7 +70,11 @@ describe("SynchSettingTab remote vault settings", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
-      listDeletedFiles: vi.fn(async () => []),
+      listDeletedFiles: vi.fn(async () => ({
+        files: [],
+        hasMore: false,
+        nextBefore: null,
+      })),
     });
 
     tab.display();
@@ -94,22 +97,24 @@ describe("SynchSettingTab remote vault settings", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
-      listDeletedFiles: vi.fn(async () => [
-        {
-          entryId: "entry-ready",
-          path: "Notes/ready.md",
-          revision: 3,
-          deletedAt: 1,
-          dirty: false,
-        },
-        {
-          entryId: "entry-dirty",
-          path: "Notes/dirty.md",
-          revision: 4,
-          deletedAt: 2,
-          dirty: true,
-        },
-      ]),
+      listDeletedFiles: vi.fn(async () => ({
+        files: [
+          {
+            entryId: "entry-ready",
+            path: "Notes/ready.md",
+            revision: 3,
+            deletedAt: 1,
+          },
+          {
+            entryId: "entry-other",
+            path: "Notes/other.md",
+            revision: 4,
+            deletedAt: 2,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      })),
       restoreDeletedFiles,
     });
 
@@ -121,10 +126,9 @@ describe("SynchSettingTab remote vault settings", () => {
 
     const modalToggles = getToggleComponents().slice(-2);
     expect(modalToggles[0]?.disabled).toBe(false);
-    expect(modalToggles[1]?.disabled).toBe(true);
+    expect(modalToggles[1]?.disabled).toBe(false);
     expect(getSettingNames()).toContain("Notes/ready.md");
-    expect(getSettingNames()).toContain("Notes/dirty.md");
-    expect(getSettingDescriptions()).toContain("Sync first");
+    expect(getSettingNames()).toContain("Notes/other.md");
 
     await modalToggles[0]?.change(true);
     await getButtonComponents()
@@ -132,7 +136,69 @@ describe("SynchSettingTab remote vault settings", () => {
       ?.click();
     await nextTask();
 
-    expect(restoreDeletedFiles).toHaveBeenCalledWith(["entry-ready"]);
+    expect(restoreDeletedFiles).toHaveBeenCalledWith([
+      {
+        entryId: "entry-ready",
+        path: "Notes/ready.md",
+        revision: 3,
+        deletedAt: 1,
+      },
+    ]);
+  });
+
+  it("loads additional deleted file pages from the modal", async () => {
+    const listDeletedFiles = vi
+      .fn()
+      .mockResolvedValueOnce({
+        files: [
+          {
+            entryId: "entry-first",
+            path: "Notes/first.md",
+            revision: 3,
+            deletedAt: 10,
+          },
+        ],
+        hasMore: true,
+        nextBefore: { deletedAt: 10, entryId: "entry-first" },
+      })
+      .mockResolvedValueOnce({
+        files: [
+          {
+            entryId: "entry-second",
+            path: "Notes/second.md",
+            revision: 4,
+            deletedAt: 9,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      });
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      hasConnectedRemoteVault: () => true,
+      listDeletedFiles,
+    });
+
+    tab.display();
+    await getButtonComponents()
+      .find((button) => button.text === "View deleted files")
+      ?.click();
+    await nextTask();
+
+    expect(getSettingNames()).toContain("Notes/first.md");
+    await getButtonComponents()
+      .filter((button) => button.text === "Load more")
+      .at(-1)
+      ?.click();
+    await nextTask();
+
+    expect(listDeletedFiles).toHaveBeenNthCalledWith(1, null, 25);
+    expect(listDeletedFiles).toHaveBeenNthCalledWith(2, {
+      deletedAt: 10,
+      entryId: "entry-first",
+    }, 25);
+    expect(getSettingNames()).toContain("Notes/first.md");
+    expect(getSettingNames()).toContain("Notes/second.md");
   });
 
   it("previews deleted files from the modal", async () => {
@@ -146,15 +212,18 @@ describe("SynchSettingTab remote vault settings", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
-      listDeletedFiles: vi.fn(async () => [
-        {
-          entryId: "entry-ready",
-          path: "Notes/ready.md",
-          revision: 3,
-          deletedAt: 1,
-          dirty: false,
-        },
-      ]),
+      listDeletedFiles: vi.fn(async () => ({
+        files: [
+          {
+            entryId: "entry-ready",
+            path: "Notes/ready.md",
+            revision: 3,
+            deletedAt: 1,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      })),
       previewDeletedFile,
     });
 
@@ -170,7 +239,10 @@ describe("SynchSettingTab remote vault settings", () => {
       ?.click();
     await nextTask();
 
-    expect(previewDeletedFile).toHaveBeenCalledWith("entry-ready");
+    expect(previewDeletedFile).toHaveBeenCalledWith(
+      "entry-ready",
+      "Notes/ready.md",
+    );
     expect(getMarkdownRenderCalls()).toEqual([
       expect.objectContaining({
         markdown: "previous content",
@@ -190,15 +262,18 @@ describe("SynchSettingTab remote vault settings", () => {
     const tab = createSettingsTab({
       hasAuthenticatedSession: () => true,
       hasConnectedRemoteVault: () => true,
-      listDeletedFiles: vi.fn(async () => [
-        {
-          entryId: "entry-ready",
-          path: "Notes/ready.txt",
-          revision: 3,
-          deletedAt: 1,
-          dirty: false,
-        },
-      ]),
+      listDeletedFiles: vi.fn(async () => ({
+        files: [
+          {
+            entryId: "entry-ready",
+            path: "Notes/ready.txt",
+            revision: 3,
+            deletedAt: 1,
+          },
+        ],
+        hasMore: false,
+        nextBefore: null,
+      })),
       previewDeletedFile,
     });
 

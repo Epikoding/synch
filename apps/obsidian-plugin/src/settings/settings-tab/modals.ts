@@ -1,11 +1,15 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 
 import type {
+  SynchDeletedFileCursor,
+  SynchDeletedFilesPage,
   SynchDeletedFile,
   SynchVersionPreview,
 } from "../../plugin/view-models";
 import { VersionPreviewModal } from "../../plugin/version-preview-modal";
 import { formatDeletedFileTimestamp } from "./format";
+
+const DELETED_FILES_PAGE_SIZE = 25;
 
 export class ExcludedFoldersModal extends Modal {
   private readonly selectedFolders: Set<string>;
@@ -70,15 +74,23 @@ export class ExcludedFoldersModal extends Modal {
 export class DeletedFilesModal extends Modal {
   private readonly selectedEntryIds = new Set<string>();
   private deletedFiles: SynchDeletedFile[] = [];
+  private nextBefore: SynchDeletedFileCursor | null = null;
+  private hasMore = false;
   private loading = false;
   private error: string | null = null;
 
   constructor(
     app: App,
     private readonly options: {
-      listDeletedFiles: () => Promise<SynchDeletedFile[]>;
-      previewDeletedFile: (entryId: string) => Promise<SynchVersionPreview>;
-      restoreDeletedFiles: (entryIds: string[]) => Promise<void>;
+      listDeletedFiles: (
+        before: SynchDeletedFileCursor | null,
+        limit: number,
+      ) => Promise<SynchDeletedFilesPage>;
+      previewDeletedFile: (
+        entryId: string,
+        fallbackPath: string,
+      ) => Promise<SynchVersionPreview>;
+      restoreDeletedFiles: (files: SynchDeletedFile[]) => Promise<void>;
     },
   ) {
     super(app);
@@ -89,20 +101,47 @@ export class DeletedFilesModal extends Modal {
   }
 
   private async loadDeletedFiles(): Promise<void> {
+    this.deletedFiles = [];
+    this.nextBefore = null;
+    this.hasMore = false;
+    await this.loadDeletedFilesPage(null);
+  }
+
+  private async loadMoreDeletedFiles(): Promise<void> {
+    if (!this.hasMore || this.loading) {
+      return;
+    }
+    await this.loadDeletedFilesPage(this.nextBefore);
+  }
+
+  private async loadDeletedFilesPage(
+    before: SynchDeletedFileCursor | null,
+  ): Promise<void> {
     this.loading = true;
     this.error = null;
     this.render();
 
     try {
-      this.deletedFiles = await this.options.listDeletedFiles();
+      const page = await this.options.listDeletedFiles(
+        before,
+        DELETED_FILES_PAGE_SIZE,
+      );
+      this.deletedFiles =
+        before === null ? page.files : [...this.deletedFiles, ...page.files];
+      this.hasMore = page.hasMore;
+      this.nextBefore = page.nextBefore;
       for (const entryId of [...this.selectedEntryIds]) {
-        if (!this.deletedFiles.some((file) => file.entryId === entryId && !file.dirty)) {
+        if (!this.deletedFiles.some((file) => file.entryId === entryId)) {
           this.selectedEntryIds.delete(entryId);
         }
       }
     } catch (error) {
-      this.deletedFiles = [];
-      this.selectedEntryIds.clear();
+      if (before === null) {
+        this.deletedFiles = [];
+        this.selectedEntryIds.clear();
+        this.hasMore = false;
+        this.nextBefore = null;
+      }
       this.error = error instanceof Error ? error.message : String(error);
     } finally {
       this.loading = false;
@@ -141,23 +180,19 @@ export class DeletedFilesModal extends Modal {
       for (const file of this.deletedFiles) {
         const setting = new Setting(contentEl)
           .setName(file.path)
-          .setDesc(
-            file.dirty
-              ? "Sync first"
-              : `Deleted ${formatDeletedFileTimestamp(file.deletedAt)}`,
-          );
+          .setDesc(`Deleted ${formatDeletedFileTimestamp(file.deletedAt)}`);
         setting.addButton((button) => {
           button
             .setButtonText("Preview")
             .setDisabled(this.loading)
             .onClick(() => {
-              void this.previewDeletedFile(file.entryId);
+              void this.previewDeletedFile(file);
             });
         });
         setting.addToggle((toggle) => {
           toggle
             .setValue(this.selectedEntryIds.has(file.entryId))
-            .setDisabled(file.dirty || this.loading)
+            .setDisabled(this.loading)
             .onChange((value) => {
               if (value) {
                 this.selectedEntryIds.add(file.entryId);
@@ -171,12 +206,22 @@ export class DeletedFilesModal extends Modal {
     }
 
     const selectedCount = this.selectedEntryIds.size;
-    new Setting(contentEl)
-      .addButton((button) =>
-        button.setButtonText("Refresh").setDisabled(this.loading).onClick(() => {
-          void this.loadDeletedFiles();
-        }),
-      )
+    const actions = new Setting(contentEl).addButton((button) =>
+      button.setButtonText("Refresh").setDisabled(this.loading).onClick(() => {
+        void this.loadDeletedFiles();
+      }),
+    );
+    if (this.hasMore) {
+      actions.addButton((button) =>
+        button
+          .setButtonText("Load more")
+          .setDisabled(this.loading)
+          .onClick(() => {
+            void this.loadMoreDeletedFiles();
+          }),
+      );
+    }
+    actions
       .addButton((button) =>
         button
           .setButtonText(
@@ -198,8 +243,10 @@ export class DeletedFilesModal extends Modal {
   }
 
   private async restoreSelected(): Promise<void> {
-    const entryIds = [...this.selectedEntryIds];
-    if (entryIds.length === 0) {
+    const selectedFiles = this.deletedFiles.filter((file) =>
+      this.selectedEntryIds.has(file.entryId),
+    );
+    if (selectedFiles.length === 0) {
       return;
     }
 
@@ -208,11 +255,11 @@ export class DeletedFilesModal extends Modal {
 
     let restored = 0;
     let failed = 0;
-    for (const entryId of entryIds) {
+    for (const file of selectedFiles) {
       try {
-        await this.options.restoreDeletedFiles([entryId]);
+        await this.options.restoreDeletedFiles([file]);
         restored += 1;
-        this.selectedEntryIds.delete(entryId);
+        this.selectedEntryIds.delete(file.entryId);
       } catch {
         failed += 1;
       }
@@ -226,9 +273,9 @@ export class DeletedFilesModal extends Modal {
     await this.loadDeletedFiles();
   }
 
-  private async previewDeletedFile(entryId: string): Promise<void> {
+  private async previewDeletedFile(file: SynchDeletedFile): Promise<void> {
     try {
-      const preview = await this.options.previewDeletedFile(entryId);
+      const preview = await this.options.previewDeletedFile(file.entryId, file.path);
       new VersionPreviewModal(this.app, preview).open();
     } catch (error) {
       new Notice(

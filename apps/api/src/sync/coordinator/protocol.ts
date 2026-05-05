@@ -69,11 +69,23 @@ const entryVersionPageCursorSchema = z.object({
 	versionId: nonEmptyString,
 });
 
+const deletedEntryPageCursorSchema = z.object({
+	deletedAt: nonNegativeInteger,
+	entryId: nonEmptyString,
+});
+
 export const listEntryVersionsMessageSchema = z.object({
 	type: z.literal("list_entry_versions"),
 	requestId: requestIdSchema,
 	entryId: nonEmptyString,
 	before: entryVersionPageCursorSchema.nullable(),
+	limit: positiveInteger,
+});
+
+export const listDeletedEntriesMessageSchema = z.object({
+	type: z.literal("list_deleted_entries"),
+	requestId: requestIdSchema,
+	before: deletedEntryPageCursorSchema.nullable(),
 	limit: positiveInteger,
 });
 
@@ -117,6 +129,7 @@ export const clientControlMessageSchema = z.discriminatedUnion("type", [
 	commitMutationsMessageSchema,
 	listEntryStatesMessageSchema,
 	listEntryVersionsMessageSchema,
+	listDeletedEntriesMessageSchema,
 	restoreEntryVersionMessageSchema,
 	ackCursorMessageSchema,
 	detachLocalVaultMessageSchema,
@@ -131,6 +144,7 @@ export type CommitMutationMessage = z.infer<typeof commitMutationMessageSchema>;
 export type CommitMutationsMessage = z.infer<typeof commitMutationsMessageSchema>;
 export type ListEntryStatesMessage = z.infer<typeof listEntryStatesMessageSchema>;
 export type ListEntryVersionsMessage = z.infer<typeof listEntryVersionsMessageSchema>;
+export type ListDeletedEntriesMessage = z.infer<typeof listDeletedEntriesMessageSchema>;
 export type RestoreEntryVersionMessage = z.infer<typeof restoreEntryVersionMessageSchema>;
 export type AckCursorMessage = z.infer<typeof ackCursorMessageSchema>;
 export type DetachLocalVaultMessage = z.infer<typeof detachLocalVaultMessageSchema>;

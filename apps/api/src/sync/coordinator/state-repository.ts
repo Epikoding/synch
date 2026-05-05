@@ -8,6 +8,8 @@ import type {
 	CommitMutationsMessage,
 	CommitMutationsResult,
 	CurrentEntryRow,
+	DeletedEntryListRow,
+	DeletedEntryPageCursor,
 	EntryStatePageCursor,
 	EntryStateRow,
 	EntryVersionListRow,
@@ -186,6 +188,14 @@ export class CoordinatorStateRepository {
 
 	countEntryStates(sinceCursor: number, targetCursor: number): number {
 		return this.entryStore.countEntryStates(sinceCursor, targetCursor);
+	}
+
+	listDeletedEntries(
+		before: DeletedEntryPageCursor | null,
+		retentionStart: number,
+		limit: number,
+	): DeletedEntryListRow[] {
+		return this.entryStore.listDeletedEntries(before, retentionStart, limit);
 	}
 
 	async stageBlob(

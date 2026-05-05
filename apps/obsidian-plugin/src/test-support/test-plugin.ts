@@ -2,7 +2,6 @@ import type { Plugin } from "obsidian";
 
 import type {
   CachedSyncBlobRow,
-  DeletedSyncEntryRow,
   LocalSyncEntryRow,
   MarkEntryDirtyOptions,
   PendingMutationBlockedReason,
@@ -221,26 +220,6 @@ class InMemorySyncStore implements SyncStore {
       }
     }
     return sortEntryRows(rows);
-  }
-
-  async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
-    return [...this.remoteEntries.values()]
-      .filter((entry) => entry.deleted && entry.revision > 0 && entry.path)
-      .map((entry) => ({
-        entryId: entry.entryId,
-        path: entry.path ?? "",
-        revision: entry.revision,
-        deletedAt: entry.updatedAt,
-        dirty: [...this.pendingMutations.values()].some(
-          (mutation) => mutation.entryId === entry.entryId,
-        ),
-      }))
-      .sort((left, right) => {
-        if (left.deletedAt !== right.deletedAt) {
-          return right.deletedAt - left.deletedAt;
-        }
-        return left.path.localeCompare(right.path);
-      });
   }
 
   async countSyncProgress(): Promise<SyncProgressCounts> {

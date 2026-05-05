@@ -4,8 +4,10 @@ import type {
 	CommitMutationResult,
 	CommitMutationsMessage,
 	CommitMutationsResult,
+	DeletedEntriesListedMessage,
 	EntryStatesListedMessage,
 	EntryVersionsListedMessage,
+	ListDeletedEntriesMessage,
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
@@ -70,6 +72,14 @@ export class SyncCoordinator extends DurableObject {
 	): Promise<EntryVersionsListedMessage> {
 		await this.ready;
 		return await this.coordinatorService.listEntryVersions(session, message);
+	}
+
+	async listDeletedEntries(
+		session: SocketSession,
+		message: ListDeletedEntriesMessage,
+	): Promise<DeletedEntriesListedMessage> {
+		await this.ready;
+		return await this.coordinatorService.listDeletedEntries(session, message);
 	}
 
 	async restoreEntryVersion(

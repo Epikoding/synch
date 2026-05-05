@@ -93,4 +93,47 @@ describe("SyncRealtimeClient listing", () => {
       versions: [{ sourceRevision: 2 }],
     });
   });
+
+  it("lists deleted entries over the realtime session", async () => {
+    const { socket, session } = await openRealtimeSession();
+
+    const deletedPromise = session.listDeletedEntries({
+      before: { deletedAt: 10, entryId: "entry-older-than" },
+      limit: 25,
+    });
+    await waitForSentMessage(socket, 1);
+    const deleted = socket.sentMessageAt(1);
+    expect(deleted).toMatchObject({
+      type: "list_deleted_entries",
+      before: { deletedAt: 10, entryId: "entry-older-than" },
+      limit: 25,
+    });
+    socket.emitMessage({
+      type: "deleted_entries_listed",
+      requestId: deleted.requestId,
+      entries: [
+        {
+          entryId: "entry-deleted",
+          revision: 3,
+          encryptedMetadata: "delete-metadata",
+          deletedAt: 9,
+        },
+      ],
+      hasMore: false,
+      nextBefore: null,
+    });
+
+    await expect(deletedPromise).resolves.toEqual({
+      entries: [
+        {
+          entryId: "entry-deleted",
+          revision: 3,
+          encryptedMetadata: "delete-metadata",
+          deletedAt: 9,
+        },
+      ],
+      hasMore: false,
+      nextBefore: null,
+    });
+  });
 });

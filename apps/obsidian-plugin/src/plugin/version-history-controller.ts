@@ -1,6 +1,8 @@
 import { TFile, type Plugin, type WorkspaceLeaf } from "obsidian";
 
 import type {
+  SynchDeletedFileCursor,
+  SynchDeletedFilesPage,
   SynchDeletedFile,
   SynchEntryVersion,
   SynchEntryVersionCursor,
@@ -16,7 +18,7 @@ import {
 import { shouldSyncPath, type SyncFileRules } from "../sync/core/file-rules";
 import type { EntryVersion } from "../sync/remote/realtime-client";
 import type { SyncController } from "../sync/runtime/controller";
-import type { DeletedSyncEntryRow } from "../sync/store/store";
+import type { SyncDeletedEntry } from "../sync/runtime/version-history-service";
 
 export interface SynchVersionHistoryControllerDeps {
   plugin: Plugin;
@@ -147,33 +149,42 @@ export class SynchVersionHistoryController
     return await this.deps.syncController.previewEntryVersionForPath(file.path, version);
   }
 
-  async listDeletedFiles(): Promise<SynchDeletedFile[]> {
+  async listDeletedFiles(
+    before: SynchDeletedFileCursor | null,
+    limit: number,
+  ): Promise<SynchDeletedFilesPage> {
     if (!this.deps.hasAuthenticatedSession() || !this.deps.hasConnectedRemoteVault()) {
       throw new Error("Connect and sign in before viewing deleted files.");
     }
 
-    return (await this.deps.syncController.listDeletedEntries()).map(
-      toSynchDeletedFile,
-    );
+    const page = await this.deps.syncController.listDeletedEntries(before, limit);
+    return {
+      files: page.entries.map(toSynchDeletedFile),
+      hasMore: page.hasMore,
+      nextBefore: page.nextBefore,
+    };
   }
 
-  async restoreDeletedFiles(entryIds: string[]): Promise<void> {
+  async restoreDeletedFiles(files: SynchDeletedFile[]): Promise<void> {
     if (!this.deps.hasAuthenticatedSession() || !this.deps.hasConnectedRemoteVault()) {
       throw new Error("Connect and sign in before restoring deleted files.");
     }
 
-    for (const entryId of entryIds) {
-      await this.deps.syncController.restoreDeletedEntry(entryId);
+    for (const file of files) {
+      await this.deps.syncController.restoreDeletedEntry(file.entryId, file.revision);
     }
     this.deps.refreshUi();
   }
 
-  async previewDeletedFile(entryId: string): Promise<SynchVersionPreview> {
+  async previewDeletedFile(
+    entryId: string,
+    fallbackPath: string,
+  ): Promise<SynchVersionPreview> {
     if (!this.deps.hasAuthenticatedSession() || !this.deps.hasConnectedRemoteVault()) {
       throw new Error("Connect and sign in before previewing deleted files.");
     }
 
-    return await this.deps.syncController.previewDeletedEntry(entryId);
+    return await this.deps.syncController.previewDeletedEntry(entryId, fallbackPath);
   }
 
   refreshViews(): void {
@@ -215,12 +226,11 @@ function toSynchEntryVersion(version: EntryVersion): SynchEntryVersion {
   };
 }
 
-function toSynchDeletedFile(file: DeletedSyncEntryRow): SynchDeletedFile {
+function toSynchDeletedFile(file: SyncDeletedEntry): SynchDeletedFile {
   return {
     entryId: file.entryId,
     path: file.path,
     revision: file.revision,
     deletedAt: file.deletedAt,
-    dirty: file.dirty,
   };
 }

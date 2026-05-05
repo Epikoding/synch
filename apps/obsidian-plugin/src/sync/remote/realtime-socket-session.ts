@@ -1,6 +1,7 @@
 import type { EntryStatePageCursor } from "./changes";
 import type {
   CommitMutationPayload,
+  DeletedEntryPageCursor,
   EntryVersionPageCursor,
   ServerMessage,
   SyncRealtimeCallbacks,
@@ -32,6 +33,12 @@ type ClientMessage =
       requestId: string;
       entryId: string;
       before: EntryVersionPageCursor | null;
+      limit: number;
+    }
+  | {
+      type: "list_deleted_entries";
+      requestId: string;
+      before: DeletedEntryPageCursor | null;
       limit: number;
     }
   | {
@@ -244,6 +251,7 @@ export class SyncRealtimeSocketSession {
       parsed.type === "commit_mutations_failed" ||
       parsed.type === "entry_states_list_failed" ||
       parsed.type === "entry_versions_list_failed" ||
+      parsed.type === "deleted_entries_list_failed" ||
       parsed.type === "entry_restore_failed"
     ) {
       request.reject(new SyncRealtimeError(parsed.code, parsed.message));

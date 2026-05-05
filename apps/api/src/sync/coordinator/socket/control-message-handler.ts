@@ -1,8 +1,10 @@
 import type {
 	CommitMutationsMessage,
 	CommitMutationsResult,
+	DeletedEntriesListedMessage,
 	EntryStatesListedMessage,
 	EntryVersionsListedMessage,
+	ListDeletedEntriesMessage,
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
@@ -31,6 +33,10 @@ export type CoordinatorControlMessageUseCases = {
 		session: SocketSession,
 		message: ListEntryVersionsMessage,
 	): Promise<EntryVersionsListedMessage>;
+	listDeletedEntries(
+		session: SocketSession,
+		message: ListDeletedEntriesMessage,
+	): Promise<DeletedEntriesListedMessage>;
 	restoreEntryVersion(
 		session: SocketSession,
 		message: RestoreEntryVersionMessage,
@@ -174,6 +180,28 @@ export class CoordinatorControlMessageHandler {
 				);
 				this.socketService.sendSocketMessage(ws, {
 					type: "entry_versions_list_failed",
+					requestId: parsed.requestId,
+					code: details.code,
+					message: details.message,
+				});
+			}
+			return;
+		}
+
+		if (parsed.type === "list_deleted_entries") {
+			try {
+				this.socketService.sendSocketMessage(
+					ws,
+					await this.useCases.listDeletedEntries(session, parsed),
+				);
+			} catch (error) {
+				const details = websocketRequestError(
+					error,
+					"deleted_entries_list_failed",
+					"deleted entries list failed",
+				);
+				this.socketService.sendSocketMessage(ws, {
+					type: "deleted_entries_list_failed",
 					requestId: parsed.requestId,
 					code: details.code,
 					message: details.message,

@@ -130,6 +130,33 @@ describe("sync protocol schema", () => {
 		});
 	});
 
+	it("accepts a deleted entries request", () => {
+		const parsed = parseClientControlMessage({
+			type: "list_deleted_entries",
+			requestId: "request-deleted",
+			before: {
+				deletedAt: 20,
+				entryId: "entry-1",
+			},
+			limit: 25,
+		});
+
+		expect(parsed.success).toBe(true);
+		if (!parsed.success) {
+			throw new Error("expected deleted entries message to parse");
+		}
+
+		expect(parsed.data).toEqual({
+			type: "list_deleted_entries",
+			requestId: "request-deleted",
+			before: {
+				deletedAt: 20,
+				entryId: "entry-1",
+			},
+			limit: 25,
+		});
+	});
+
 	it("accepts an entry restore request", () => {
 		const parsed = parseClientControlMessage({
 			type: "restore_entry_version",

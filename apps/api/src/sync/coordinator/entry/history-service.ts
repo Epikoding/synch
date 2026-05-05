@@ -2,7 +2,9 @@ import { apiError } from "../../../errors";
 import type {
 	CommitMutationMessage,
 	CommitMutationResult,
+	DeletedEntriesListedMessage,
 	EntryVersionsListedMessage,
+	ListDeletedEntriesMessage,
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
 	RestoreEntryVersionResult,
@@ -11,6 +13,7 @@ import type {
 import type { CoordinatorStateRepository } from "../state-repository";
 
 const MAX_HISTORY_BATCH = 100;
+const MAX_DELETED_ENTRIES_BATCH = 100;
 
 export class EntryHistoryService {
 	constructor(
@@ -22,6 +25,44 @@ export class EntryHistoryService {
 			options?: { forcedHistoryBefore?: "before_restore" | null },
 		) => Promise<CommitMutationResult>,
 	) {}
+
+	async listDeletedEntries(
+		session: SocketSession,
+		message: ListDeletedEntriesMessage,
+	): Promise<DeletedEntriesListedMessage> {
+		const versionHistoryRetentionMs = await this.readVersionHistoryRetentionMs(
+			session.vaultId,
+		);
+		const retentionStart = Date.now() - versionHistoryRetentionMs;
+		const effectiveLimit = Math.min(message.limit, MAX_DELETED_ENTRIES_BATCH);
+		const entries = this.stateRepository.listDeletedEntries(
+			message.before,
+			retentionStart,
+			effectiveLimit + 1,
+		);
+		const hasMore = entries.length > effectiveLimit;
+		const page = hasMore ? entries.slice(0, effectiveLimit) : entries;
+		const last = page.at(-1);
+
+		return {
+			type: "deleted_entries_listed",
+			requestId: message.requestId,
+			entries: page.map((entry) => ({
+				entryId: entry.entry_id,
+				revision: entry.revision,
+				encryptedMetadata: entry.encrypted_metadata,
+				deletedAt: entry.deleted_at,
+			})),
+			hasMore,
+			nextBefore:
+				hasMore && last
+					? {
+							deletedAt: last.deleted_at,
+							entryId: last.entry_id,
+						}
+					: null,
+		};
+	}
 
 	async listEntryVersions(
 		session: SocketSession,

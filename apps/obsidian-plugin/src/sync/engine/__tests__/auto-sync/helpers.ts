@@ -86,6 +86,9 @@ export function createRealtimeClient(
         async listEntryVersions() {
           throw new Error("auto-sync tests should not list entry versions");
         },
+        async listDeletedEntries() {
+          throw new Error("auto-sync tests should not list deleted entries");
+        },
         async restoreEntryVersion() {
           throw new Error("auto-sync tests should not restore entry versions");
 	        },

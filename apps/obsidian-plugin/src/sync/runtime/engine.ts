@@ -24,11 +24,12 @@ import { SyncBlobClient } from "../remote/blob-client";
 import { SyncPullClient } from "../remote/pull-client";
 import {
   type EntryVersion,
+  type DeletedEntryPageCursor,
   type EntryVersionPageCursor,
   type SyncRealtimeSession,
   type SyncStorageStatus,
 } from "../remote/realtime-client";
-import type { DeletedSyncEntryRow, SyncStore } from "../store/store";
+import type { SyncStore } from "../store/store";
 import {
   getOrCreateStoredLocalVaultId,
   readStoredSyncConnection,
@@ -38,6 +39,7 @@ import type { UserVisibleSyncProgress } from "./user-visible-status";
 import { SyncVaultEventHandler } from "./vault-event-handler";
 import {
   SyncVersionHistoryService,
+  type SyncDeletedEntriesPage,
   type SyncEntryVersionPreview,
   type SyncEntryVersionsPage,
 } from "./version-history-service";
@@ -350,18 +352,25 @@ export class SyncEngine {
     await this.syncVersionHistoryService.restoreEntryVersionForPath(path, version);
   }
 
-  async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
-    return await this.syncVersionHistoryService.listDeletedEntries();
+  async listDeletedEntries(
+    before: DeletedEntryPageCursor | null,
+    limit: number,
+  ): Promise<SyncDeletedEntriesPage> {
+    return await this.syncVersionHistoryService.listDeletedEntries(before, limit);
   }
 
-  async restoreDeletedEntry(entryId: string): Promise<void> {
-    await this.syncVersionHistoryService.restoreDeletedEntry(entryId);
+  async restoreDeletedEntry(entryId: string, baseRevision: number): Promise<void> {
+    await this.syncVersionHistoryService.restoreDeletedEntry(entryId, baseRevision);
   }
 
   async previewDeletedEntry(
     entryId: string,
+    fallbackPath: string,
   ): Promise<SyncEntryVersionPreview> {
-    return await this.syncVersionHistoryService.previewDeletedEntry(entryId);
+    return await this.syncVersionHistoryService.previewDeletedEntry(
+      entryId,
+      fallbackPath,
+    );
   }
 
   async waitForLocalMutationWork(): Promise<void> {

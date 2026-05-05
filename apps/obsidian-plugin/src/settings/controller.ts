@@ -1,5 +1,7 @@
 import type { AuthReadiness } from "../auth/manager";
 import type {
+  SynchDeletedFileCursor,
+  SynchDeletedFilesPage,
   SynchDeletedFile,
   SynchFileRules,
   SynchPluginUpdateStatus,
@@ -43,7 +45,10 @@ export interface SynchSettingsController {
   ): Promise<void>;
   updateExcludedFolders(paths: string[]): Promise<void>;
   listSelectableExcludedFolderPaths(): string[];
-  listDeletedFiles(): Promise<SynchDeletedFile[]>;
-  previewDeletedFile(entryId: string): Promise<SynchVersionPreview>;
-  restoreDeletedFiles(entryIds: string[]): Promise<void>;
+  listDeletedFiles(
+    before: SynchDeletedFileCursor | null,
+    limit: number,
+  ): Promise<SynchDeletedFilesPage>;
+  previewDeletedFile(entryId: string, fallbackPath: string): Promise<SynchVersionPreview>;
+  restoreDeletedFiles(files: SynchDeletedFile[]): Promise<void>;
 }

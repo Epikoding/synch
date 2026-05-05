@@ -2,6 +2,8 @@ import type {
   CommitAcceptedResult,
   CommitMutationPayload,
   CommitMutationsResult,
+  DeletedEntriesResponse,
+  DeletedEntryPageCursor,
   EntryVersionPageCursor,
   EntryVersionRestoredResponse,
   EntryVersionsResponse,
@@ -116,6 +118,27 @@ export class SyncRealtimeApiSession implements SyncRealtimeSession {
     return {
       entryId: message.entryId,
       versions: message.versions,
+      hasMore: message.hasMore,
+      nextBefore: message.nextBefore,
+    };
+  }
+
+  async listDeletedEntries(input: {
+    before: DeletedEntryPageCursor | null;
+    limit: number;
+  }): Promise<DeletedEntriesResponse> {
+    const message = await this.transport.request({
+      type: "list_deleted_entries",
+      before: input.before,
+      limit: input.limit,
+    });
+
+    if (message.type !== "deleted_entries_listed") {
+      throw new Error("list deleted entries did not produce a deleted_entries_listed response");
+    }
+
+    return {
+      entries: message.entries,
       hasMore: message.hasMore,
       nextBefore: message.nextBefore,
     };

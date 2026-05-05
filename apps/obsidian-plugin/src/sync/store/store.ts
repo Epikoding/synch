@@ -97,14 +97,6 @@ export interface SyncProgressCounts {
   totalEntries: number;
 }
 
-export interface DeletedSyncEntryRow {
-  entryId: string;
-  path: string;
-  revision: number;
-  deletedAt: number;
-  dirty: boolean;
-}
-
 export interface SyncStore
   extends SyncConnectionStore,
     SyncRemoteEntryStore,

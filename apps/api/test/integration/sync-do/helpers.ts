@@ -193,6 +193,57 @@ export async function listEntryVersions(
 	});
 }
 
+export async function listDeletedEntries(
+	stub: DurableObjectStub,
+	session: SyncDoSession,
+	input: {
+		before: { deletedAt: number; entryId: string } | null;
+		limit: number;
+	},
+): Promise<{
+	type: "deleted_entries_listed";
+	requestId: string;
+	entries: Array<{
+		entryId: string;
+		revision: number;
+		encryptedMetadata: string;
+		deletedAt: number;
+	}>;
+	hasMore: boolean;
+	nextBefore: { deletedAt: number; entryId: string } | null;
+}> {
+	return await runInDurableObject(stub, async (instance) => {
+		const coordinator = instance as unknown as {
+			listDeletedEntries: (
+				sessionValue: SyncDoSession,
+				message: {
+					type: "list_deleted_entries";
+					requestId: string;
+					before: { deletedAt: number; entryId: string } | null;
+					limit: number;
+				},
+			) => Promise<{
+				type: "deleted_entries_listed";
+				requestId: string;
+				entries: Array<{
+					entryId: string;
+					revision: number;
+					encryptedMetadata: string;
+					deletedAt: number;
+				}>;
+				hasMore: boolean;
+				nextBefore: { deletedAt: number; entryId: string } | null;
+			}>;
+		};
+		return await coordinator.listDeletedEntries(session, {
+			type: "list_deleted_entries",
+			requestId: "request-deleted-entries",
+			before: input.before,
+			limit: input.limit,
+		});
+	});
+}
+
 export async function restoreEntryVersion(
 	stub: DurableObjectStub,
 	session: SyncDoSession,

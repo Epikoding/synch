@@ -10,6 +10,8 @@ import { SynchVersionHistoryController } from "./version-history-controller";
 import type { VersionHistoryViewState } from "./version-history-view";
 import type {
   SynchDeletedFile,
+  SynchDeletedFileCursor,
+  SynchDeletedFilesPage,
   SynchEntryVersionCursor,
   SynchFileSizeBlockedFile,
   SynchFileRules,
@@ -397,20 +399,29 @@ export class SynchPluginController implements SynchSettingsController {
     await this.versionHistoryController.restoreActiveFileVersion(versionId);
   }
 
-  async listDeletedFiles(): Promise<SynchDeletedFile[]> {
-    return await this.versionHistoryController.listDeletedFiles();
+  async listDeletedFiles(
+    before: SynchDeletedFileCursor | null,
+    limit: number,
+  ): Promise<SynchDeletedFilesPage> {
+    return await this.versionHistoryController.listDeletedFiles(before, limit);
   }
 
   async listFileSizeBlockedFiles(): Promise<SynchFileSizeBlockedFile[]> {
     return await this.syncController.listFileSizeBlockedFiles();
   }
 
-  async previewDeletedFile(entryId: string): Promise<SynchVersionPreview> {
-    return await this.versionHistoryController.previewDeletedFile(entryId);
+  async previewDeletedFile(
+    entryId: string,
+    fallbackPath: string,
+  ): Promise<SynchVersionPreview> {
+    return await this.versionHistoryController.previewDeletedFile(
+      entryId,
+      fallbackPath,
+    );
   }
 
-  async restoreDeletedFiles(entryIds: string[]): Promise<void> {
-    await this.versionHistoryController.restoreDeletedFiles(entryIds);
+  async restoreDeletedFiles(files: SynchDeletedFile[]): Promise<void> {
+    await this.versionHistoryController.restoreDeletedFiles(files);
   }
 
   refreshVersionHistoryViews(): void {

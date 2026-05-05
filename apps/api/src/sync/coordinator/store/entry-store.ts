@@ -4,6 +4,8 @@ import { drizzle } from "drizzle-orm/durable-sqlite";
 import * as doSchema from "../../../db/do";
 import type {
 	CurrentEntryRow,
+	DeletedEntryListRow,
+	DeletedEntryPageCursor,
 	EntryStatePageCursor,
 	EntryStateRow,
 } from "../types";
@@ -83,6 +85,60 @@ export class CoordinatorEntryStore {
 			.one();
 
 		return Number(row.total);
+	}
+
+	listDeletedEntries(
+		before: DeletedEntryPageCursor | null,
+		retentionStart: number,
+		limit: number,
+	): DeletedEntryListRow[] {
+		const rows = this.storage.sql
+			.exec<{
+				entry_id: string;
+				revision: number;
+				encrypted_metadata: string;
+				deleted_at: number;
+			}>(
+				`
+				SELECT
+					entry_id,
+					revision,
+					encrypted_metadata,
+					updated_at AS deleted_at
+				FROM entries
+				WHERE deleted = 1
+					AND revision > 0
+					AND (
+						? IS NULL
+						OR updated_at < ?
+						OR (updated_at = ? AND entry_id < ?)
+					)
+					AND EXISTS (
+						SELECT 1
+						FROM entry_versions
+						WHERE entry_versions.entry_id = entries.entry_id
+							AND entry_versions.op_type = 'upsert'
+							AND entry_versions.blob_id IS NOT NULL
+							AND entry_versions.captured_at >= ?
+					)
+				ORDER BY updated_at DESC, entry_id DESC
+				LIMIT ?
+				`,
+				before?.deletedAt ?? null,
+				before?.deletedAt ?? null,
+				before?.deletedAt ?? null,
+				before?.entryId ?? null,
+				retentionStart,
+				limit,
+			)
+			.toArray();
+
+		return rows.map((row) => ({
+			entry_id: row.entry_id,
+			revision: Number(row.revision),
+			encrypted_metadata: row.encrypted_metadata,
+			deleted_at: Number(row.deleted_at),
+		}));
 	}
 
 	readEntry(entryId: string): CurrentEntryRow | null {

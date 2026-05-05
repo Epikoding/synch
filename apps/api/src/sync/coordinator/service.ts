@@ -3,8 +3,10 @@ import type {
 	CommitMutationResult,
 	CommitMutationsMessage,
 	CommitMutationsResult,
+	DeletedEntriesListedMessage,
 	EntryStatesListedMessage,
 	EntryVersionsListedMessage,
+	ListDeletedEntriesMessage,
 	ListEntryStatesMessage,
 	ListEntryVersionsMessage,
 	RestoreEntryVersionMessage,
@@ -99,6 +101,8 @@ export class CoordinatorService {
 					this.listEntryStates(session, message),
 				listEntryVersions: async (session, message) =>
 					await this.listEntryVersions(session, message),
+				listDeletedEntries: async (session, message) =>
+					await this.listDeletedEntries(session, message),
 				restoreEntryVersion: async (session, message) =>
 					await this.restoreEntryVersion(session, message),
 			},
@@ -144,6 +148,13 @@ export class CoordinatorService {
 		message: ListEntryVersionsMessage,
 	): Promise<EntryVersionsListedMessage> {
 		return await this.entryHistoryService.listEntryVersions(session, message);
+	}
+
+	async listDeletedEntries(
+		session: SocketSession,
+		message: ListDeletedEntriesMessage,
+	): Promise<DeletedEntriesListedMessage> {
+		return await this.entryHistoryService.listDeletedEntries(session, message);
 	}
 
 	async restoreEntryVersion(

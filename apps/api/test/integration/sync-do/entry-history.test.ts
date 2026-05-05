@@ -12,6 +12,7 @@ import {
 import {
 	ackCursor,
 	commitMutation,
+	listDeletedEntries,
 	listEntryVersions,
 	restoreEntryVersion,
 	uploadBlob,
@@ -326,6 +327,146 @@ describe("sync durable object entry history integration", () => {
 			},
 		);
 		expect(deleted.status).toBe(404);
+	});
+
+	it("lists restorable deleted entries in retention-window pages", async () => {
+		const primary = await signUpAndCreateVault();
+		const token = await issueSyncToken(
+			primary.sessionCookie,
+			primary.vaultId,
+			"local-vault-deleted-list",
+		);
+		const stub = env.SYNC_COORDINATOR.getByName(primary.vaultId);
+		const session = {
+			userId: primary.userId,
+			localVaultId: token.localVaultId,
+			vaultId: primary.vaultId,
+		};
+		const now = Date.now();
+		const oldTimestamp = now - 25 * 60 * 60 * 1000;
+
+		await initializeCoordinatorState(primary.vaultId);
+		await runInDurableObject(stub, async (_instance, state) => {
+			const insertDeletedEntry = (
+				entryId: string,
+				deletedAt: number,
+				encryptedMetadata: string,
+			) => {
+				state.storage.sql.exec(
+					`
+					INSERT INTO entries (
+						entry_id,
+						revision,
+						blob_id,
+						encrypted_metadata,
+						deleted,
+						updated_seq,
+						updated_at,
+						updated_by_user_id,
+						updated_by_local_vault_id
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+					`,
+					entryId,
+					2,
+					null,
+					encryptedMetadata,
+					1,
+					deletedAt,
+					deletedAt,
+					primary.userId,
+					"local-vault-deleted-list",
+				);
+			};
+			const insertVersion = (
+				entryId: string,
+				versionId: string,
+				blobId: string | null,
+				capturedAt: number,
+			) => {
+				state.storage.sql.exec(
+					`
+					INSERT INTO entry_versions (
+						version_id,
+						entry_id,
+						source_revision,
+						op_type,
+						blob_id,
+						encrypted_metadata,
+						reason,
+						bucket_start_ms,
+						captured_at,
+						expires_at,
+						created_by_user_id,
+						created_by_local_vault_id
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					`,
+					versionId,
+					entryId,
+					1,
+					blobId ? "upsert" : "delete",
+					blobId,
+					`history-${entryId}`,
+					"before_delete",
+					null,
+					capturedAt,
+					capturedAt + 24 * 60 * 60 * 1000,
+					primary.userId,
+					"local-vault-deleted-list",
+				);
+			};
+
+			insertDeletedEntry("entry-a", now + 300, "delete-a");
+			insertVersion("entry-a", "version-a", "blob-a", now);
+			insertDeletedEntry("entry-c", now + 200, "delete-c");
+			insertVersion("entry-c", "version-c", "blob-c", now);
+			insertDeletedEntry("entry-b", now + 200, "delete-b");
+			insertVersion("entry-b", "version-b", "blob-b", now);
+			insertDeletedEntry("entry-no-upsert", now + 100, "delete-no-upsert");
+			insertVersion("entry-no-upsert", "version-no-upsert", null, now);
+			insertDeletedEntry("entry-expired", now + 50, "delete-expired");
+			insertVersion("entry-expired", "version-expired", "blob-expired", oldTimestamp);
+
+			for (let index = 0; index < 101; index += 1) {
+				const entryId = `entry-cap-${String(index).padStart(3, "0")}`;
+				insertDeletedEntry(entryId, now - 1_000 - index, `delete-cap-${index}`);
+				insertVersion(entryId, `version-cap-${index}`, `blob-cap-${index}`, now);
+			}
+		});
+
+		const firstPage = await listDeletedEntries(stub, session, {
+			before: null,
+			limit: 2,
+		});
+		expect(firstPage.entries.map((entry) => entry.entryId)).toEqual([
+			"entry-a",
+			"entry-c",
+		]);
+		expect(firstPage.hasMore).toBe(true);
+		expect(firstPage.nextBefore).toEqual({
+			deletedAt: now + 200,
+			entryId: "entry-c",
+		});
+
+		const secondPage = await listDeletedEntries(stub, session, {
+			before: firstPage.nextBefore,
+			limit: 2,
+		});
+		expect(secondPage.entries.map((entry) => entry.entryId)).toEqual([
+			"entry-b",
+			"entry-cap-000",
+		]);
+		expect(
+			secondPage.entries.some((entry) =>
+				["entry-no-upsert", "entry-expired"].includes(entry.entryId),
+			),
+		).toBe(false);
+
+		const capped = await listDeletedEntries(stub, session, {
+			before: null,
+			limit: 500,
+		});
+		expect(capped.entries).toHaveLength(100);
+		expect(capped.hasMore).toBe(true);
 	});
 
 	it("retains sampled entry versions after older blobs are collected", async () => {

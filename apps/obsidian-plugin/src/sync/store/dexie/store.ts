@@ -1,6 +1,5 @@
 import type {
   CachedSyncBlobRow,
-  DeletedSyncEntryRow,
   LocalSyncEntryRow,
   MarkEntryDirtyOptions,
   PendingMutationBlockedReason,
@@ -30,7 +29,6 @@ import {
   toBlobRecord,
   toCachedBlobRow,
   toCombinedEntryRow,
-  toDeletedEntryRow,
   toDirtyEntryRecord,
   toEntryStateRow,
   toLocalEntryRow,
@@ -233,19 +231,6 @@ export class DexieSyncStore implements SyncStore {
         .map(toCombinedEntryRow)
         .filter((entry): entry is SyncEntryRow => !!entry),
     );
-  }
-
-  async listDeletedEntries(): Promise<DeletedSyncEntryRow[]> {
-    return (await this.db.entries.toArray())
-      .filter((row) => row.remoteKnown && row.remoteDeleted && row.remoteRevision > 0)
-      .map(toDeletedEntryRow)
-      .filter(isPresent)
-      .sort((left, right) => {
-        if (left.deletedAt !== right.deletedAt) {
-          return right.deletedAt - left.deletedAt;
-        }
-        return left.path.localeCompare(right.path);
-      });
   }
 
   async countSyncProgress(): Promise<SyncProgressCounts> {

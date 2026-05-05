@@ -1,6 +1,5 @@
 import type {
   CachedSyncBlobRow,
-  DeletedSyncEntryRow,
   LocalSyncEntryRow,
   PendingMutationRow,
   RemoteSyncEntryRow,
@@ -145,21 +144,6 @@ export function toEntryStateRow(row: EntryRecord): SyncEntryStateRow {
     },
     local: row.localKnown ? toLocalEntryRow(row) : null,
     dirty: toPendingMutationRow(row),
-  };
-}
-
-export function toDeletedEntryRow(row: EntryRecord): DeletedSyncEntryRow | null {
-  const path = row.remotePath ?? row.localPath ?? row.basePath;
-  if (!path) {
-    return null;
-  }
-
-  return {
-    entryId: row.entryId,
-    path,
-    revision: row.remoteRevision,
-    deletedAt: row.remoteUpdatedAt,
-    dirty: toPendingMutationRow(row) !== null,
   };
 }
 

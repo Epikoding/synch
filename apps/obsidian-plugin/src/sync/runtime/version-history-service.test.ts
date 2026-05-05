@@ -38,47 +38,62 @@ describe("SyncVersionHistoryService", () => {
     await store.close();
   });
 
-  it("lists synced deleted entries from the local store", async () => {
+  it("lists server deleted entries as decrypted pages", async () => {
     const store = await createInitializedTestSyncStore(createTestPlugin());
-    await store.upsertEntry({
-      entryId: "entry-deleted",
-      path: "Folder/deleted.md",
-      revision: 3,
-      blobId: null,
-      hash: null,
-      deleted: true,
-      updatedAt: 30,
-      localMtime: null,
-      localSize: null,
-    });
-    const service = createService(store);
-
-    await expect(service.listDeletedEntries()).resolves.toEqual([
+    const encryptedMetadata = await encryptSyncMetadata(
+      TEST_VAULT_KEY,
+      {
+        path: "Folder/deleted.md",
+        hash: null,
+      },
       {
         entryId: "entry-deleted",
-        path: "Folder/deleted.md",
         revision: 3,
-        deletedAt: 30,
-        dirty: false,
+        op: "delete",
+        blobId: null,
       },
-    ]);
+    );
+    const listDeletedEntries = vi.fn(async () => ({
+      entries: [
+        {
+          entryId: "entry-deleted",
+          revision: 3,
+          encryptedMetadata,
+          deletedAt: 30,
+        },
+      ],
+      hasMore: true,
+      nextBefore: { deletedAt: 30, entryId: "entry-deleted" },
+    }));
+    const service = createService(store, {
+      withRealtimeSession: async (work) =>
+        await work(createRealtimeSession({ listDeletedEntries })),
+    });
+
+    await expect(
+      service.listDeletedEntries({ deletedAt: 40, entryId: "entry-before" }, 25),
+    ).resolves.toEqual({
+      entries: [
+        {
+          entryId: "entry-deleted",
+          path: "Folder/deleted.md",
+          revision: 3,
+          deletedAt: 30,
+        },
+      ],
+      hasMore: true,
+      nextBefore: { deletedAt: 30, entryId: "entry-deleted" },
+    });
+    expect(listDeletedEntries).toHaveBeenCalledWith({
+      before: { deletedAt: 40, entryId: "entry-before" },
+      limit: 25,
+    });
 
     await store.close();
   });
 
   it("restores deleted entries from their newest upsert version", async () => {
     const store = await createInitializedTestSyncStore(createTestPlugin());
-    await store.upsertEntry({
-      entryId: "entry-deleted",
-      path: "Folder/deleted.md",
-      revision: 3,
-      blobId: null,
-      hash: null,
-      deleted: true,
-      updatedAt: 30,
-      localMtime: null,
-      localSize: null,
-    });
     const versionMetadata = await encryptSyncMetadata(
       TEST_VAULT_KEY,
       {
@@ -133,7 +148,7 @@ describe("SyncVersionHistoryService", () => {
       withRealtimeSession: async (work) => await work(session),
     });
 
-    await service.restoreDeletedEntry("entry-deleted");
+    await service.restoreDeletedEntry("entry-deleted", 3);
 
     expect(restoreEntryVersion).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -328,7 +343,9 @@ describe("SyncVersionHistoryService", () => {
       withRealtimeSession: async (work) => await work(session),
     });
 
-    await expect(service.previewDeletedEntry("entry-deleted")).resolves.toEqual(
+    await expect(
+      service.previewDeletedEntry("entry-deleted", "Folder/deleted.md"),
+    ).resolves.toEqual(
       expect.objectContaining({
         status: "text",
         path: "Folder/deleted.md",
@@ -374,7 +391,9 @@ describe("SyncVersionHistoryService", () => {
       withRealtimeSession: async (work) => await work(session),
     });
 
-    await expect(service.previewDeletedEntry("entry-deleted")).resolves.toEqual({
+    await expect(
+      service.previewDeletedEntry("entry-deleted", "Folder/deleted.md"),
+    ).resolves.toEqual({
       status: "unavailable",
       path: "Folder/deleted.md",
       reason: null,
@@ -527,7 +546,7 @@ describe("SyncVersionHistoryService", () => {
       withRealtimeSession: async (work) => await work(session),
     });
 
-    await expect(service.restoreDeletedEntry("entry-deleted")).rejects.toThrow(
+    await expect(service.restoreDeletedEntry("entry-deleted", 3)).rejects.toThrow(
       "No restorable version exists for this deleted file.",
     );
     expect(restoreEntryVersion).not.toHaveBeenCalled();
@@ -626,6 +645,11 @@ function createRealtimeSession(
       entries: [],
     })),
     listEntryVersions: vi.fn(),
+    listDeletedEntries: vi.fn(async () => ({
+      entries: [],
+      hasMore: false,
+      nextBefore: null,
+    })),
     restoreEntryVersion: vi.fn(),
     commitMutation: vi.fn(),
     commitMutations: vi.fn(),
