@@ -116,12 +116,23 @@
 			async function signOut() {
 				logoutButton.disabled = true;
 				try {
-					await fetch("/api/auth/sign-out", {
+					const response = await fetch("/api/auth/sign-out", {
 						method: "POST",
 						credentials: "include",
+						headers: {
+							"content-type": "application/json",
+						},
+						body: JSON.stringify({}),
 					});
-				} finally {
+					if (!response.ok) {
+						setStatus(await readErrorMessage(response, "Unable to sign out."));
+						logoutButton.disabled = false;
+						return;
+					}
 					redirectToLogin();
+				} catch {
+					setStatus("Unable to reach the API.");
+					logoutButton.disabled = false;
 				}
 			}
 
