@@ -12,6 +12,7 @@ import type {
   SyncRemoteEntryStore,
 } from "../store/ports";
 import {
+  renameVaultPath,
   removeVaultPathIfExists,
   type SyncVaultWriter,
   writeVaultBytes,
@@ -346,7 +347,13 @@ export class PullEntryStateApplier {
       let filesDeleted = 0;
       let entriesApplied = 0;
       filesDeleted = await this.runWithSuppressedPaths(
-        [...prepared.batches.flatMap((batch) => batch.pathsToRemove), ...prepared.pathsToWrite],
+        [
+          ...prepared.batches.flatMap((batch) => batch.pathsToRemove),
+          ...prepared.batches.flatMap((batch) =>
+            batch.plans.flatMap((plan) => [plan.vaultMove?.from, plan.vaultMove?.to]),
+          ),
+          ...prepared.pathsToWrite,
+        ],
         async () => {
           let removedTotal = 0;
           for (const batch of prepared.batches) {
@@ -358,6 +365,16 @@ export class PullEntryStateApplier {
             }
             await this.applyAdoptedLocalEntries(store, batch.plans);
             await this.clearChangingStorePaths(store, batch.plans);
+
+            for (const plan of batch.plans) {
+              if (plan.vaultMove) {
+                await renameVaultPath(
+                  this.deps.vaultAdapter,
+                  plan.vaultMove.from,
+                  plan.vaultMove.to,
+                );
+              }
+            }
 
             let removed = 0;
             for (const path of batch.pathsToRemove) {

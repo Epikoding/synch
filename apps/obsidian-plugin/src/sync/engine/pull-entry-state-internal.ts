@@ -26,12 +26,18 @@ export type PlannedEntryState = {
   state: RemoteEntryState;
   existing: SyncEntryRow | null;
   adoptedLocalEntry: AdoptedLocalEntry | null;
+  vaultMove: PlannedVaultMove | null;
   skipVaultWrite: boolean;
   metadata: SyncedEntryMetadata;
   finalPath: string | null;
   hash: string | null;
   pathConflict: PullConflictEvent | null;
   pendingConflict: PullConflictEvent | null;
+};
+
+export type PlannedVaultMove = {
+  from: string;
+  to: string;
 };
 
 export type AdoptedLocalEntry = {
@@ -239,6 +245,10 @@ export function pathsToRemoveForPlan(
 ): Array<string | null | undefined> {
   if (plan.state.deleted) {
     return [plan.existing?.path ?? plan.metadata.path];
+  }
+
+  if (plan.vaultMove) {
+    return [];
   }
 
   return plan.existing?.path !== plan.finalPath ? [plan.existing?.path] : [];

@@ -320,9 +320,15 @@ export function createVaultAdapter(initialFiles: Record<string, string | Uint8Ar
     ]),
   );
   const directories = new Set<string>();
+  const renames: Array<{ oldPath: string; newPath: string }> = [];
+  const removes: string[] = [];
+  const writes: string[] = [];
 
   return {
     files,
+    renames,
+    removes,
+    writes,
     text(path: string): string | null {
       const bytes = files.get(path);
       return bytes ? new TextDecoder().decode(bytes) : null;
@@ -345,12 +351,25 @@ export function createVaultAdapter(initialFiles: Record<string, string | Uint8Ar
       return bytes;
     },
     async writeText(path: string, content: string): Promise<void> {
+      writes.push(path);
       files.set(path, new TextEncoder().encode(content));
     },
     async writeBinary(path: string, content: Uint8Array): Promise<void> {
+      writes.push(path);
       files.set(path, content);
     },
+    async rename(oldPath: string, newPath: string): Promise<void> {
+      const bytes = files.get(oldPath);
+      if (!bytes) {
+        throw new Error(`missing file fixture for ${oldPath}`);
+      }
+
+      renames.push({ oldPath, newPath });
+      files.delete(oldPath);
+      files.set(newPath, bytes);
+    },
     async remove(path: string): Promise<void> {
+      removes.push(path);
       files.delete(path);
       directories.delete(path);
     },

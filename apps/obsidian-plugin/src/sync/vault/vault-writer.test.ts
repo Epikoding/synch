@@ -68,6 +68,21 @@ class MemoryVaultWriter implements SyncVaultWriter {
     this.binaryFiles.set(path, content);
   }
 
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const text = this.textFiles.get(oldPath);
+    if (text !== undefined) {
+      this.textFiles.delete(oldPath);
+      this.textFiles.set(newPath, text);
+      return;
+    }
+
+    const binary = this.binaryFiles.get(oldPath);
+    if (binary !== undefined) {
+      this.binaryFiles.delete(oldPath);
+      this.binaryFiles.set(newPath, binary);
+    }
+  }
+
   async remove(path: string): Promise<void> {
     this.textFiles.delete(path);
     this.binaryFiles.delete(path);

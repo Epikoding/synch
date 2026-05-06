@@ -3,6 +3,7 @@ export interface SyncVaultWriter {
   mkdir(path: string): Promise<void>;
   writeText(path: string, content: string): Promise<void>;
   writeBinary(path: string, content: Uint8Array): Promise<void>;
+  rename(oldPath: string, newPath: string): Promise<void>;
   remove(path: string): Promise<void>;
 }
 
@@ -36,6 +37,15 @@ export async function writeVaultText(
 ): Promise<void> {
   await ensureParentDirectories(writer, path);
   await writer.writeText(path, content);
+}
+
+export async function renameVaultPath(
+  writer: Pick<SyncVaultWriter, "exists" | "mkdir" | "rename">,
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
+  await ensureParentDirectories(writer, newPath);
+  await writer.rename(oldPath, newPath);
 }
 
 export async function removeVaultPathIfExists(

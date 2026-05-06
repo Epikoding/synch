@@ -17,6 +17,96 @@ import {
 } from "./helpers";
 
 describe("SyncPullService path operations", () => {
+  it("applies remote path changes using a vault rename", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    const adapter = createVaultAdapter({
+      "Old/path.md": "old content",
+    });
+    const suppressionCalls: string[][] = [];
+    await store.upsertEntry({
+      entryId: "entry-rename",
+      path: "Old/path.md",
+      revision: 1,
+      blobId: "blob-old",
+      hash: await hashText("old content"),
+      deleted: false,
+      updatedAt: 1,
+    });
+
+    const session = createRealtimeSession({
+      pages: [
+        {
+          cursor: 2,
+          hasMore: false,
+          commits: [
+            createCommit({
+              cursor: 2,
+              entryId: "entry-rename",
+              revision: 2,
+              blobId: "blob-new",
+              encryptedMetadata: await encryptRemoteMetadata({
+                entryId: "entry-rename",
+                revision: 2,
+                blobId: "blob-new",
+                path: "New/path.md",
+                hash: await hashText("renamed content"),
+              }),
+            }),
+          ],
+        },
+      ],
+    });
+    const client = createPullClient({
+      blobs: {
+        "blob-new": await encryptTestBlob(
+          "blob-new",
+          new TextEncoder().encode("renamed content"),
+        ),
+      },
+    });
+
+    const service = new SyncPullService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      vaultAdapter: adapter,
+      eventGate: createEventGate(suppressionCalls),
+      pullClient: client,
+      onProgress: ignoreProgress,
+    });
+
+    const result = await service.pullOnce(session);
+
+    expect(result).toEqual({
+      cursor: 2,
+      entriesApplied: 1,
+      filesWritten: 1,
+      filesDeleted: 0,
+      conflictsCreated: 0,
+    });
+    expect(adapter.renames).toEqual([
+      { oldPath: "Old/path.md", newPath: "New/path.md" },
+    ]);
+    expect(adapter.removes).toEqual([]);
+    expect(adapter.text("Old/path.md")).toBeNull();
+    expect(adapter.text("New/path.md")).toBe("renamed content");
+    expect(await store.getEntryById("entry-rename")).toEqual({
+      entryId: "entry-rename",
+      path: "New/path.md",
+      revision: 2,
+      blobId: "blob-new",
+      hash: await hashText("renamed content"),
+      deleted: false,
+      updatedAt: 2,
+      localMtime: null,
+      localSize: null,
+    });
+    expect(suppressionCalls).toEqual([["Old/path.md", "New/path.md"]]);
+    await store.close();
+  });
+
   it("handles renames and deletes using the stored entry mapping", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);

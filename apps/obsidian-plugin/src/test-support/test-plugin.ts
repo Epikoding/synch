@@ -65,6 +65,14 @@ export function createTestPlugin(): Plugin {
           async writeBinary(path: string, value: ArrayBuffer): Promise<void> {
             files.set(path, new Uint8Array(value));
           },
+          async rename(oldPath: string, newPath: string): Promise<void> {
+            const value = files.get(oldPath);
+            if (value === undefined) {
+              throw new Error(`missing test file: ${oldPath}`);
+            }
+            files.delete(oldPath);
+            files.set(newPath, value);
+          },
           async remove(path: string): Promise<void> {
             files.delete(path);
           },

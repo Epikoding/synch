@@ -263,7 +263,7 @@ describe("SyncPullService deferred path dependencies", () => {
       cursor: 3,
       entriesApplied: 3,
       filesWritten: 3,
-      filesDeleted: 3,
+      filesDeleted: 2,
       conflictsCreated: 0,
     });
     expect(adapter.text("Folder/a.md")).toBe("new c");

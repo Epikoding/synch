@@ -61,6 +61,10 @@ export class ObsidianSyncVaultAdapter {
     await this.plugin.app.vault.adapter.writeBinary(path, toArrayBuffer(content));
   }
 
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    await this.plugin.app.vault.adapter.rename(oldPath, newPath);
+  }
+
   async remove(path: string): Promise<void> {
     await this.plugin.app.vault.adapter.remove(path);
   }

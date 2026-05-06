@@ -107,6 +107,7 @@ export class PullManifestPlanner {
       let hash: string | null = null;
       let pathConflict: PullConflictEvent | null = null;
       let adoptedLocalEntry: AdoptedLocalEntry | null = null;
+      let vaultMove: PlannedEntryState["vaultMove"] = null;
 
       if (!state.deleted) {
         if (!state.blobId) {
@@ -145,6 +146,14 @@ export class PullManifestPlanner {
         if (!finalPath) {
           throw new Error(`Entry state ${state.entryId}@${state.revision} has no target path.`);
         }
+        vaultMove = await this.planVaultMove(
+          store,
+          state.entryId,
+          existing,
+          finalPath,
+          pathConflict,
+          adoptedLocalEntry,
+        );
         reservedPaths.set(finalPath, state.entryId);
       } else if (metadata.hash !== null) {
         throw new Error(`Deleted entry state ${state.entryId}@${state.revision} has a hash.`);
@@ -154,6 +163,7 @@ export class PullManifestPlanner {
         state,
         existing,
         adoptedLocalEntry,
+        vaultMove,
         skipVaultWrite: false,
         metadata,
         finalPath,
@@ -164,6 +174,40 @@ export class PullManifestPlanner {
     }
 
     return { plans, deferred };
+  }
+
+  private async planVaultMove(
+    store: PullManifestStore,
+    entryId: string,
+    existing: SyncEntryRow | null,
+    finalPath: string,
+    pathConflict: PullConflictEvent | null,
+    adoptedLocalEntry: AdoptedLocalEntry | null,
+  ): Promise<PlannedEntryState["vaultMove"]> {
+    if (
+      !existing ||
+      existing.entryId !== entryId ||
+      existing.deleted ||
+      !existing.path ||
+      existing.path === finalPath ||
+      pathConflict ||
+      adoptedLocalEntry ||
+      (await store.getDirtyEntryMutation(entryId))
+    ) {
+      return null;
+    }
+
+    if (
+      !(await this.deps.vaultAdapter.exists(existing.path)) ||
+      (await this.deps.vaultAdapter.exists(finalPath))
+    ) {
+      return null;
+    }
+
+    return {
+      from: existing.path,
+      to: finalPath,
+    };
   }
 
   private async findAdoptableLocalPathOwner(
