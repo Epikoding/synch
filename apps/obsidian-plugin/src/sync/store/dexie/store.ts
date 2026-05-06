@@ -1,4 +1,5 @@
 import type {
+  AcceptedPushMutationRow,
   CachedSyncBlobRow,
   LocalSyncEntryRow,
   MarkEntryDirtyOptions,
@@ -13,6 +14,7 @@ import type {
   SyncReconcileEntryUpdate,
   SyncStore,
 } from "../store";
+import { decryptSyncMetadata, encryptSyncMetadata } from "../../core/crypto";
 import {
   METADATA_ID,
   MIN_PENDING_CREATED_AT,
@@ -38,7 +40,9 @@ import {
   toRemoteEntryRow,
   toSyncConnection,
 } from "./mappers";
-import type { EntryRecord, MetadataRecord } from "./records";
+import type { BlobRecord, EntryRecord, MetadataRecord } from "./records";
+
+const ACCEPTED_PUSH_BATCH_MAX_RETRIES = 3;
 
 export class DexieSyncStore implements SyncStore {
   private readonly db: SyncDexieDatabase;
@@ -497,6 +501,68 @@ export class DexieSyncStore implements SyncStore {
     await this.db.blobs.put(toBlobRecord(blob));
   }
 
+  async applyAcceptedPushBatch(
+    accepted: AcceptedPushMutationRow[],
+    options: { remoteVaultKey: Uint8Array },
+  ): Promise<void> {
+    if (accepted.length === 0) {
+      return;
+    }
+
+    for (let attempt = 0; attempt < ACCEPTED_PUSH_BATCH_MAX_RETRIES; attempt += 1) {
+      const initialRows = await this.db.entries.bulkGet(
+        accepted.map((item) => item.mutation.entryId),
+      );
+      const plans = await Promise.all(
+        accepted.map((item, index) =>
+          planAcceptedPushApply(
+            initialRows[index] ?? createEmptyEntryRecord(item.mutation.entryId),
+            item,
+            options.remoteVaultKey,
+          ),
+        ),
+      );
+
+      try {
+        await this.db.transaction("rw", this.db.entries, this.db.blobs, async () => {
+          const existingRows = await this.db.entries.bulkGet(
+            accepted.map((item) => item.mutation.entryId),
+          );
+          const rowsToPut: EntryRecord[] = [];
+          const blobsToPut: BlobRecord[] = [];
+
+          for (let index = 0; index < accepted.length; index += 1) {
+            const item = accepted[index];
+            const row =
+              existingRows[index] ?? createEmptyEntryRecord(item.mutation.entryId);
+            const applied = applyAcceptedPushToEntry(row, item, plans[index]);
+            if (applied === "retry") {
+              throw new AcceptedPushBatchRetryError();
+            }
+            rowsToPut.push(applied);
+
+            if (item.remoteCacheBlob) {
+              blobsToPut.push(toBlobRecord(item.remoteCacheBlob));
+            }
+          }
+
+          await this.db.entries.bulkPut(rowsToPut.map(normalizeEntryRecord));
+          if (blobsToPut.length > 0) {
+            await this.db.blobs.bulkPut(blobsToPut);
+          }
+        });
+        return;
+      } catch (error) {
+        if (error instanceof AcceptedPushBatchRetryError) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error("Accepted push batch changed while applying; retry limit exceeded.");
+  }
+
   async flush(): Promise<void> {}
 
   async close(): Promise<void> {
@@ -539,4 +605,132 @@ export class DexieSyncStore implements SyncStore {
       lastPulledCursor: metadata.lastPulledCursor,
     });
   }
+}
+
+class AcceptedPushBatchRetryError extends Error {
+  constructor() {
+    super("Accepted push batch changed while applying.");
+    this.name = "AcceptedPushBatchRetryError";
+  }
+}
+
+interface AcceptedPushApplyPlan {
+  rebase:
+    | {
+        pendingMutationId: string;
+        encryptedMetadata: string;
+      }
+    | null;
+}
+
+async function planAcceptedPushApply(
+  row: EntryRecord,
+  accepted: AcceptedPushMutationRow,
+  remoteVaultKey: Uint8Array,
+): Promise<AcceptedPushApplyPlan> {
+  const currentPending = toPendingMutationRow(row);
+  if (!currentPending || currentPending.mutationId === accepted.mutation.mutationId) {
+    return { rebase: null };
+  }
+
+  const pendingMetadata = await decryptSyncMetadata(
+    remoteVaultKey,
+    currentPending.encryptedMetadata,
+    metadataContextFromMutation(currentPending),
+  );
+
+  return {
+    rebase: {
+      pendingMutationId: currentPending.mutationId,
+      encryptedMetadata: await encryptSyncMetadata(
+        remoteVaultKey,
+        pendingMetadata,
+        metadataContextFromMutation({
+          ...currentPending,
+          baseRevision: accepted.acceptedRevision,
+          baseBlobId: accepted.remoteBlobId,
+          baseHash: accepted.localHash,
+        }),
+      ),
+    },
+  };
+}
+
+function applyAcceptedPushToEntry(
+  row: EntryRecord,
+  accepted: AcceptedPushMutationRow,
+  plan: AcceptedPushApplyPlan,
+): EntryRecord | "retry" {
+  const { mutation, metadata } = accepted;
+  let updated: EntryRecord = {
+    ...row,
+    remoteKnown: true,
+    remotePath: metadata.path,
+    remoteRevision: accepted.acceptedRevision,
+    remoteBlobId: mutation.op === "delete" ? null : accepted.remoteBlobId,
+    remoteHash: mutation.op === "delete" ? null : accepted.localHash,
+    remoteDeleted: mutation.op === "delete",
+    remoteUpdatedAt: accepted.acceptedAt,
+  };
+
+  if (mutation.op === "upsert" && shouldApplyAcceptedPushToLocal(updated, accepted)) {
+    updated = {
+      ...updated,
+      localKnown: true,
+      localPath: metadata.path,
+      localBlobId: accepted.remoteBlobId,
+      localHash: accepted.localHash,
+      localDeleted: false,
+      localUpdatedAt: accepted.acceptedAt,
+      localMtime: updated.localMtime,
+      localSize: updated.localSize,
+    };
+  }
+
+  const currentPending = toPendingMutationRow(updated);
+  if (!currentPending) {
+    copyRemoteToBase(updated);
+    return updated;
+  }
+
+  if (currentPending.mutationId === mutation.mutationId) {
+    updated = clearPendingMutation(updated);
+    copyRemoteToBase(updated);
+    return updated;
+  }
+
+  if (plan.rebase?.pendingMutationId !== currentPending.mutationId) {
+    return "retry";
+  }
+
+  return toDirtyEntryRecord(
+    updated,
+    normalizePendingMutation({
+      ...currentPending,
+      baseRevision: accepted.acceptedRevision,
+      baseBlobId: accepted.remoteBlobId,
+      baseHash: accepted.localHash,
+      encryptedMetadata: plan.rebase.encryptedMetadata,
+    }),
+  );
+}
+
+function shouldApplyAcceptedPushToLocal(
+  row: EntryRecord,
+  accepted: AcceptedPushMutationRow,
+): boolean {
+  return (
+    !row.localKnown ||
+    (row.localHash === accepted.mutation.hash &&
+      row.localPath === accepted.metadata.path)
+  );
+}
+
+function metadataContextFromMutation(mutation: PendingMutationRow) {
+  return {
+    entryId: mutation.entryId,
+    revision: mutation.baseRevision + 1,
+    op: mutation.op,
+    blobId: mutation.blobId,
+  };
 }

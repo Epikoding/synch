@@ -1,8 +1,12 @@
 import { SyncBlobClient } from "../remote/blob-client";
 import type { ConflictFileWriter } from "../core/conflict-file";
 import type { SyncTokenResponse } from "../remote/client";
-import type { SyncRealtimeSession } from "../remote/realtime-client";
 import type {
+  CommitMutationBatchResult,
+  SyncRealtimeSession,
+} from "../remote/realtime-client";
+import type {
+  AcceptedPushMutationRow,
   PendingMutationRow,
   SyncProgressCounts,
 } from "../store/store";
@@ -161,25 +165,46 @@ export class SyncPushService {
           committed.results.map((result) => [result.mutationId, result]),
         );
 
+        const acceptedPushMutations: AcceptedPushMutationRow[] = [];
+        const rejectedPushMutations: Array<{
+          mutation: (typeof committable)[number]["mutation"];
+          result: Extract<CommitMutationBatchResult, { status: "rejected" }>;
+        }> = [];
         for (const { mutation, prepared } of committable) {
           const batchResult = resultsByMutationId.get(mutation.mutationId);
           if (!batchResult) {
             throw new Error(`Commit batch did not include ${mutation.mutationId}.`);
           }
 
-          const result =
-            batchResult.status === "accepted"
-              ? await this.mutationCommitter.applyAcceptedPreparedMutation(
-                  store,
-                  mutation,
-                  prepared,
-                  batchResult,
-                )
-              : await this.mutationCommitter.handleRejectedPreparedMutation(
-                  store,
-                  mutation,
-                  batchResult,
-                );
+          if (batchResult.status === "accepted") {
+            acceptedPushMutations.push(
+              await this.mutationCommitter.buildAcceptedPushMutation(
+                mutation,
+                prepared,
+                batchResult,
+              ),
+            );
+            cursor = Math.max(cursor, batchResult.cursor);
+            acceptedCursors.push(batchResult.cursor);
+            filesCreatedOrUpdated += mutation.op === "upsert" ? 1 : 0;
+            filesDeleted += mutation.op === "delete" ? 1 : 0;
+            mutationsPushed += 1;
+            continue;
+          }
+
+          rejectedPushMutations.push({ mutation, result: batchResult });
+        }
+
+        await store.applyAcceptedPushBatch(acceptedPushMutations, {
+          remoteVaultKey: this.deps.getRemoteVaultKey(),
+        });
+
+        for (const { mutation, result: batchResult } of rejectedPushMutations) {
+          const result = await this.mutationCommitter.handleRejectedPreparedMutation(
+            store,
+            mutation,
+            batchResult,
+          );
           conflictsCreated += result.conflictsCreated;
           shouldPullAfterPush = shouldPullAfterPush || result.shouldPullAfterPush;
 
@@ -195,11 +220,6 @@ export class SyncPushService {
           if (result.status === "conflict") {
             continue;
           }
-          cursor = Math.max(cursor, result.accepted.cursor);
-          acceptedCursors.push(result.accepted.cursor);
-          filesCreatedOrUpdated += result.filesCreatedOrUpdated;
-          filesDeleted += result.filesDeleted;
-          mutationsPushed += 1;
         }
         await this.reportProgress(store);
         if (stopAfterCurrentBatch) {

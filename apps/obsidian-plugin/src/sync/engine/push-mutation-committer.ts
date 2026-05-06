@@ -1,5 +1,5 @@
 import { writeConflictCopy } from "../core/conflict-file";
-import { decryptSyncMetadata, encryptSyncMetadata } from "../core/crypto";
+import { decryptSyncMetadata } from "../core/crypto";
 import type { SyncTokenResponse } from "../remote/client";
 import {
   type CommitAcceptedResult,
@@ -7,7 +7,10 @@ import {
   SyncRealtimeError,
   type SyncRealtimeSession,
 } from "../remote/realtime-client";
-import type { PendingMutationRow } from "../store/store";
+import type {
+  AcceptedPushMutationRow,
+  PendingMutationRow,
+} from "../store/store";
 import { PushMutationPreparer } from "./push-mutation-preparer";
 import {
   isLocalAheadStaleRevision,
@@ -117,8 +120,10 @@ export class PushMutationCommitter {
       throw error;
     }
 
-    await this.applyAcceptedMutation(store, mutation, prepared, accepted);
-    await store.clearDirtyEntryByMutationId(mutation.mutationId);
+    await store.applyAcceptedPushBatch(
+      [await this.buildAcceptedPushMutation(mutation, prepared, accepted)],
+      { remoteVaultKey: this.deps.getRemoteVaultKey() },
+    );
 
     return {
       status: "accepted",
@@ -136,8 +141,10 @@ export class PushMutationCommitter {
     prepared: PreparedPushMutation,
     accepted: CommitAcceptedResult,
   ): Promise<PushMutationCommitResult> {
-    await this.applyAcceptedMutation(store, mutation, prepared, accepted);
-    await store.clearDirtyEntryByMutationId(mutation.mutationId);
+    await store.applyAcceptedPushBatch(
+      [await this.buildAcceptedPushMutation(mutation, prepared, accepted)],
+      { remoteVaultKey: this.deps.getRemoteVaultKey() },
+    );
 
     return {
       status: "accepted",
@@ -181,135 +188,42 @@ export class PushMutationCommitter {
     throw new SyncRealtimeError(rejected.code, rejected.message);
   }
 
-  private async applyAcceptedMutation(
-    store: PushMutationStore,
+  async buildAcceptedPushMutation(
     mutation: PendingMutationRow,
     prepared: PreparedPushMutation,
     accepted: CommitAcceptedResult,
-  ): Promise<void> {
-    if (mutation.op === "delete") {
-      const metadata = await decryptSyncMetadata(
-        this.deps.getRemoteVaultKey(),
-        mutation.encryptedMetadata,
-        metadataContextFromMutation(mutation),
-      );
-      await store.applyRemoteState({
-        entryId: mutation.entryId,
-        path: metadata.path,
-        revision: accepted.revision,
-        blobId: null,
-        hash: null,
-        deleted: true,
-        updatedAt: Date.now(),
-      });
-      await this.applyAcceptedPendingState(store, mutation, {
-        revision: accepted.revision,
-        blobId: null,
-        hash: null,
-      });
-      return;
-    }
-
+  ): Promise<AcceptedPushMutationRow> {
     const metadata = await decryptSyncMetadata(
       this.deps.getRemoteVaultKey(),
       mutation.encryptedMetadata,
       metadataContextFromMutation(mutation),
     );
-    await store.applyRemoteState({
-      entryId: mutation.entryId,
-      path: metadata.path,
-      revision: accepted.revision,
-      blobId: prepared.commitPayload.blobId,
-      hash: prepared.localHash,
-      deleted: false,
-      updatedAt: Date.now(),
-    });
-    if (
+
+    const acceptedAt = Date.now();
+    const remoteCacheBlob =
+      mutation.op === "upsert" &&
       isAutoMergeTextPath(metadata.path) &&
       prepared.commitPayload.blobId &&
       prepared.encryptedBytes
-    ) {
-      await store.putBlob({
-        blobId: prepared.commitPayload.blobId,
-        hash: prepared.localHash,
-        encryptedBytes: prepared.encryptedBytes,
-        role: "remote",
-        refEntryId: mutation.entryId,
-        cachedAt: Date.now(),
-      });
-    }
-    const local = await store.getLocalStateById(mutation.entryId);
-    if (!local || (local.hash === mutation.hash && local.path === metadata.path)) {
-      await store.applyLocalState({
-        entryId: mutation.entryId,
-        path: metadata.path,
-        blobId: prepared.commitPayload.blobId,
-        hash: prepared.localHash,
-        deleted: false,
-        updatedAt: Date.now(),
-        localMtime: local?.localMtime ?? null,
-        localSize: local?.localSize ?? null,
-      });
-    }
-    await this.applyAcceptedPendingState(store, mutation, {
-      revision: accepted.revision,
-      blobId: prepared.commitPayload.blobId,
-      hash: prepared.localHash,
-    });
-  }
+        ? {
+            blobId: prepared.commitPayload.blobId,
+            hash: prepared.localHash,
+            encryptedBytes: prepared.encryptedBytes,
+            role: "remote" as const,
+            refEntryId: mutation.entryId,
+            cachedAt: acceptedAt,
+          }
+        : null;
 
-  private async applyAcceptedPendingState(
-    store: PushMutationStore,
-    mutation: PendingMutationRow,
-    acceptedBase: {
-      revision: number;
-      blobId: string | null;
-      hash: string | null;
-    },
-  ): Promise<void> {
-    const currentPending = await store.getDirtyEntryMutation(mutation.entryId);
-    if (!currentPending) {
-      return;
-    }
-
-    if (currentPending.mutationId === mutation.mutationId) {
-      await store.clearDirtyEntryByMutationId(mutation.mutationId);
-      return;
-    }
-
-    await this.rebasePendingMutation(store, currentPending, acceptedBase);
-  }
-
-  private async rebasePendingMutation(
-    store: PushMutationStore,
-    pending: PendingMutationRow,
-    acceptedBase: {
-      revision: number;
-      blobId: string | null;
-      hash: string | null;
-    },
-  ): Promise<void> {
-    const metadata = await decryptSyncMetadata(
-      this.deps.getRemoteVaultKey(),
-      pending.encryptedMetadata,
-      metadataContextFromMutation(pending),
-    );
-    await store.updateDirtyEntry({
-      ...pending,
-      baseRevision: acceptedBase.revision,
-      baseBlobId: acceptedBase.blobId,
-      baseHash: acceptedBase.hash,
-      encryptedMetadata: await encryptSyncMetadata(
-        this.deps.getRemoteVaultKey(),
-        metadata,
-        {
-          entryId: pending.entryId,
-          revision: acceptedBase.revision + 1,
-          op: pending.op,
-          blobId: pending.blobId,
-        },
-      ),
-    });
+    return {
+      mutation,
+      metadata,
+      acceptedRevision: accepted.revision,
+      remoteBlobId: mutation.op === "delete" ? null : prepared.commitPayload.blobId,
+      localHash: mutation.op === "delete" ? null : prepared.localHash,
+      acceptedAt,
+      remoteCacheBlob,
+    };
   }
 
   private async handleLocalAheadConflict(

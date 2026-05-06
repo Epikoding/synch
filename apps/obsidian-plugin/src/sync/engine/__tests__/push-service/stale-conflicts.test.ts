@@ -305,6 +305,122 @@ describe("SyncPushService stale revisions", () => {
     await store.close();
   });
 
+  it("keeps accepted batch results when a later rejection throws", async () => {
+    const plugin = createTestPlugin();
+    const store = await createInitializedTestSyncStore(plugin);
+    const noteHash = await hashBytes(encodeUtf8("local note"));
+    const taskHash = await hashBytes(encodeUtf8("local task"));
+    await store.upsertEntry({
+      entryId: "entry-note",
+      path: "Folder/note.md",
+      revision: 1,
+      blobId: "blob-note-current",
+      hash: noteHash,
+      deleted: false,
+      updatedAt: 1,
+    });
+    await store.upsertEntry({
+      entryId: "entry-task",
+      path: "Folder/task.md",
+      revision: 1,
+      blobId: "blob-task-current",
+      hash: taskHash,
+      deleted: false,
+      updatedAt: 1,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-note",
+      entryId: "entry-note",
+      op: "upsert",
+      baseRevision: 1,
+      blobId: "blob-note-next",
+      hash: noteHash,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-note",
+        baseRevision: 1,
+        op: "upsert",
+        blobId: "blob-note-next",
+        path: "Folder/note.md",
+        hash: noteHash,
+      }),
+      createdAt: 2,
+    });
+    await store.markEntryDirty({
+      mutationId: "mutation-task",
+      entryId: "entry-task",
+      op: "upsert",
+      baseRevision: 1,
+      blobId: "blob-task-next",
+      hash: taskHash,
+      encryptedMetadata: await encryptMutationMetadata({
+        entryId: "entry-task",
+        baseRevision: 1,
+        op: "upsert",
+        blobId: "blob-task-next",
+        path: "Folder/task.md",
+        hash: taskHash,
+      }),
+      createdAt: 3,
+    });
+
+    const session = createPushSession(
+      async () => {
+        throw new Error("single commit should not be used");
+      },
+      async () => ({
+        cursor: 2,
+        results: [
+          {
+            status: "accepted",
+            mutationId: "mutation-note",
+            entryId: "entry-note",
+            cursor: 1,
+            revision: 2,
+          },
+          {
+            status: "rejected",
+            mutationId: "mutation-task",
+            entryId: "entry-task",
+            code: "unavailable",
+            message: "service unavailable",
+          },
+        ],
+      }),
+    );
+    const service = new SyncPushService({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      getRemoteVaultKey: () => TEST_VAULT_KEY,
+      fileReader: {
+        async readBytes(path) {
+          return encodeUtf8(path === "Folder/note.md" ? "local note" : "local task");
+        },
+      },
+      blobClient: {
+        async uploadBlob() {},
+      },
+      onProgress: ignoreProgress,
+    });
+
+    await expect(service.pushPendingMutations(session)).rejects.toMatchObject({
+      code: "unavailable",
+    });
+    expect(await store.getRemoteStateById("entry-note")).toMatchObject({
+      revision: 2,
+      blobId: "blob-note-next",
+      hash: noteHash,
+    });
+    expect(await store.listDirtyEntries()).toMatchObject([
+      {
+        mutationId: "mutation-task",
+        entryId: "entry-task",
+      },
+    ]);
+
+    await store.close();
+  });
+
   it("rebases a clean text pending mutation after pull and retries push from the new base", async () => {
     const plugin = createTestPlugin();
     const store = await createInitializedTestSyncStore(plugin);

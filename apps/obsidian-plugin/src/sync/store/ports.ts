@@ -1,4 +1,5 @@
 import type {
+  AcceptedPushMutationRow,
   CachedSyncBlobRow,
   LocalSyncEntryRow,
   MarkEntryDirtyOptions,
@@ -80,6 +81,13 @@ export interface SyncReconcileStore {
 export interface SyncBlobStore {
   getBlob(blobId: string): Promise<CachedSyncBlobRow | null>;
   putBlob(blob: CachedSyncBlobRow): Promise<void>;
+}
+
+export interface SyncPushAcceptanceStore {
+  applyAcceptedPushBatch(
+    accepted: AcceptedPushMutationRow[],
+    options: { remoteVaultKey: Uint8Array },
+  ): Promise<void>;
 }
 
 export interface SyncStoreLifecycle {

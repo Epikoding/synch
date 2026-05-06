@@ -5,10 +5,12 @@ import type {
   SyncEntryStore,
   SyncLocalEntryStore,
   SyncMutationStore,
+  SyncPushAcceptanceStore,
   SyncReconcileStore,
   SyncRemoteEntryStore,
   SyncStoreLifecycle,
 } from "./ports";
+import type { SyncedEntryMetadata } from "../core/content";
 
 export interface RemoteSyncEntryRow {
   entryId: string;
@@ -114,6 +116,16 @@ export interface SyncProgressCounts {
   totalEntries: number;
 }
 
+export interface AcceptedPushMutationRow {
+  mutation: PendingMutationRow;
+  metadata: SyncedEntryMetadata;
+  acceptedRevision: number;
+  remoteBlobId: string | null;
+  localHash: string | null;
+  acceptedAt: number;
+  remoteCacheBlob?: CachedSyncBlobRow | null;
+}
+
 export interface SyncStore
   extends SyncConnectionStore,
     SyncRemoteEntryStore,
@@ -121,6 +133,7 @@ export interface SyncStore
     SyncEntryStore,
     SyncCursorStore,
     SyncMutationStore,
+    SyncPushAcceptanceStore,
     SyncReconcileStore,
     SyncBlobStore,
     SyncStoreLifecycle {}

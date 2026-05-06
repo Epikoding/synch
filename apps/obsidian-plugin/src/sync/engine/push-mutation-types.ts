@@ -9,6 +9,7 @@ import type {
   SyncEntryStore,
   SyncLocalEntryStore,
   SyncMutationStore,
+  SyncPushAcceptanceStore,
   SyncRemoteEntryStore,
 } from "../store/ports";
 import type { SyncProgressCounts } from "../store/store";
@@ -83,7 +84,8 @@ export interface PushMutationStore
       | "replaceDirtyEntry"
       | "updateDirtyEntry"
     >,
-    Pick<SyncBlobStore, "putBlob"> {}
+    Pick<SyncBlobStore, "putBlob">,
+    SyncPushAcceptanceStore {}
 
 export interface SkippedPushMutation {
   skipped: true;

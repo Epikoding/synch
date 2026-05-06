@@ -1,6 +1,7 @@
 import type { Plugin } from "obsidian";
 
 import type {
+  AcceptedPushMutationRow,
   CachedSyncBlobRow,
   LocalSyncEntryRow,
   MarkEntryDirtyOptions,
@@ -15,6 +16,7 @@ import type {
   SyncReconcileEntryUpdate,
   SyncStore,
 } from "../sync/store/store";
+import { decryptSyncMetadata, encryptSyncMetadata } from "../sync/core/crypto";
 
 export function createTestPlugin(): Plugin {
   let data: unknown = null;
@@ -446,6 +448,75 @@ class InMemorySyncStore implements SyncStore {
     });
   }
 
+  async applyAcceptedPushBatch(
+    accepted: AcceptedPushMutationRow[],
+    options: { remoteVaultKey: Uint8Array },
+  ): Promise<void> {
+    for (const item of accepted) {
+      const { mutation, metadata } = item;
+      await this.applyRemoteState({
+        entryId: mutation.entryId,
+        path: metadata.path,
+        revision: item.acceptedRevision,
+        blobId: mutation.op === "delete" ? null : item.remoteBlobId,
+        hash: mutation.op === "delete" ? null : item.localHash,
+        deleted: mutation.op === "delete",
+        updatedAt: item.acceptedAt,
+      });
+
+      const local = await this.getLocalStateById(mutation.entryId);
+      if (
+        mutation.op === "upsert" &&
+        (!local || (local.hash === mutation.hash && local.path === metadata.path))
+      ) {
+        await this.applyLocalState({
+          entryId: mutation.entryId,
+          path: metadata.path,
+          blobId: item.remoteBlobId,
+          hash: item.localHash,
+          deleted: false,
+          updatedAt: item.acceptedAt,
+          localMtime: local?.localMtime ?? null,
+          localSize: local?.localSize ?? null,
+        });
+      }
+
+      const currentPending = await this.getDirtyEntryMutation(mutation.entryId);
+      if (!currentPending) {
+        continue;
+      }
+      if (currentPending.mutationId === mutation.mutationId) {
+        await this.clearDirtyEntryByMutationId(mutation.mutationId);
+      } else {
+        const pendingMetadata = await decryptSyncMetadata(
+          options.remoteVaultKey,
+          currentPending.encryptedMetadata,
+          metadataContextFromMutation(currentPending),
+        );
+        await this.updateDirtyEntry({
+          ...currentPending,
+          baseRevision: item.acceptedRevision,
+          baseBlobId: item.remoteBlobId,
+          baseHash: item.localHash,
+          encryptedMetadata: await encryptSyncMetadata(
+            options.remoteVaultKey,
+            pendingMetadata,
+            metadataContextFromMutation({
+              ...currentPending,
+              baseRevision: item.acceptedRevision,
+              baseBlobId: item.remoteBlobId,
+              baseHash: item.localHash,
+            }),
+          ),
+        });
+      }
+
+      if (item.remoteCacheBlob) {
+        await this.putBlob(item.remoteCacheBlob);
+      }
+    }
+  }
+
   async flush(): Promise<void> {}
 
   async close(): Promise<void> {}
@@ -564,6 +635,15 @@ function comparePendingMutationsDescending(
     return right.createdAt - left.createdAt;
   }
   return right.mutationId.localeCompare(left.mutationId);
+}
+
+function metadataContextFromMutation(mutation: PendingMutationRow) {
+  return {
+    entryId: mutation.entryId,
+    revision: mutation.baseRevision + 1,
+    op: mutation.op,
+    blobId: mutation.blobId,
+  };
 }
 
 function clone<T>(value: T): T {
