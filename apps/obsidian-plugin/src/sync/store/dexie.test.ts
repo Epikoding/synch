@@ -399,10 +399,28 @@ describe("DexieSyncStore", () => {
       createdAt: 11,
     });
 
+    const dexieStore = store as unknown as {
+      db: { entries: { toArray: () => Promise<unknown[]> } };
+    };
+    const originalToArray = dexieStore.db.entries.toArray.bind(dexieStore.db.entries);
+    let fullEntryScans = 0;
+    dexieStore.db.entries.toArray = async () => {
+      fullEntryScans += 1;
+      return await originalToArray();
+    };
+
     expect(await store.countSyncProgress()).toEqual({
       completedEntries: 1,
       totalEntries: 4,
     });
+    expect(fullEntryScans).toBe(0);
+
+    await store.clearDirtyEntryByMutationId("mutation-pending");
+    expect(await store.countSyncProgress()).toEqual({
+      completedEntries: 2,
+      totalEntries: 4,
+    });
+    expect(fullEntryScans).toBe(0);
     await store.close();
   });
 

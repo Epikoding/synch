@@ -8,6 +8,8 @@ export interface MetadataRecord {
   id: string;
   remoteVaultId: string | null;
   lastPulledCursor: number;
+  progressCompletedEntries?: number;
+  progressTotalEntries?: number;
 }
 
 export type PendingMutationStatus = "pending" | "blocked";

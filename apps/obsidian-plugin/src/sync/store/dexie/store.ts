@@ -53,6 +53,7 @@ export class DexieSyncStore implements SyncStore {
 
   async initialize(): Promise<void> {
     await this.db.open();
+    await this.ensureProgressSnapshot();
   }
 
   async readLocalVaultId(): Promise<string> {
@@ -139,7 +140,7 @@ export class DexieSyncStore implements SyncStore {
       remoteUpdatedAt: 0,
     };
     if (!updated.localKnown && !updated.dirty) {
-      await this.db.entries.delete(entryId);
+      await this.deleteEntryRecord(entryId);
       return;
     }
 
@@ -197,7 +198,7 @@ export class DexieSyncStore implements SyncStore {
       localSize: null,
     };
     if (!updated.remoteKnown && !updated.dirty) {
-      await this.db.entries.delete(entryId);
+      await this.deleteEntryRecord(entryId);
       return;
     }
 
@@ -240,28 +241,12 @@ export class DexieSyncStore implements SyncStore {
   }
 
   async countSyncProgress(): Promise<SyncProgressCounts> {
-    const entries = await this.db.entries.toArray();
-    let completedEntries = 0;
-    let totalEntries = 0;
-
-    for (const entry of entries) {
-      const hasPendingMutation = hasPendingMutationRecord(entry);
-      const deleted = entry.localKnown
-        ? entry.localDeleted
-        : entry.remoteKnown
-          ? entry.remoteDeleted
-          : true;
-      if (!hasPendingMutation && deleted) {
-        continue;
-      }
-
-      totalEntries += 1;
-      if (entry.remoteKnown && entry.remoteRevision > 0 && !hasPendingMutation) {
-        completedEntries += 1;
-      }
+    const metadata = await this.readMetadata();
+    if (hasProgressSnapshot(metadata)) {
+      return toProgressCounts(metadata);
     }
 
-    return { completedEntries, totalEntries };
+    return await this.ensureProgressSnapshot();
   }
 
   async getOrCreateEntryId(path: string): Promise<string> {
@@ -297,11 +282,11 @@ export class DexieSyncStore implements SyncStore {
       localMtime: entry.localMtime,
       localSize: entry.localSize,
     });
-    await this.db.entries.put(row);
+    await this.putEntry(row);
   }
 
   async deleteEntry(entryId: string): Promise<void> {
-    await this.db.entries.delete(entryId);
+    await this.deleteEntryRecord(entryId);
   }
 
   async getCursor(): Promise<number> {
@@ -337,13 +322,19 @@ export class DexieSyncStore implements SyncStore {
     options: MarkEntryDirtyOptions = {},
   ): Promise<void> {
     const normalized = normalizePendingMutation(mutation);
-    await this.db.transaction("rw", this.db.entries, this.db.blobs, async () => {
-      if (options.requireBaseBlob) {
-        await this.assertRequiredBaseBlob(normalized);
-      }
-      const entry = await this.getOrCreateEntryRecord(normalized.entryId);
-      await this.putEntry(toDirtyEntryRecord(entry, normalized));
-    });
+    await this.db.transaction(
+      "rw",
+      this.db.entries,
+      this.db.blobs,
+      this.db.metadata,
+      async () => {
+        if (options.requireBaseBlob) {
+          await this.assertRequiredBaseBlob(normalized);
+        }
+        const entry = await this.getOrCreateEntryRecord(normalized.entryId);
+        await this.putEntry(toDirtyEntryRecord(entry, normalized));
+      },
+    );
   }
 
   async getDirtyEntryMutation(entryId: string): Promise<PendingMutationRow | null> {
@@ -387,7 +378,7 @@ export class DexieSyncStore implements SyncStore {
       .equals("blocked")
       .filter((entry) => entry.pendingBlockedReason === reason)
       .toArray();
-    await this.db.transaction("rw", this.db.entries, async () => {
+    await this.db.transaction("rw", this.db.entries, this.db.metadata, async () => {
       for (const entry of blocked) {
         await this.putEntry({
           ...entry,
@@ -437,59 +428,80 @@ export class DexieSyncStore implements SyncStore {
       return;
     }
 
-    await this.db.transaction("rw", this.db.entries, this.db.blobs, async () => {
-      const existingRows = await this.db.entries.bulkGet(
-        updates.map((update) => update.entryId),
-      );
-      const rowsToPut: EntryRecord[] = [];
-      const entryIdsToDelete: string[] = [];
+    await this.db.transaction(
+      "rw",
+      this.db.entries,
+      this.db.blobs,
+      this.db.metadata,
+      async () => {
+        const existingRows = await this.db.entries.bulkGet(
+          updates.map((update) => update.entryId),
+        );
+        const rowsToPut: EntryRecord[] = [];
+        const rowsBeforePut: Array<EntryRecord | null> = [];
+        const entriesToDelete: EntryRecord[] = [];
 
-      for (let index = 0; index < updates.length; index += 1) {
-        const update = updates[index];
-        if (update.deleteEntry) {
-          entryIdsToDelete.push(update.entryId);
-          continue;
-        }
-
-        let row = existingRows[index] ?? createEmptyEntryRecord(update.entryId);
-        if (update.dirty !== undefined) {
-          if (update.dirty === null) {
-            row = clearPendingMutation(row);
-          } else {
-            const mutation = normalizePendingMutation(update.dirty);
-            if (update.requireBaseBlob) {
-              await this.assertRequiredBaseBlob(mutation);
+        for (let index = 0; index < updates.length; index += 1) {
+          const update = updates[index];
+          const existingRow = existingRows[index] ?? null;
+          if (update.deleteEntry) {
+            if (existingRow) {
+              entriesToDelete.push(existingRow);
             }
-            row = toDirtyEntryRecord(row, mutation);
+            continue;
           }
-        } else if (update.clearDirty) {
-          row = clearPendingMutation(row);
+
+          let row = existingRow ?? createEmptyEntryRecord(update.entryId);
+          if (update.dirty !== undefined) {
+            if (update.dirty === null) {
+              row = clearPendingMutation(row);
+            } else {
+              const mutation = normalizePendingMutation(update.dirty);
+              if (update.requireBaseBlob) {
+                await this.assertRequiredBaseBlob(mutation);
+              }
+              row = toDirtyEntryRecord(row, mutation);
+            }
+          } else if (update.clearDirty) {
+            row = clearPendingMutation(row);
+          }
+
+          if (update.local) {
+            row = {
+              ...row,
+              localKnown: true,
+              localPath: update.local.path,
+              localBlobId: update.local.blobId,
+              localHash: update.local.hash,
+              localDeleted: update.local.deleted,
+              localUpdatedAt: update.local.updatedAt,
+              localMtime: update.local.localMtime,
+              localSize: update.local.localSize,
+            };
+          }
+
+          rowsToPut.push(normalizeEntryRecord(row));
+          rowsBeforePut.push(existingRow);
         }
 
-        if (update.local) {
-          row = {
-            ...row,
-            localKnown: true,
-            localPath: update.local.path,
-            localBlobId: update.local.blobId,
-            localHash: update.local.hash,
-            localDeleted: update.local.deleted,
-            localUpdatedAt: update.local.updatedAt,
-            localMtime: update.local.localMtime,
-            localSize: update.local.localSize,
-          };
+        const progressDelta = sumProgressDeltas([
+          ...rowsToPut.map((row, index) =>
+            getProgressDelta(rowsBeforePut[index] ?? null, row),
+          ),
+          ...entriesToDelete.map((row) => getProgressDelta(row, null)),
+        ]);
+
+        if (entriesToDelete.length > 0) {
+          await this.db.entries.bulkDelete(
+            entriesToDelete.map((entry) => entry.entryId),
+          );
         }
-
-        rowsToPut.push(normalizeEntryRecord(row));
-      }
-
-      if (entryIdsToDelete.length > 0) {
-        await this.db.entries.bulkDelete(entryIdsToDelete);
-      }
-      if (rowsToPut.length > 0) {
-        await this.db.entries.bulkPut(rowsToPut);
-      }
-    });
+        if (rowsToPut.length > 0) {
+          await this.db.entries.bulkPut(rowsToPut);
+        }
+        await this.applyProgressDelta(progressDelta);
+      },
+    );
   }
 
   async getBlob(blobId: string): Promise<CachedSyncBlobRow | null> {
@@ -524,33 +536,45 @@ export class DexieSyncStore implements SyncStore {
       );
 
       try {
-        await this.db.transaction("rw", this.db.entries, this.db.blobs, async () => {
-          const existingRows = await this.db.entries.bulkGet(
-            accepted.map((item) => item.mutation.entryId),
-          );
-          const rowsToPut: EntryRecord[] = [];
-          const blobsToPut: BlobRecord[] = [];
+        await this.db.transaction(
+          "rw",
+          this.db.entries,
+          this.db.blobs,
+          this.db.metadata,
+          async () => {
+            const existingRows = await this.db.entries.bulkGet(
+              accepted.map((item) => item.mutation.entryId),
+            );
+            const rowsToPut: EntryRecord[] = [];
+            const blobsToPut: BlobRecord[] = [];
 
-          for (let index = 0; index < accepted.length; index += 1) {
-            const item = accepted[index];
-            const row =
-              existingRows[index] ?? createEmptyEntryRecord(item.mutation.entryId);
-            const applied = applyAcceptedPushToEntry(row, item, plans[index]);
-            if (applied === "retry") {
-              throw new AcceptedPushBatchRetryError();
+            for (let index = 0; index < accepted.length; index += 1) {
+              const item = accepted[index];
+              const row =
+                existingRows[index] ?? createEmptyEntryRecord(item.mutation.entryId);
+              const applied = applyAcceptedPushToEntry(row, item, plans[index]);
+              if (applied === "retry") {
+                throw new AcceptedPushBatchRetryError();
+              }
+              rowsToPut.push(applied);
+
+              if (item.remoteCacheBlob) {
+                blobsToPut.push(toBlobRecord(item.remoteCacheBlob));
+              }
             }
-            rowsToPut.push(applied);
 
-            if (item.remoteCacheBlob) {
-              blobsToPut.push(toBlobRecord(item.remoteCacheBlob));
+            const progressDelta = sumProgressDeltas(
+              rowsToPut.map((row, index) =>
+                getProgressDelta(existingRows[index] ?? null, row),
+              ),
+            );
+            await this.db.entries.bulkPut(rowsToPut.map(normalizeEntryRecord));
+            if (blobsToPut.length > 0) {
+              await this.db.blobs.bulkPut(blobsToPut);
             }
-          }
-
-          await this.db.entries.bulkPut(rowsToPut.map(normalizeEntryRecord));
-          if (blobsToPut.length > 0) {
-            await this.db.blobs.bulkPut(blobsToPut);
-          }
-        });
+            await this.applyProgressDelta(progressDelta);
+          },
+        );
         return;
       } catch (error) {
         if (error instanceof AcceptedPushBatchRetryError) {
@@ -574,7 +598,69 @@ export class DexieSyncStore implements SyncStore {
   }
 
   private async putEntry(entry: EntryRecord): Promise<void> {
-    await this.db.entries.put(normalizeEntryRecord(entry));
+    const normalized = normalizeEntryRecord(entry);
+    await this.db.transaction("rw", this.db.entries, this.db.metadata, async () => {
+      const existing = await this.db.entries.get(normalized.entryId);
+      await this.db.entries.put(normalized);
+      await this.applyProgressDelta(getProgressDelta(existing ?? null, normalized));
+    });
+  }
+
+  private async deleteEntryRecord(entryId: string): Promise<void> {
+    await this.db.transaction("rw", this.db.entries, this.db.metadata, async () => {
+      const existing = await this.db.entries.get(entryId);
+      if (!existing) {
+        return;
+      }
+
+      await this.db.entries.delete(entryId);
+      await this.applyProgressDelta(getProgressDelta(existing, null));
+    });
+  }
+
+  private async ensureProgressSnapshot(): Promise<SyncProgressCounts> {
+    const metadata = await this.readMetadata();
+    if (hasProgressSnapshot(metadata)) {
+      return toProgressCounts(metadata);
+    }
+
+    const progress = calculateProgressSnapshot(await this.db.entries.toArray());
+    await this.db.metadata.put({
+      id: METADATA_ID,
+      remoteVaultId: metadata?.remoteVaultId ?? null,
+      lastPulledCursor: metadata?.lastPulledCursor ?? 0,
+      progressCompletedEntries: progress.completedEntries,
+      progressTotalEntries: progress.totalEntries,
+    });
+    return progress;
+  }
+
+  private async applyProgressDelta(delta: SyncProgressCounts): Promise<void> {
+    if (delta.completedEntries === 0 && delta.totalEntries === 0) {
+      return;
+    }
+
+    const metadata = await this.readMetadata();
+    if (!hasProgressSnapshot(metadata)) {
+      const progress = calculateProgressSnapshot(await this.db.entries.toArray());
+      await this.db.metadata.put({
+        id: METADATA_ID,
+        remoteVaultId: metadata?.remoteVaultId ?? null,
+        lastPulledCursor: metadata?.lastPulledCursor ?? 0,
+        progressCompletedEntries: progress.completedEntries,
+        progressTotalEntries: progress.totalEntries,
+      });
+      return;
+    }
+
+    const current = toProgressCounts(metadata);
+    await this.db.metadata.put({
+      id: METADATA_ID,
+      remoteVaultId: metadata?.remoteVaultId ?? null,
+      lastPulledCursor: metadata?.lastPulledCursor ?? 0,
+      progressCompletedEntries: current.completedEntries + delta.completedEntries,
+      progressTotalEntries: current.totalEntries + delta.totalEntries,
+    });
   }
 
   private async assertRequiredBaseBlob(
@@ -597,12 +683,18 @@ export class DexieSyncStore implements SyncStore {
   }
 
   private async writeMetadata(
-    metadata: Omit<MetadataRecord, "id">,
+    metadata: Pick<MetadataRecord, "remoteVaultId" | "lastPulledCursor">,
   ): Promise<void> {
+    const existing = await this.readMetadata();
+    const progress = hasProgressSnapshot(existing)
+      ? toProgressCounts(existing)
+      : await this.ensureProgressSnapshot();
     await this.db.metadata.put({
       id: METADATA_ID,
       remoteVaultId: metadata.remoteVaultId,
       lastPulledCursor: metadata.lastPulledCursor,
+      progressCompletedEntries: progress.completedEntries,
+      progressTotalEntries: progress.totalEntries,
     });
   }
 }
@@ -732,5 +824,78 @@ function metadataContextFromMutation(mutation: PendingMutationRow) {
     revision: mutation.baseRevision + 1,
     op: mutation.op,
     blobId: mutation.blobId,
+  };
+}
+
+function hasProgressSnapshot(
+  metadata: MetadataRecord | null | undefined,
+): metadata is MetadataRecord &
+  Required<Pick<MetadataRecord, "progressCompletedEntries" | "progressTotalEntries">> {
+  return (
+    typeof metadata?.progressCompletedEntries === "number" &&
+    Number.isFinite(metadata.progressCompletedEntries) &&
+    typeof metadata.progressTotalEntries === "number" &&
+    Number.isFinite(metadata.progressTotalEntries)
+  );
+}
+
+function toProgressCounts(
+  metadata: MetadataRecord &
+    Required<Pick<MetadataRecord, "progressCompletedEntries" | "progressTotalEntries">>,
+): SyncProgressCounts {
+  return {
+    completedEntries: metadata.progressCompletedEntries,
+    totalEntries: metadata.progressTotalEntries,
+  };
+}
+
+function calculateProgressSnapshot(entries: EntryRecord[]): SyncProgressCounts {
+  return sumProgressDeltas(entries.map((entry) => getProgressDelta(null, entry)));
+}
+
+function getProgressDelta(
+  before: EntryRecord | null,
+  after: EntryRecord | null,
+): SyncProgressCounts {
+  const previous = classifyProgressEntry(before);
+  const next = classifyProgressEntry(after);
+  return {
+    completedEntries: Number(next.completed) - Number(previous.completed),
+    totalEntries: Number(next.counted) - Number(previous.counted),
+  };
+}
+
+function sumProgressDeltas(deltas: SyncProgressCounts[]): SyncProgressCounts {
+  let completedEntries = 0;
+  let totalEntries = 0;
+  for (const delta of deltas) {
+    completedEntries += delta.completedEntries;
+    totalEntries += delta.totalEntries;
+  }
+
+  return { completedEntries, totalEntries };
+}
+
+function classifyProgressEntry(entry: EntryRecord | null): {
+  counted: boolean;
+  completed: boolean;
+} {
+  if (!entry) {
+    return { counted: false, completed: false };
+  }
+
+  const hasPendingMutation = hasPendingMutationRecord(entry);
+  const deleted = entry.localKnown
+    ? entry.localDeleted
+    : entry.remoteKnown
+      ? entry.remoteDeleted
+      : true;
+  if (!hasPendingMutation && deleted) {
+    return { counted: false, completed: false };
+  }
+
+  return {
+    counted: true,
+    completed: entry.remoteKnown && entry.remoteRevision > 0 && !hasPendingMutation,
   };
 }
