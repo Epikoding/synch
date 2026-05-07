@@ -97,13 +97,13 @@ describe("SynchSettingTab", () => {
 
     expect(ensurePluginUpdateCheck).toHaveBeenCalledTimes(1);
     expect(getSettingNames()[0]).toBe("Synch");
-    expect(getCreatedElementTexts()).toContain("Latest version available");
+    expect(getCreatedElementTexts()).toContain("Update to the latest version from BRAT");
     expect(getSettingDescriptions()).not.toContain(
       "Version 0.0.2 is available. Current version: 0.0.1.",
     );
     expect(getCreatedElements()).toContainEqual({
       tag: "span",
-      text: "Latest version available",
+      text: "Update to the latest version from BRAT",
       classes: ["synch-plugin-update-badge"],
       attributes: {},
     });
@@ -141,7 +141,7 @@ describe("SynchSettingTab", () => {
     tab.display();
 
     expect(getSettingNames()).not.toContain("Plugin update");
-    expect(getCreatedElementTexts()).not.toContain("Latest version available");
+    expect(getCreatedElementTexts()).not.toContain("Update to the latest version from BRAT");
 
     resetObsidianMocks();
     createSettingsTab({
