@@ -9,6 +9,7 @@ import type {
   SyncRealtimeClientOptions,
 } from "./realtime-types";
 import { SyncRealtimeConnectionError, SyncRealtimeError } from "./realtime-types";
+import { remoteVaultUnavailableFromWebSocketClose } from "../../remote-vault/unavailable";
 
 type ClientMessage =
   | {
@@ -267,7 +268,7 @@ export class SyncRealtimeSocketSession {
     );
   };
 
-  private readonly handleClose = (): void => {
+  private readonly handleClose = (event: CloseEvent): void => {
     if (this.closed) {
       return;
     }
@@ -279,7 +280,10 @@ export class SyncRealtimeSocketSession {
         "sync websocket closed before the request completed",
       ),
     );
-    this.callbacks.onClose();
+    this.callbacks.onClose({
+      code: event.code,
+      reason: event.reason,
+    });
   };
 
   private async sendHeartbeat(): Promise<void> {
@@ -315,7 +319,10 @@ export class SyncRealtimeSocketSession {
     if (reportError) {
       this.callbacks.onError(error);
     }
-    this.callbacks.onClose();
+    this.callbacks.onClose({
+      code: 0,
+      reason: error.message,
+    });
     try {
       this.socket.close();
     } catch {
@@ -348,7 +355,10 @@ export class SyncRealtimeSocketSession {
   }
 }
 
-export async function waitForOpen(socket: WebSocket): Promise<void> {
+export async function waitForOpen(
+  socket: WebSocket,
+  remoteVaultId: string,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const onOpen = () => {
       cleanup();
@@ -358,8 +368,20 @@ export async function waitForOpen(socket: WebSocket): Promise<void> {
       cleanup();
       reject(new SyncRealtimeConnectionError("sync websocket connection failed"));
     };
-    const onClose = () => {
+    const onClose = (event: CloseEvent) => {
       cleanup();
+      const unavailable = remoteVaultUnavailableFromWebSocketClose(
+        {
+          code: event.code,
+          reason: event.reason,
+        },
+        remoteVaultId,
+      );
+      if (unavailable) {
+        reject(unavailable);
+        return;
+      }
+
       reject(
         new SyncRealtimeConnectionError(
           "sync websocket closed before the session started",

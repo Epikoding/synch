@@ -5,6 +5,7 @@ import {
   isOfflineLikeError,
   type OfflineDetector,
 } from "../../http/network-status";
+import type { RemoteVaultUnavailableError } from "../../remote-vault/unavailable";
 import { SyncAutoLoop } from "../engine/auto-sync";
 import type { SyncTokenResponse } from "../remote/client";
 import { SyncEventGate } from "../engine/event-gate";
@@ -73,6 +74,9 @@ export interface SyncEngineDeps {
   setStorageStatus: (status: SyncStorageStatus | null) => void;
   onFileSizeBlockedFilesChange?: () => void;
   onStorageQuotaExceeded?: () => void | Promise<void>;
+  onRemoteVaultUnavailable?: (
+    error: RemoteVaultUnavailableError,
+  ) => void | Promise<void>;
   isOffline?: OfflineDetector;
 }
 
@@ -167,6 +171,9 @@ export class SyncEngine {
 
       this.deps.setSyncStatus("attention_needed");
       this.deps.notifyError(error, "Auto sync failed");
+    },
+    onRemoteVaultUnavailable: async (error) => {
+      await this.deps.onRemoteVaultUnavailable?.(error);
     },
     onStorageQuotaExceeded: async () => {
       await this.deps.onStorageQuotaExceeded?.();

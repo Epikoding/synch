@@ -81,13 +81,13 @@ export class RemoteVaultManager {
     this.deps.refreshUi();
   }
 
-  async disconnectRemoteVault(): Promise<void> {
+  async disconnectRemoteVault(options: { notify?: boolean } = {}): Promise<void> {
     const vault = this.session?.summary ?? this.deps.getStoredRemoteVaultId();
     this.session = null;
     await this.deps.saveStoredRemoteVaultKeySecret(null);
     this.deps.refreshUi();
 
-    if (vault) {
+    if (vault && options.notify !== false) {
       this.notify(t("vault.disconnected", { label: formatStoredVaultLabel(vault) }));
     }
   }

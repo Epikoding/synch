@@ -8,7 +8,7 @@ export interface SyncRealtimeCallbacks {
   onCursorAdvanced(cursor: number): void;
   onStorageStatusUpdated(status: SyncStorageStatus): void;
   onPolicyUpdated(policy: SyncPolicy, storageStatus: SyncStorageStatus): void;
-  onClose(): void;
+  onClose(event: { code: number; reason: string }): void;
   onError(error: Error): void;
 }
 

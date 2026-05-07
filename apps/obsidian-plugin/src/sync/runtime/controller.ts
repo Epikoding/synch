@@ -5,6 +5,10 @@ import {
   isOfflineLikeError,
   type OfflineDetector,
 } from "../../http/network-status";
+import {
+  isRemoteVaultUnavailableError,
+  type RemoteVaultUnavailableError,
+} from "../../remote-vault/unavailable";
 import type { SyncTokenResponse } from "../remote/client";
 import type {
   DeletedEntryPageCursor,
@@ -50,6 +54,9 @@ export interface SyncControllerDeps {
   onStorageStatusChange?: () => void;
   onFileSizeBlockedFilesChange?: () => void;
   onStorageQuotaExceeded?: () => void | Promise<void>;
+  onRemoteVaultUnavailable?: (
+    error: RemoteVaultUnavailableError,
+  ) => void | Promise<void>;
   isOffline?: OfflineDetector;
 }
 
@@ -78,6 +85,9 @@ export class SyncController {
     },
     onStorageQuotaExceeded: async () => {
       await this.deps.onStorageQuotaExceeded?.();
+    },
+    onRemoteVaultUnavailable: async (error) => {
+      await this.handleRemoteVaultUnavailable(error);
     },
     isOffline: this.deps.isOffline,
   });
@@ -227,6 +237,11 @@ export class SyncController {
     } catch (error) {
       this.syncEngine.setStorageStatusWatching(false);
       this.setStorageStatus(null);
+      if (isRemoteVaultUnavailableError(error)) {
+        await this.handleRemoteVaultUnavailable(error);
+        return;
+      }
+
       if (isOfflineLikeError(error, this.deps.isOffline)) {
         this.setSyncStatus("offline");
         return;
@@ -271,6 +286,11 @@ export class SyncController {
       await this.syncEngine.reconcileOnce();
       this.syncEngine.notifyLocalChange();
     } catch (error) {
+      if (isRemoteVaultUnavailableError(error)) {
+        await this.handleRemoteVaultUnavailable(error);
+        return;
+      }
+
       if (isOfflineLikeError(error, this.deps.isOffline)) {
         this.setSyncStatus("offline");
         return;
@@ -409,6 +429,13 @@ export class SyncController {
     }
 
     new Notice(message, timeout);
+  }
+
+  private async handleRemoteVaultUnavailable(
+    error: RemoteVaultUnavailableError,
+  ): Promise<void> {
+    this.stopAutoSyncAndMarkNotReady();
+    await this.deps.onRemoteVaultUnavailable?.(error);
   }
 
   private notifySyncConflict(event: {

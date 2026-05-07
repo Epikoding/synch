@@ -71,7 +71,10 @@ describe("SyncAutoLoop retry flow", () => {
     await autoLoop.start();
     expect(callbacks).toHaveLength(1);
 
-    callbacks[0]?.onClose();
+    callbacks[0]?.onClose({
+      code: 1006,
+      reason: "connection closed",
+    });
     await autoLoop.resumeConnection();
 
     expect(callbacks).toHaveLength(2);
@@ -130,7 +133,10 @@ describe("SyncAutoLoop retry flow", () => {
     await autoLoop.start();
     expect(callbacks).toHaveLength(1);
 
-    callbacks[0]?.onClose();
+    callbacks[0]?.onClose({
+      code: 1006,
+      reason: "connection closed",
+    });
     expect(states).toContain("reconnecting");
 
     await vi.advanceTimersByTimeAsync(999);
@@ -139,6 +145,77 @@ describe("SyncAutoLoop retry flow", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(callbacks).toHaveLength(2);
     expect(states.at(-1)).toBe("live");
+
+    autoLoop.stop();
+    await store.close();
+  });
+
+  it("stops instead of reconnecting when the active remote vault becomes unavailable", async () => {
+    vi.useFakeTimers();
+
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const callbacks: SyncRealtimeCallbacks[] = [];
+    const onRemoteVaultUnavailable = vi.fn();
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations: vi.fn(async () => createPushResult()),
+      pullOnce: vi.fn(async () => {}),
+      realtimeClient: createRealtimeClient((nextCallbacks) => {
+        callbacks.push(nextCallbacks);
+      }),
+      reconnectDelayMs: 1_000,
+      onRemoteVaultUnavailable,
+    });
+
+    await autoLoop.start();
+
+    callbacks[0]?.onClose({
+      code: 4403,
+      reason: "vault deleted",
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(callbacks).toHaveLength(1);
+    expect(onRemoteVaultUnavailable).toHaveBeenCalledTimes(1);
+    expect(onRemoteVaultUnavailable.mock.calls[0]?.[0]).toMatchObject({
+      remoteVaultId: "vault-1",
+      reason: "not_found",
+    });
+
+    await store.close();
+  });
+
+  it("reconnects when a non-unavailable close reason mentions the local vault", async () => {
+    vi.useFakeTimers();
+
+    const store = await createInitializedTestSyncStore(createTestPlugin());
+    const callbacks: SyncRealtimeCallbacks[] = [];
+    const onRemoteVaultUnavailable = vi.fn();
+    const autoLoop = new SyncAutoLoop({
+      getApiBaseUrl: () => "http://127.0.0.1:8787",
+      getSyncToken: async () => createToken(),
+      getSyncStore: () => store,
+      pushPendingMutations: vi.fn(async () => createPushResult()),
+      pullOnce: vi.fn(async () => {}),
+      realtimeClient: createRealtimeClient((nextCallbacks) => {
+        callbacks.push(nextCallbacks);
+      }),
+      reconnectDelayMs: 1_000,
+      onRemoteVaultUnavailable,
+    });
+
+    await autoLoop.start();
+
+    callbacks[0]?.onClose({
+      code: 0,
+      reason: "connection replaced by a newer sync session for this local vault",
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(callbacks).toHaveLength(2);
+    expect(onRemoteVaultUnavailable).not.toHaveBeenCalled();
 
     autoLoop.stop();
     await store.close();
@@ -172,7 +249,10 @@ describe("SyncAutoLoop retry flow", () => {
     callbacks[0]?.onError(
       new SyncRealtimeConnectionError("sync websocket connection failed"),
     );
-    callbacks[0]?.onClose();
+    callbacks[0]?.onClose({
+      code: 1006,
+      reason: "connection closed",
+    });
 
     expect(onError).not.toHaveBeenCalled();
     expect(states).toContain("reconnecting");

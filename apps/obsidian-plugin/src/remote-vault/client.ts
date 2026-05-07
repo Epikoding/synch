@@ -1,9 +1,10 @@
 import {
+  createApiRequestError,
   defaultHttpClient,
-  extractErrorMessage,
   stripTrailingSlash,
   type HttpClient,
 } from "../http/request";
+import { remoteVaultUnavailableFromApiError } from "./unavailable";
 import type {
   CreateRemoteVaultResponse,
   RemoteVaultBootstrapResponse,
@@ -44,10 +45,14 @@ export class RemoteVaultClient {
     sessionToken: string,
     vaultId: string,
   ): Promise<RemoteVaultBootstrapResponse> {
-    return await this.requestJson<RemoteVaultBootstrapResponse>(
-      `${stripTrailingSlash(apiBaseUrl)}/v1/vaults/${encodeURIComponent(vaultId)}/bootstrap`,
-      sessionToken,
-    );
+    try {
+      return await this.requestJson<RemoteVaultBootstrapResponse>(
+        `${stripTrailingSlash(apiBaseUrl)}/v1/vaults/${encodeURIComponent(vaultId)}/bootstrap`,
+        sessionToken,
+      );
+    } catch (error) {
+      throw remoteVaultUnavailableFromApiError(error, vaultId) ?? error;
+    }
   }
 
   private async requestJson<T>(
@@ -70,8 +75,10 @@ export class RemoteVaultClient {
     });
 
     if (response.status < 200 || response.status >= 300) {
-      const message = extractErrorMessage(response.json);
-      throw new Error(message || `vault request failed with status ${response.status}`);
+      throw createApiRequestError(
+        response,
+        `vault request failed with status ${response.status}`,
+      );
     }
 
     return response.json as T;

@@ -1,9 +1,10 @@
 import {
+  createApiRequestError,
   defaultHttpClient,
-  extractErrorMessage,
   stripTrailingSlash,
   type HttpClient,
 } from "../../http/request";
+import { remoteVaultUnavailableFromApiError } from "../../remote-vault/unavailable";
 
 export interface SyncTokenResponse {
   token: string;
@@ -21,14 +22,18 @@ export class SyncAccessClient {
     sessionToken: string,
     input: { vaultId: string; localVaultId: string },
   ): Promise<SyncTokenResponse> {
-    return await this.requestJson<SyncTokenResponse>(
-      `${stripTrailingSlash(apiBaseUrl)}/v1/sync/token`,
-      sessionToken,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+    try {
+      return await this.requestJson<SyncTokenResponse>(
+        `${stripTrailingSlash(apiBaseUrl)}/v1/sync/token`,
+        sessionToken,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+      );
+    } catch (error) {
+      throw remoteVaultUnavailableFromApiError(error, input.vaultId) ?? error;
+    }
   }
 
   private async requestJson<T>(
@@ -51,8 +56,10 @@ export class SyncAccessClient {
     });
 
     if (response.status < 200 || response.status >= 300) {
-      const message = extractErrorMessage(response.json);
-      throw new Error(message || `sync access request failed with status ${response.status}`);
+      throw createApiRequestError(
+        response,
+        `sync access request failed with status ${response.status}`,
+      );
     }
 
     return response.json as T;

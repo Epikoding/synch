@@ -70,7 +70,7 @@ export class SyncRealtimeClient {
       [SYNC_WEBSOCKET_PROTOCOL, `${SYNC_WEBSOCKET_AUTH_PROTOCOL_PREFIX}${token.token}`],
     );
 
-    await waitForOpen(socket);
+    await waitForOpen(socket, token.vaultId);
     const state: RealtimeSessionState = {
       storageStatus: {
         storageUsedBytes: 0,

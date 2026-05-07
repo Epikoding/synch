@@ -1,4 +1,9 @@
 import type { SyncTokenResponse } from "../remote/client";
+import {
+  isRemoteVaultUnavailableError,
+  remoteVaultUnavailableFromWebSocketClose,
+  type RemoteVaultUnavailableError,
+} from "../../remote-vault/unavailable";
 import type { PushPendingMutationsResult } from "./push-service";
 import {
   SyncRealtimeClient,
@@ -39,6 +44,7 @@ export interface SyncAutoLoopDeps {
   onSyncScheduled?: () => void;
   onIdle?: () => void;
   onError?: (error: unknown) => void;
+  onRemoteVaultUnavailable?: (error: RemoteVaultUnavailableError) => void | Promise<void>;
   onStorageQuotaExceeded?: () => void | Promise<void>;
 }
 
@@ -187,7 +193,16 @@ export class SyncAutoLoop {
           onPolicyUpdated: (_policy, storageStatus) => {
             void this.handlePolicyUpdated(storageStatus);
           },
-          onClose: () => {
+          onClose: (event) => {
+            const unavailable = remoteVaultUnavailableFromWebSocketClose(
+              event,
+              token.vaultId,
+            );
+            if (unavailable) {
+              this.handleRemoteVaultUnavailable(unavailable);
+              return;
+            }
+
             this.markRealtimeDisconnected();
           },
           onError: (error) => {
@@ -232,6 +247,11 @@ export class SyncAutoLoop {
         throw error;
       }
     } catch (error) {
+      if (isRemoteVaultUnavailableError(error)) {
+        this.handleRemoteVaultUnavailable(error);
+        return;
+      }
+
       if (!isRealtimeConnectionError(error)) {
         this.handleError(error);
       }
@@ -412,6 +432,11 @@ export class SyncAutoLoop {
         }
         this.resetSyncRetry();
       } catch (error) {
+        if (isRemoteVaultUnavailableError(error)) {
+          this.handleRemoteVaultUnavailable(error);
+          return;
+        }
+
         if (shouldPush && !pushCompleted) {
           this.requestPush();
         }
@@ -474,6 +499,11 @@ export class SyncAutoLoop {
 
   private handleError(error: unknown): void {
     this.deps.onError?.(error);
+  }
+
+  private handleRemoteVaultUnavailable(error: RemoteVaultUnavailableError): void {
+    this.stop();
+    void this.deps.onRemoteVaultUnavailable?.(error);
   }
 }
 

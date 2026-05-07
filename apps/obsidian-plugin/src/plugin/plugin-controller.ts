@@ -37,6 +37,10 @@ import {
   writeStoredRemoteVaultKeySecret,
 } from "../remote-vault/device-storage";
 import { RemoteVaultManager } from "../remote-vault/manager";
+import {
+  isRemoteVaultUnavailableError,
+  type RemoteVaultUnavailableError,
+} from "../remote-vault/unavailable";
 import type { SyncConnection } from "../sync/store/store";
 
 const PLUGIN_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -63,6 +67,7 @@ export class SynchPluginController implements SynchSettingsController {
   private storedSyncConnection: SyncConnection | null = null;
   private remoteVaultSyncFormatVersion: number | null = null;
   private resumeAutoSyncPromise: Promise<void> | null = null;
+  private remoteVaultUnavailableDisconnectPromise: Promise<void> | null = null;
   private readonly authManager = new AuthManager({
     plugin: this.plugin,
     getApiBaseUrl: () => this.getApiBaseUrl(),
@@ -122,6 +127,9 @@ export class SynchPluginController implements SynchSettingsController {
     onStorageQuotaExceeded: async () => {
       await this.setSyncEnabled(false);
       new Notice("Storage quota exceeded. Sync has been paused.");
+    },
+    onRemoteVaultUnavailable: async (error) => {
+      await this.disconnectUnavailableRemoteVault(error);
     },
   });
   private readonly versionHistoryController = new SynchVersionHistoryController({
@@ -376,7 +384,16 @@ export class SynchPluginController implements SynchSettingsController {
   }
 
   async getSyncTokenForActiveRemoteVault(): Promise<SyncTokenResponse> {
-    const token = await this.syncTokenManager.getTokenForActiveRemoteVault();
+    let token: SyncTokenResponse;
+    try {
+      token = await this.syncTokenManager.getTokenForActiveRemoteVault();
+    } catch (error) {
+      if (isRemoteVaultUnavailableError(error)) {
+        await this.disconnectUnavailableRemoteVault(error);
+      }
+      throw error;
+    }
+
     if (this.remoteVaultSyncFormatVersion !== token.syncFormatVersion) {
       this.remoteVaultSyncFormatVersion = token.syncFormatVersion;
       this.refreshUi();
@@ -574,10 +591,16 @@ export class SynchPluginController implements SynchSettingsController {
       return;
     }
 
+    let hasActiveRemoteVaultStore = false;
     try {
-      await this.ensureActiveRemoteVaultStore();
+      hasActiveRemoteVaultStore = await this.ensureActiveRemoteVaultStore();
     } catch (error) {
       this.notifyUnlessOffline(error, "Vault restore failed");
+      return;
+    }
+
+    if (!hasActiveRemoteVaultStore) {
+      this.syncController.stopAutoSyncAndMarkNotReady();
       return;
     }
 
@@ -589,19 +612,37 @@ export class SynchPluginController implements SynchSettingsController {
     await startAutoSync();
   }
 
-  private async ensureActiveRemoteVaultStore(): Promise<void> {
+  private async ensureActiveRemoteVaultStore(): Promise<boolean> {
     if (!this.hasActiveRemoteVaultSession()) {
-      await this.remoteVaultManager.restoreStoredSessionIfNeeded();
+      try {
+        await this.remoteVaultManager.restoreStoredSessionIfNeeded();
+      } catch (error) {
+        if (isRemoteVaultUnavailableError(error)) {
+          await this.disconnectUnavailableRemoteVault(error);
+          return false;
+        }
+        throw error;
+      }
     }
 
-    if (!this.hasActiveRemoteVaultSession() || this.syncController.hasStore()) {
-      return;
+    if (!this.hasActiveRemoteVaultSession()) {
+      return false;
+    }
+
+    if (this.syncController.hasStore()) {
+      return true;
     }
 
     await this.initializeSyncStoreForActiveRemoteVault();
+    return this.hasActiveRemoteVaultSession();
   }
 
   private notifyUnlessOffline(error: unknown, prefix: string): void {
+    if (isRemoteVaultUnavailableError(error)) {
+      void this.disconnectUnavailableRemoteVault(error);
+      return;
+    }
+
     if (isOfflineLikeError(error)) {
       this.syncController.markOffline();
       return;
@@ -630,6 +671,45 @@ export class SynchPluginController implements SynchSettingsController {
       this.notifyError(error, "Local sync state reset failed");
       this.syncController.stopAutoSyncAndMarkNotReady();
     }
+  }
+
+  private async disconnectUnavailableRemoteVault(
+    error: RemoteVaultUnavailableError,
+  ): Promise<void> {
+    if (this.remoteVaultUnavailableDisconnectPromise) {
+      await this.remoteVaultUnavailableDisconnectPromise;
+      return;
+    }
+
+    const activeRemoteVaultId = this.remoteVaultManager.getRemoteVaultId();
+    const storedRemoteVaultId = this.storedSyncConnection?.remoteVaultId ?? null;
+    if (
+      activeRemoteVaultId !== error.remoteVaultId &&
+      storedRemoteVaultId !== error.remoteVaultId
+    ) {
+      return;
+    }
+
+    this.remoteVaultUnavailableDisconnectPromise =
+      this.runUnavailableRemoteVaultDisconnect(error).finally(() => {
+        this.remoteVaultUnavailableDisconnectPromise = null;
+      });
+    await this.remoteVaultUnavailableDisconnectPromise;
+  }
+
+  private async runUnavailableRemoteVaultDisconnect(
+    error: RemoteVaultUnavailableError,
+  ): Promise<void> {
+    this.syncController.stopAutoSyncAndMarkNotReady();
+    this.clearSyncTokenState();
+    await this.remoteVaultManager.disconnectRemoteVault({ notify: false });
+    await this.resetSyncConnection();
+
+    const message =
+      error.reason === "not_found"
+        ? "Remote vault was removed. Synch disconnected this Obsidian vault."
+        : "Remote vault access is no longer available. Synch disconnected this Obsidian vault.";
+    new Notice(message);
   }
 
   private notifyError(error: unknown, prefix: string): void {
