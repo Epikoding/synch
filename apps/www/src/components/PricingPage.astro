@@ -11,6 +11,11 @@ interface Props {
 const { locale } = Astro.props;
 const t = ui[locale];
 const apiUrl = import.meta.env.PUBLIC_API_URL || "";
+const authBaseUrl = apiUrl || Astro.url.origin;
+const vaultsUrl = new URL("/vaults", authBaseUrl).toString();
+const signupUrl = new URL("/signup", authBaseUrl);
+signupUrl.searchParams.set("return_to", vaultsUrl);
+signupUrl.searchParams.set("lang", locale);
 const freeFeatures = [
   t.pricing.features.oneVault,
   t.pricing.features.freeStorage,
@@ -64,13 +69,12 @@ const starterFeatures = [
             }
           </ul>
 
-          <button
-            type="button"
-            data-waitlist-open
+          <a
+            href={signupUrl.toString()}
             class="w-full py-2 px-4 text-center text-xs bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
           >
             {t.home.getStarted}
-          </button>
+          </a>
         </div>
 
         <div

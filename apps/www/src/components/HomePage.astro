@@ -11,6 +11,12 @@ interface Props {
 const { locale } = Astro.props;
 const t = ui[locale].home;
 const repositoryUrl = "https://github.com/hjinco/synch";
+const apiUrl = import.meta.env.PUBLIC_API_URL || "";
+const authBaseUrl = apiUrl || Astro.url.origin;
+const vaultsUrl = new URL("/vaults", authBaseUrl).toString();
+const signupUrl = new URL("/signup", authBaseUrl);
+signupUrl.searchParams.set("return_to", vaultsUrl);
+signupUrl.searchParams.set("lang", locale);
 ---
 
 <Layout locale={locale}>
@@ -28,13 +34,12 @@ const repositoryUrl = "https://github.com/hjinco/synch";
         </p>
 
         <div class="flex items-center gap-4 pt-4 text-xs">
-          <button
-            type="button"
-            data-waitlist-open
+          <a
+            href={signupUrl.toString()}
             class="px-4 py-2 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 rounded transition-colors"
           >
             {t.getStarted}
-          </button>
+          </a>
           <a
             href={repositoryUrl}
             target="_blank"

@@ -8,7 +8,11 @@ interface Props {
 const locale = Astro.props.locale ?? getLocale(Astro.currentLocale);
 const t = ui[locale].nav;
 const apiUrl = import.meta.env.PUBLIC_API_URL || "";
-const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
+const authBaseUrl = apiUrl || Astro.url.origin;
+const vaultsUrl = new URL("/vaults", authBaseUrl).toString();
+const signupUrl = new URL("/signup", authBaseUrl);
+signupUrl.searchParams.set("return_to", vaultsUrl);
+signupUrl.searchParams.set("lang", locale);
 const authButtonClass =
   "inline-flex h-8 min-w-16 items-center justify-center rounded bg-zinc-200 px-3 text-xs font-medium text-[#0a0a0a] transition-colors hover:bg-white";
 ---
@@ -28,11 +32,10 @@ const authButtonClass =
       class="hover:text-zinc-200 transition-colors">{t.github}</a
     >
     <div class="w-px h-3 bg-zinc-800"></div>
-    <button
+    <a
       id="auth-link"
-      type="button"
-      data-waitlist-open
-      class={authButtonClass}>{t.joinWaitlist}</button
+      href={signupUrl.toString()}
+      class={authButtonClass}>{t.signUp}</a
     >
   </nav>
 </header>
@@ -53,10 +56,7 @@ const authButtonClass =
 
       if (session?.user) {
         authLink.textContent = vaultsLabel;
-        authLink.removeAttribute("data-waitlist-open");
-        authLink.addEventListener("click", () => {
-          window.location.href = vaultsUrl;
-        });
+        authLink.setAttribute("href", vaultsUrl);
         authLink.className = authButtonClass;
       }
     } catch (error) {
