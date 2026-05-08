@@ -66,7 +66,7 @@ to:
 
 Synch-hosted infrastructure uses third-party providers, including Cloudflare for
 hosting, storage, networking, databases, queues, and related infrastructure.
-Billing, if enabled, may be handled by Polar or another payment provider.
+Billing is handled by Polar.
 
 ### Data sent to Synch
 
@@ -79,7 +79,7 @@ End-to-end encryption does not hide all operational metadata. Synch may process
 account information, vault identifiers and names, organization and membership
 records, local vault identifiers, blob identifiers, file sizes, storage usage,
 timestamps, sync cursors, session information, IP addresses, User-Agent strings,
-billing identifiers if billing is enabled, and similar operational metadata.
+billing identifiers for hosted subscriptions, and similar operational metadata.
 
 ### Local vault access
 
@@ -93,10 +93,10 @@ vault.
 
 ### Payments
 
-Synch is currently in beta. The hosted service may offer free, beta, trial,
-paid, or limited plans. Paid plans are planned but may not be generally
-available yet. If paid plans are enabled, payment processing may be handled by
-Polar or another third-party payment provider.
+Synch is currently in beta. The hosted service offers free and paid subscription
+plans. The current paid hosted plan is Sync Starter, available with monthly or
+annual billing. Payment processing and subscription management are handled by
+Polar.
 
 ### Telemetry, ads, and privacy
 

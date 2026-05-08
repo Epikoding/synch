@@ -1,10 +1,10 @@
 ---
 title: Terms of Service
 description: Terms that apply to the hosted Synch service.
-updatedDate: 2026-04-29
+updatedDate: 2026-05-08
 ---
 
-Last updated: April 29, 2026
+Last updated: May 8, 2026
 
 These Terms of Service ("Terms") govern your access to and use of the hosted Synch service, including the Synch website, API, and hosted sync infrastructure (the "Service"). The Service is operated by Synch ("Synch", "we", "us", or "our").
 
@@ -64,7 +64,7 @@ Because Synch cannot inspect plaintext encrypted vault contents, you remain full
 
 Synch may offer free, beta, trial, paid, or limited plans. Plans may include limits on synced vaults, storage, maximum file size, version history, traffic, devices, or other usage.
 
-Paid plans are currently planned but may not be generally available. If paid plans are enabled, billing may be handled by a third-party payment provider such as Polar. Any payment information, taxes, renewals, cancellations, refunds, and subscription terms may be subject to additional checkout terms shown at the time of purchase.
+Paid plans are available for the hosted Service. Billing is handled by Polar, and subscription management may be available through a Polar customer portal linked from Synch. Payment information, taxes, renewals, cancellations, refunds, and subscription terms may be subject to additional checkout or billing portal terms shown at the time of purchase or management.
 
 We may change plans, prices, limits, or included features. If a change materially affects a paid plan, we will provide notice as required by law or by the terms shown at purchase.
 
@@ -84,7 +84,7 @@ We may suspend or terminate access to the Service if we reasonably believe you v
 
 ## 10. Service Changes
 
-Synch is not in production yet and may change rapidly. We may add, remove, or modify features, limits, APIs, storage formats, client requirements, and hosted infrastructure. We may discontinue the Service or any part of it.
+Synch is in beta and may change rapidly. We may add, remove, or modify features, limits, APIs, storage formats, client requirements, pricing, plan availability, billing providers, and hosted infrastructure. We may discontinue the Service or any part of it.
 
 Where practical, we will provide notice of material changes that affect your ability to access synced data, but you are responsible for keeping your own backups and exportable copies.
 
@@ -96,7 +96,7 @@ These Terms govern the hosted Synch Service. The MIT License does not grant you 
 
 ## 12. Third-Party Services
 
-The Service depends on third-party infrastructure and services, including Cloudflare for hosting, storage, and related infrastructure. If billing is enabled, Synch may use Polar or another payment provider. Third-party services may process information as described in our Privacy Policy and their own terms.
+The Service depends on third-party infrastructure and services, including Cloudflare for hosting, storage, and related infrastructure, and Polar for checkout, subscription management, customer portal sessions, payment processing, and related billing operations. Third-party services may process information as described in our Privacy Policy and their own terms.
 
 ## 13. Disclaimers
 

@@ -1,10 +1,10 @@
 ---
 title: Privacy Policy
 description: How Synch collects, uses, and protects information for the hosted service.
-updatedDate: 2026-04-29
+updatedDate: 2026-05-08
 ---
 
-Last updated: April 29, 2026
+Last updated: May 8, 2026
 
 This Privacy Policy explains how Synch ("Synch", "we", "us", or "our") collects, uses, shares, and protects information when you use the hosted Synch service, including the Synch website, API, hosted sync infrastructure, and related account features (the "Service").
 
@@ -42,9 +42,9 @@ Synch does not store plaintext vault keys. A wrapped key envelope is encrypted k
 
 ### Billing Information
 
-Paid plans are planned but may not be generally available. If billing is enabled, Synch may use a payment provider such as Polar. Synch may receive and store billing-related identifiers and status, such as Polar customer IDs, checkout IDs, subscription IDs, product IDs, subscription status, renewal periods, cancellation status, and the email address used for checkout.
+Synch offers paid subscription plans for the hosted Service. Billing is handled by Polar. Synch may receive and store billing-related identifiers and status, such as Polar customer IDs, checkout IDs, subscription IDs, product IDs, subscription status, renewal periods, cancellation status, and the email address used for checkout.
 
-Payment providers may collect and process payment details under their own terms and privacy policies.
+Polar may collect and process payment details under its own terms and privacy policy. Synch does not store complete payment card numbers.
 
 ### Communications And Support
 
@@ -77,7 +77,7 @@ We use information to:
 - Enforce quotas, file-size limits, plan limits, and abuse-prevention controls.
 - Operate, monitor, debug, protect, and improve the Service.
 - Send account, security, support, service, and billing notices.
-- Process billing and subscription status if paid plans are enabled.
+- Process billing and subscription status.
 - Respond to requests, support inquiries, legal obligations, security incidents, and policy violations.
 
 ## 4. How We Share Information
@@ -87,7 +87,7 @@ We do not sell personal information. We do not share personal information for ta
 We may share information with:
 
 - Infrastructure providers, including Cloudflare, for hosting, storage, networking, databases, queues, workers, security, and related infrastructure.
-- Payment providers, such as Polar, if billing is enabled.
+- Polar for checkout, subscription management, customer portal sessions, payment processing, and related billing operations.
 - Email delivery providers, if email features are configured.
 - Professional advisers, auditors, or service providers who help us operate the Service.
 - Law enforcement, regulators, courts, or other parties when we believe disclosure is required by law or necessary to protect rights, safety, security, or the integrity of the Service.
