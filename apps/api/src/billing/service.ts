@@ -44,11 +44,7 @@ export class BillingService {
 		const planId = input.planId as PaidSubscriptionPlanId;
 		const productId = this.config.productIdsByPlanId?.[planId];
 		if (!productId) {
-			throw apiError(
-				500,
-				"billing_not_configured",
-				`Polar product ID is not configured for ${planId}`,
-			);
+			throw new Error(`Polar product ID is not configured for ${planId}`);
 		}
 
 		const billingStatus = await this.readOrganizationBillingStatus(organizationId);

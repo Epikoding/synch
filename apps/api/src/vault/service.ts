@@ -114,7 +114,7 @@ export class VaultService {
 			throw apiError(403, "forbidden", "vault access denied");
 		}
 		if (!this.vaultPurgeQueue) {
-			throw apiError(500, "queue_unavailable", "vault purge queue is not configured");
+			throw new Error("vault purge queue is not configured");
 		}
 
 		await this.vaultRepository.markVaultDeletionQueued(vaultId);

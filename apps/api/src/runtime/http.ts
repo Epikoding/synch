@@ -30,11 +30,10 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 	const requestOrigin = new URL(request.url).origin;
 	const authBaseUrl = resolveUrlBinding("BETTER_AUTH_URL", env.BETTER_AUTH_URL, requestOrigin);
 	const publicOrigin = new URL(authBaseUrl).origin;
-	const corsOrigin = resolveOriginBinding(
-		"WWW_BASE_URL",
-		env.WWW_BASE_URL,
-		"http://localhost:4321",
-	);
+	const devMode = resolveBooleanBinding(env.DEV_MODE, false);
+	const corsOrigin = devMode
+		? "http://localhost:4321"
+		: resolveOriginBinding("WWW_BASE_URL", env.WWW_BASE_URL, "http://localhost:4321");
 	const db = createDb(env.DB);
 	const billingRepository = new BillingRepository(db);
 	const productIdsByPlanId = {
@@ -66,7 +65,7 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 		baseURL: authBaseUrl,
 		trustedOrigins: Array.from(new Set([publicOrigin, corsOrigin])),
 		selfHosted: env.SELF_HOSTED,
-		devMode: resolveBooleanBinding(env.DEV_MODE, false),
+		devMode,
 		email: env.EMAIL,
 		emailFrom: env.AUTH_EMAIL_FROM,
 		plugins: polarAuthPlugin ? [polarAuthPlugin] : [],

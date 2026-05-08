@@ -1,15 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-import { createRuntimeApp } from "../../../src/runtime";
 import { extractCookieHeader, uniqueId } from "../../helpers/api";
-
-type RuntimeTestEnv = Omit<Env, "AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL"> & {
-	EMAIL?: SendEmail;
-	AUTH_EMAIL_FROM?: string;
-	DEV_MODE?: boolean | string;
-	WWW_BASE_URL?: string;
-};
+import { requestWithEnv, type RuntimeTestEnv } from "./helpers";
 
 type SentEmail = {
 	from: string | EmailAddress;
@@ -136,28 +129,6 @@ async function jsonRequestWithEnv<T = unknown>(
 		text,
 		json: text ? (JSON.parse(text) as T) : null,
 	};
-}
-
-async function requestWithEnv(
-	path: string,
-	testEnv: RuntimeTestEnv,
-	init: RequestInit = {},
-): Promise<Response> {
-	const url = new URL(path, process.env.BETTER_AUTH_URL);
-	const headers = new Headers(init.headers ?? {});
-	if (!headers.has("origin")) {
-		headers.set("origin", url.origin);
-	}
-	if (!headers.has("referer")) {
-		headers.set("referer", `${url.origin}/`);
-	}
-
-	const request = new Request(url.toString(), {
-		...init,
-		headers,
-	});
-
-	return await createRuntimeApp(testEnv, request).fetch(request);
 }
 
 function createCapturingEmailBinding(): SendEmail & { sent: SentEmail[] } {

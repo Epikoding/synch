@@ -85,7 +85,7 @@ describe("createPolarCheckout", () => {
 		expect(polarMocks.checkoutsCreate).not.toHaveBeenCalled();
 	});
 
-	it("wraps Polar checkout failures as API errors", async () => {
+	it("throws Polar checkout failures", async () => {
 		polarMocks.checkoutsCreate.mockRejectedValueOnce(new Error("polar unavailable"));
 
 		await expect(

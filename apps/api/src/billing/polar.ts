@@ -2,7 +2,6 @@ import { polar, webhooks } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
 import type { Subscription } from "@polar-sh/sdk/models/components/subscription";
 
-import { apiError } from "../errors";
 import type {
 	BillingRepository,
 	PolarSubscriptionUpsertInput,
@@ -59,36 +58,28 @@ export async function createPolarCheckout(
 	},
 ): Promise<{ checkoutId: string; url: string }> {
 	if (!config.accessToken) {
-		throw apiError(500, "billing_not_configured", "POLAR_ACCESS_TOKEN is not configured");
+		throw new Error("POLAR_ACCESS_TOKEN is not configured");
 	}
-	try {
-		const checkout = await createPolarClient(config).checkouts.create({
-			products: [input.productId],
-			externalCustomerId: input.userId,
-			customerEmail: input.email,
-			successUrl: new URL(
-				"/billing/success?checkout_id={CHECKOUT_ID}",
-				config.wwwBaseUrl,
-			).toString(),
-			metadata: {
-				referenceId: input.organizationId,
-				organizationId: input.organizationId,
-				userId: input.userId,
-				planId: input.planId,
-			},
-		});
+	const checkout = await createPolarClient(config).checkouts.create({
+		products: [input.productId],
+		externalCustomerId: input.userId,
+		customerEmail: input.email,
+		successUrl: new URL(
+			"/billing/success?checkout_id={CHECKOUT_ID}",
+			config.wwwBaseUrl,
+		).toString(),
+		metadata: {
+			referenceId: input.organizationId,
+			organizationId: input.organizationId,
+			userId: input.userId,
+			planId: input.planId,
+		},
+	});
 
-		return {
-			checkoutId: checkout.id,
-			url: checkout.url,
-		};
-	} catch (error) {
-		throw apiError(
-			502,
-			"polar_checkout_failed",
-			error instanceof Error ? error.message : "Polar checkout creation failed",
-		);
-	}
+	return {
+		checkoutId: checkout.id,
+		url: checkout.url,
+	};
 }
 
 function createPolarClient(config: PolarClientConfig): Polar {
