@@ -8,6 +8,7 @@ import type {
   SynchFileRules,
   SynchPluginUpdateStatus,
   SynchStorageStatus,
+  SynchSubscriptionStatus,
   SynchSyncProgress,
   SynchSyncState,
   SynchVersionPreview,
@@ -17,6 +18,11 @@ export interface SynchSettingsController {
   getPluginUpdateStatus(): SynchPluginUpdateStatus;
   ensurePluginUpdateCheck(): Promise<void>;
   retryPluginUpdateCheck(): Promise<void>;
+  getSubscriptionStatus(): SynchSubscriptionStatus;
+  ensureSubscriptionStatusCheck(): Promise<void>;
+  retrySubscriptionStatusCheck(): Promise<void>;
+  openBillingManagementPage(): void;
+  openPricingPage(): void;
   getAuthReadiness(): AuthReadiness;
   getAuthStatusLabel(): string;
   getSyncState(): SynchSyncState;

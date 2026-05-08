@@ -76,8 +76,8 @@ describe("SynchSettingTab sync status", () => {
       "Synch",
       "Sync",
       "Authentication",
+      "Subscription",
       "Vault management",
-      "Vault",
     ]);
   });
 

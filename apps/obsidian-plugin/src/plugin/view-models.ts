@@ -60,6 +60,24 @@ export type SynchPluginUpdateStatus =
       error: string;
     };
 
+export type SynchSubscriptionStatus =
+  | {
+      state: "idle" | "checking";
+    }
+  | {
+      state: "loaded";
+      planId: "free" | "starter" | "self_hosted";
+      billingInterval: "monthly" | "annual" | null;
+      active: boolean;
+      status: string;
+      cancelAtPeriodEnd: boolean;
+      periodEnd: string | null;
+    }
+  | {
+      state: "failed";
+      error: string;
+    };
+
 export interface SynchDeletedFile {
   entryId: string;
   path: string;

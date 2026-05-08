@@ -1,7 +1,10 @@
 import { Notice, type Plugin, TFolder } from "obsidian";
 
+import { BillingClient } from "../billing/client";
+import { buildBillingWebPageUrl } from "../billing/web-url";
+import { getDefaultApiBaseUrl } from "../config";
 import { isOfflineLikeError } from "../http/network-status";
-import { t } from "../i18n";
+import { getSynchLocale, t } from "../i18n";
 import { AuthManager, type AuthReadiness } from "../auth/manager";
 import { SynchPluginDataStore } from "../plugin-data";
 import type { SynchSettingsController } from "../settings/controller";
@@ -20,6 +23,7 @@ import type {
   SynchFileRules,
   SynchPluginUpdateStatus,
   SynchStorageStatus,
+  SynchSubscriptionStatus,
   SynchSyncProgress,
   SynchSyncState,
   SynchVersionPreview,
@@ -44,6 +48,7 @@ import {
 import type { SyncConnection } from "../sync/store/store";
 
 const PLUGIN_UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const SUBSCRIPTION_STATUS_CHECK_INTERVAL_MS = 30 * 1000;
 
 export interface SynchPluginControllerDeps {
   plugin: Plugin;
@@ -55,13 +60,19 @@ export class SynchPluginController implements SynchSettingsController {
   private readonly plugin = this.deps.plugin;
   private readonly pluginDataStore = new SynchPluginDataStore(this.plugin);
   private readonly settingsStore = new SynchSettingsStore(this.pluginDataStore);
+  private readonly billingClient = new BillingClient();
   private readonly pluginUpdateChecker = new SynchPluginUpdateChecker();
   private readonly serverPluginVersionChecker = new SynchServerPluginVersionChecker();
   private pluginUpdateCheckPromise: Promise<void> | null = null;
   private pluginUpdateCheckedAt = 0;
+  private subscriptionStatusCheckPromise: Promise<void> | null = null;
+  private subscriptionStatusCheckedAt = 0;
   private pluginUpdateStatus: SynchPluginUpdateStatus = {
     state: "idle",
     currentVersion: this.plugin.manifest.version,
+  };
+  private subscriptionStatus: SynchSubscriptionStatus = {
+    state: "idle",
   };
   private storedRemoteVaultKeySecret: StoredRemoteVaultKeySecret | null = null;
   private storedSyncConnection: SyncConnection | null = null;
@@ -240,6 +251,48 @@ export class SynchPluginController implements SynchSettingsController {
     await this.checkPluginUpdate();
   }
 
+  getSubscriptionStatus(): SynchSubscriptionStatus {
+    return this.subscriptionStatus;
+  }
+
+  async ensureSubscriptionStatusCheck(): Promise<void> {
+    if (!this.hasAuthenticatedSession() || !this.usesDefaultApiBaseUrl()) {
+      this.clearSubscriptionStatus();
+      return;
+    }
+
+    if (this.subscriptionStatusCheckPromise) {
+      await this.subscriptionStatusCheckPromise;
+      return;
+    }
+
+    if (
+      this.subscriptionStatus.state !== "idle" &&
+      Date.now() - this.subscriptionStatusCheckedAt < SUBSCRIPTION_STATUS_CHECK_INTERVAL_MS
+    ) {
+      return;
+    }
+
+    await this.checkSubscriptionStatus();
+  }
+
+  async retrySubscriptionStatusCheck(): Promise<void> {
+    if (!this.hasAuthenticatedSession() || !this.usesDefaultApiBaseUrl()) {
+      this.clearSubscriptionStatus();
+      return;
+    }
+
+    await this.checkSubscriptionStatus();
+  }
+
+  openBillingManagementPage(): void {
+    this.openBillingWebPage("billing");
+  }
+
+  openPricingPage(): void {
+    this.openBillingWebPage("pricing");
+  }
+
   getAuthStatusLabel(): string {
     return this.authManager.getAuthStatusLabel();
   }
@@ -408,6 +461,7 @@ export class SynchPluginController implements SynchSettingsController {
       loginStarted = await this.authManager.beginDeviceLogin();
     } finally {
       if (loginStarted) {
+        this.clearSubscriptionStatus();
         this.clearSyncTokenState();
         await this.ensureAutoSyncState();
       }
@@ -418,6 +472,7 @@ export class SynchPluginController implements SynchSettingsController {
     try {
       await this.authManager.signOutDevice();
     } finally {
+      this.clearSubscriptionStatus();
       this.clearSyncTokenState();
       this.remoteVaultManager.clearSession();
       await this.saveStoredRemoteVaultKeySecret(null);
@@ -546,6 +601,57 @@ export class SynchPluginController implements SynchSettingsController {
       });
 
     await this.pluginUpdateCheckPromise;
+  }
+
+  private async checkSubscriptionStatus(): Promise<void> {
+    if (this.subscriptionStatusCheckPromise) {
+      await this.subscriptionStatusCheckPromise;
+      return;
+    }
+
+    const sessionToken = this.authManager.getAuthSessionToken().trim();
+    if (!sessionToken) {
+      this.clearSubscriptionStatus();
+      return;
+    }
+
+    this.subscriptionStatus = { state: "checking" };
+    this.subscriptionStatusCheckPromise = this.billingClient
+      .readBillingStatus(this.getApiBaseUrl(), sessionToken)
+      .then((status) => {
+        this.subscriptionStatus = {
+          state: "loaded",
+          ...status,
+        };
+      })
+      .catch((error) => {
+        this.subscriptionStatus = {
+          state: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      })
+      .finally(() => {
+        this.subscriptionStatusCheckedAt = Date.now();
+        this.subscriptionStatusCheckPromise = null;
+        this.refreshUi();
+      });
+
+    await this.subscriptionStatusCheckPromise;
+  }
+
+  private clearSubscriptionStatus(): void {
+    this.subscriptionStatus = { state: "idle" };
+    this.subscriptionStatusCheckedAt = 0;
+    this.subscriptionStatusCheckPromise = null;
+  }
+
+  private usesDefaultApiBaseUrl(): boolean {
+    return this.getApiBaseUrl() === getDefaultApiBaseUrl();
+  }
+
+  private openBillingWebPage(page: "pricing" | "billing"): void {
+    const url = buildBillingWebPageUrl(this.getApiBaseUrl(), page, getSynchLocale());
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   private async saveStoredRemoteVaultKeySecret(

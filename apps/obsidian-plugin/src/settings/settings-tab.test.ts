@@ -225,6 +225,128 @@ describe("SynchSettingTab", () => {
     expect(updateApiBaseUrl).not.toHaveBeenCalled();
   });
 
+  it("shows subscription status after sign-in", () => {
+    const ensureSubscriptionStatusCheck = vi.fn(async () => {});
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      ensureSubscriptionStatusCheck,
+    });
+
+    tab.display();
+
+    expect(ensureSubscriptionStatusCheck).toHaveBeenCalledTimes(1);
+    expect(getSettingNames()).toContain("Subscription");
+    expect(getSettingDescriptions()).toContain("Checking subscription...");
+  });
+
+  it("hides subscription settings for custom API servers", () => {
+    const ensureSubscriptionStatusCheck = vi.fn(async () => {});
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      getApiBaseUrl: () => "https://custom.synch.test",
+      ensureSubscriptionStatusCheck,
+    });
+
+    tab.display();
+
+    expect(ensureSubscriptionStatusCheck).not.toHaveBeenCalled();
+    expect(getSettingNames()).not.toContain("Subscription");
+    expect(getSettingDescriptions()).not.toContain("Checking subscription...");
+  });
+
+  it("opens pricing from free subscription settings", async () => {
+    const openPricingPage = vi.fn();
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      getSubscriptionStatus: () => ({
+        state: "loaded",
+        planId: "free",
+        billingInterval: null,
+        active: false,
+        status: "none",
+        cancelAtPeriodEnd: false,
+        periodEnd: null,
+      }),
+      openPricingPage,
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()).toContain("Sync Free");
+    const upgradeButton = getButtonComponents().find((button) => button.text === "Upgrade");
+    await upgradeButton?.click();
+
+    expect(openPricingPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens billing management from paid subscription settings", async () => {
+    const openBillingManagementPage = vi.fn();
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      getSubscriptionStatus: () => ({
+        state: "loaded",
+        planId: "starter",
+        billingInterval: "annual",
+        active: true,
+        status: "active",
+        cancelAtPeriodEnd: false,
+        periodEnd: "2026-05-09T00:00:00.000Z",
+      }),
+      openBillingManagementPage,
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()).toContain("Sync Starter");
+    const manageButton = getButtonComponents().find(
+      (button) => button.text === "Manage subscription",
+    );
+    await manageButton?.click();
+
+    expect(openBillingManagementPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows canceling paid subscription period end", () => {
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      getSubscriptionStatus: () => ({
+        state: "loaded",
+        planId: "starter",
+        billingInterval: "monthly",
+        active: true,
+        status: "active",
+        cancelAtPeriodEnd: true,
+        periodEnd: "2026-05-09T00:00:00.000Z",
+      }),
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()).toContain("Sync Starter. Current period ends May 9, 2026.");
+  });
+
+  it("can retry failed subscription status checks", async () => {
+    const retrySubscriptionStatusCheck = vi.fn(async () => {});
+    const tab = createSettingsTab({
+      hasAuthenticatedSession: () => true,
+      getSubscriptionStatus: () => ({
+        state: "failed",
+        error: "offline",
+      }),
+      retrySubscriptionStatusCheck,
+    });
+
+    tab.display();
+
+    expect(getSettingDescriptions()).toContain(
+      "Subscription status could not be loaded.",
+    );
+    const refreshButton = getButtonComponents().find((button) => button.text === "Refresh");
+    await refreshButton?.click();
+
+    expect(retrySubscriptionStatusCheck).toHaveBeenCalledTimes(1);
+  });
+
   it("disables the self-hosted server URL during device sign-in", async () => {
     const updateApiBaseUrl = vi.fn(async () => {});
     const tab = createSettingsTab({

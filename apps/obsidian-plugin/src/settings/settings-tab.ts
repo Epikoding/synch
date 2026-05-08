@@ -1,5 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 
+import { getDefaultApiBaseUrl } from "../config";
 import { t } from "../i18n";
 import type { SynchUiEvent } from "../plugin/ui-events";
 import type { SynchSettingsController } from "./controller";
@@ -10,6 +11,7 @@ import {
   renderNetworkConnectionRequiredSetting,
   renderRemoteVaultSettings,
   renderSettingsHeading,
+  renderSubscriptionSetting,
   renderSyncStatusSetting,
   type SyncStatusSettingControls,
 } from "./settings-tab/sections";
@@ -73,6 +75,7 @@ export class SynchSettingTab extends PluginSettingTab {
     this.syncStatusControls = null;
     const hasConnectedRemoteVault = this.controller.hasConnectedRemoteVault();
     const hasAuthenticatedSession = this.controller.hasAuthenticatedSession();
+    const usesDefaultApiBaseUrl = this.controller.getApiBaseUrl() === getDefaultApiBaseUrl();
     const authReadiness = this.controller.getAuthReadiness();
     const isDeviceLoginInProgress = this.controller.isDeviceLoginInProgress();
     const canChangeApiBaseUrl =
@@ -86,6 +89,10 @@ export class SynchSettingTab extends PluginSettingTab {
     if (authReadiness.state === "pending_network") {
       renderNetworkConnectionRequiredSetting(containerEl);
       return;
+    }
+
+    if (hasAuthenticatedSession && usesDefaultApiBaseUrl) {
+      void this.controller.ensureSubscriptionStatusCheck();
     }
 
     if (hasAuthenticatedSession) {
@@ -104,6 +111,10 @@ export class SynchSettingTab extends PluginSettingTab {
       isDeviceLoginInProgress,
       () => this.refresh(),
     );
+
+    if (hasAuthenticatedSession && usesDefaultApiBaseUrl) {
+      renderSubscriptionSetting(containerEl, this.controller, () => this.refresh());
+    }
 
     if (!hasAuthenticatedSession) {
       new Setting(containerEl).setName(t("server.heading")).setHeading();
