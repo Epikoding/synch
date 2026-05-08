@@ -35,9 +35,7 @@ const vaultsUrl = new URL("/vaults", apiUrl || Astro.url.origin).toString();
   </div>
 </Layout>
 
-<script define:vars={{ fallbackMessage: t.billing.fallback }}>
-  const apiUrl = import.meta.env.PUBLIC_API_URL || "";
-  const vaultsUrl = new URL("/vaults", apiUrl || window.location.origin).toString();
+<script define:vars={{ apiUrl, fallbackMessage: t.billing.fallback, vaultsUrl }}>
   const message = document.getElementById("message");
   const actions = document.getElementById("actions");
   const spinner = document.getElementById("spinner");
