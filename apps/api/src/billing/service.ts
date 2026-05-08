@@ -1,6 +1,7 @@
 import { apiError } from "../errors";
 import {
 	createPolarCheckout,
+	createPolarCustomerPortalSession,
 	type PolarClientConfig,
 } from "./polar";
 import type { BillingRepository } from "./repository";
@@ -78,6 +79,8 @@ export class BillingService {
 		billingInterval: SubscriptionBillingInterval | null;
 		active: boolean;
 		status: string;
+		cancelAtPeriodEnd: boolean;
+		periodEnd: string | null;
 	}> {
 		const organizationId = await this.repository.readDefaultOrganizationIdForUser(userId);
 		if (!organizationId) {
@@ -87,11 +90,38 @@ export class BillingService {
 		return await this.readOrganizationBillingStatus(organizationId);
 	}
 
+	async createCustomerPortalSession(
+		userId: string,
+		returnPath = "/billing",
+	): Promise<{ url: string }> {
+		const organizationId = await this.repository.readDefaultOrganizationIdForUser(userId);
+		if (!organizationId) {
+			throw apiError(400, "organization_required", "user has no organization");
+		}
+
+		const polarCustomerId =
+			await this.repository.readOrganizationPolarCustomerId(organizationId);
+		if (!polarCustomerId) {
+			throw apiError(
+				404,
+				"billing_customer_not_found",
+				"billing customer was not found",
+			);
+		}
+
+		return await createPolarCustomerPortalSession(this.config, {
+			polarCustomerId,
+			returnUrl: new URL(returnPath, this.config.wwwBaseUrl).toString(),
+		});
+	}
+
 	private async readOrganizationBillingStatus(organizationId: string): Promise<{
 		planId: SubscriptionPlanId;
 		billingInterval: SubscriptionBillingInterval | null;
 		active: boolean;
 		status: string;
+		cancelAtPeriodEnd: boolean;
+		periodEnd: string | null;
 	}> {
 		const subscriptions =
 			await this.repository.readOrganizationSubscriptionStatuses(organizationId);
@@ -111,6 +141,13 @@ export class BillingService {
 			active,
 			status:
 				activeSubscription?.subscription.status ?? subscriptions[0]?.status ?? "none",
+			cancelAtPeriodEnd:
+				activeSubscription?.subscription.cancelAtPeriodEnd
+				?? subscriptions[0]?.cancelAtPeriodEnd
+				?? false,
+			periodEnd:
+				(activeSubscription?.subscription.periodEnd ?? subscriptions[0]?.periodEnd)
+					?.toISOString() ?? null,
 		};
 	}
 }

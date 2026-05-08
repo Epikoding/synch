@@ -20,6 +20,7 @@ export type OrganizationSubscriptionStatus = {
 	productId: string;
 	status: string;
 	periodEnd: Date | null;
+	cancelAtPeriodEnd: boolean;
 	updatedAt: Date;
 };
 
@@ -47,12 +48,27 @@ export class BillingRepository {
 				productId: schema.polarSubscription.productId,
 				status: schema.polarSubscription.status,
 				periodEnd: schema.polarSubscription.periodEnd,
+				cancelAtPeriodEnd: schema.polarSubscription.cancelAtPeriodEnd,
 				updatedAt: schema.polarSubscription.updatedAt,
 			})
 			.from(schema.polarSubscription)
 			.where(eq(schema.polarSubscription.organizationId, organizationId))
 			.orderBy(desc(schema.polarSubscription.updatedAt))
 			.limit(10);
+	}
+
+	async readOrganizationPolarCustomerId(
+		organizationId: string,
+	): Promise<string | null> {
+		const rows = await this.db
+			.select({
+				polarCustomerId: schema.organization.polarCustomerId,
+			})
+			.from(schema.organization)
+			.where(eq(schema.organization.id, organizationId))
+			.limit(1);
+
+		return rows[0]?.polarCustomerId ?? null;
 	}
 
 	async upsertPolarSubscription(input: PolarSubscriptionUpsertInput): Promise<void> {

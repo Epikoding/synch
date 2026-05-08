@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const polarMocks = vi.hoisted(() => ({
 	checkoutsCreate: vi.fn(),
+	customerSessionsCreate: vi.fn(),
 	Polar: vi.fn(function Polar(this: unknown, config: unknown) {
 		Object.assign(this as object, {
 			config,
 			checkouts: {
 				create: polarMocks.checkoutsCreate,
+			},
+			customerSessions: {
+				create: polarMocks.customerSessionsCreate,
 			},
 		});
 	}),
@@ -16,7 +20,7 @@ vi.mock("@polar-sh/sdk", () => ({
 	Polar: polarMocks.Polar,
 }));
 
-import { createPolarCheckout } from "./polar";
+import { createPolarCheckout, createPolarCustomerPortalSession } from "./polar";
 
 describe("createPolarCheckout", () => {
 	beforeEach(() => {
@@ -107,5 +111,48 @@ describe("createPolarCheckout", () => {
 				},
 			),
 		).rejects.toThrow("polar unavailable");
+	});
+
+	it("creates a customer portal session", async () => {
+		polarMocks.customerSessionsCreate.mockResolvedValueOnce({
+			customerPortalUrl: "https://polar.example/portal/session-1",
+		});
+
+		await expect(
+			createPolarCustomerPortalSession(
+				{
+					accessToken: "polar-token",
+					sandbox: true,
+				},
+				{
+					polarCustomerId: "customer-1",
+					returnUrl: "https://synch.example/billing",
+				},
+			),
+		).resolves.toEqual({
+			url: "https://polar.example/portal/session-1",
+		});
+
+		expect(polarMocks.Polar).toHaveBeenCalledWith({
+			accessToken: "polar-token",
+			server: "sandbox",
+		});
+		expect(polarMocks.customerSessionsCreate).toHaveBeenCalledWith({
+			customerId: "customer-1",
+			returnUrl: "https://synch.example/billing",
+		});
+	});
+
+	it("requires a Polar access token for customer portal sessions", async () => {
+		await expect(
+			createPolarCustomerPortalSession(
+				{},
+				{
+					polarCustomerId: "customer-1",
+					returnUrl: "https://synch.example/billing",
+				},
+			),
+		).rejects.toThrow("POLAR_ACCESS_TOKEN is not configured");
+		expect(polarMocks.customerSessionsCreate).not.toHaveBeenCalled();
 	});
 });

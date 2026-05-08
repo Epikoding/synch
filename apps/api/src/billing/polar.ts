@@ -87,6 +87,26 @@ export async function createPolarCheckout(
 	};
 }
 
+export async function createPolarCustomerPortalSession(
+	config: PolarClientConfig,
+	input: {
+		polarCustomerId: string;
+		returnUrl: string;
+	},
+): Promise<{ url: string }> {
+	if (!config.accessToken) {
+		throw new Error("POLAR_ACCESS_TOKEN is not configured");
+	}
+	const session = await createPolarClient(config).customerSessions.create({
+		customerId: input.polarCustomerId,
+		returnUrl: input.returnUrl,
+	});
+
+	return {
+		url: session.customerPortalUrl,
+	};
+}
+
 function createPolarClient(config: PolarClientConfig): Polar {
 	return new Polar({
 		accessToken: config.accessToken,

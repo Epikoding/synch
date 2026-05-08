@@ -17,6 +17,10 @@ const checkoutRequestSchema = z.object({
 	planId: z.enum(SUBSCRIPTION_PLAN_IDS).optional(),
 }).strict();
 
+const portalRequestSchema = z.object({
+	returnPath: z.string().optional(),
+}).strict();
+
 export function registerBillingRoutes(
 	app: Hono,
 	deps: { auth: Auth; billingService: BillingService },
@@ -42,6 +46,42 @@ export function registerBillingRoutes(
 
 		return c.json(status);
 	});
+
+	app.post("/v1/billing/portal", ensureAuthenticatedSession, async (c) => {
+		const user = c.var.user;
+		const returnPath = await readPortalRequestReturnPath(c.req.raw);
+		const portal = await deps.billingService.createCustomerPortalSession(
+			user.id,
+			returnPath,
+		);
+
+		return c.json(portal);
+	});
+}
+
+async function readPortalRequestReturnPath(request: Request): Promise<string> {
+	if (!request.headers.get("content-type")) {
+		return "/billing";
+	}
+
+	let json: unknown;
+	try {
+		json = await request.json();
+	} catch {
+		throw apiError(400, "bad_request", "invalid billing portal request");
+	}
+
+	const parsed = portalRequestSchema.safeParse(json);
+	if (!parsed.success) {
+		throw apiError(400, "bad_request", "invalid billing portal request");
+	}
+
+	const returnPath = parsed.data.returnPath ?? "/billing";
+	if (!returnPath.startsWith("/") || returnPath.startsWith("//")) {
+		throw apiError(400, "bad_request", "invalid billing portal return path");
+	}
+
+	return returnPath;
 }
 
 async function readCheckoutRequestPlanId(request: Request): Promise<{

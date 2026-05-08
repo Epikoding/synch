@@ -1,0 +1,273 @@
+---
+import Footer from "./Footer.astro";
+import Header from "./Header.astro";
+import Layout from "../layouts/Layout.astro";
+import { localizedPath, ui, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = ui[locale];
+const apiUrl = import.meta.env.PUBLIC_API_URL || "";
+const authBaseUrl = apiUrl || Astro.url.origin;
+const billingUrl = new URL(localizedPath(locale, "/billing"), Astro.url.origin).toString();
+const signupUrl = new URL("/signup", authBaseUrl);
+signupUrl.searchParams.set("return_to", billingUrl);
+signupUrl.searchParams.set("lang", locale);
+const pricingUrl = localizedPath(locale, "/pricing");
+---
+
+<Layout title={t.meta.billingTitle} locale={locale}>
+  <div class="max-w-2xl mx-auto px-6 w-full flex-1 flex flex-col">
+    <Header locale={locale} />
+
+    <main class="flex-1 py-16">
+      <div class="space-y-3 mb-10">
+        <p class="text-xs text-zinc-600">{t.billingSettings.eyebrow}</p>
+        <h1 class="text-2xl sm:text-3xl text-zinc-200 tracking-tight">
+          {t.billingSettings.heading}
+        </h1>
+        <p class="text-zinc-500 max-w-md leading-relaxed">
+          {t.billingSettings.subheading}
+        </p>
+      </div>
+
+      <section
+        class="rounded-lg border border-zinc-800/50 bg-zinc-900/20 p-6"
+        aria-live="polite"
+      >
+        <div id="billing-loading" class="flex items-center gap-3 text-sm text-zinc-500">
+          <div class="h-4 w-4 animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-300" aria-hidden="true"></div>
+          <span>{t.billingSettings.loading}</span>
+        </div>
+
+        <div id="billing-content" class="hidden space-y-8">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="mb-2 text-xs text-zinc-600">{t.billingSettings.currentPlan}</p>
+              <div class="flex flex-wrap items-center gap-3">
+                <h2 id="billing-plan" class="text-xl text-zinc-200"></h2>
+                <span
+                  id="billing-badge"
+                  class="rounded border border-zinc-700 bg-zinc-950/60 px-2 py-1 text-[11px] font-medium text-zinc-400"
+                ></span>
+              </div>
+            </div>
+            <div id="billing-period-group" class="text-left sm:text-right">
+              <p id="billing-period-label" class="mb-2 text-xs text-zinc-600">
+                {t.billingSettings.renewal}
+              </p>
+              <p id="billing-period" class="text-sm text-zinc-400"></p>
+            </div>
+          </div>
+
+          <p id="billing-message" class="text-sm leading-relaxed text-zinc-500"></p>
+
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <button
+              id="manage-button"
+              type="button"
+              class="hidden rounded bg-zinc-200 px-4 py-2 text-sm font-medium text-[#0a0a0a] transition-colors hover:bg-white disabled:bg-zinc-800/50 disabled:text-zinc-500 disabled:cursor-not-allowed"
+            >
+              {t.billingSettings.manage}
+            </button>
+            <a
+              id="upgrade-link"
+              href={pricingUrl}
+              class="hidden rounded bg-zinc-200 px-4 py-2 text-center text-sm font-medium text-[#0a0a0a] transition-colors hover:bg-white"
+            >
+              {t.billingSettings.upgrade}
+            </a>
+          </div>
+        </div>
+
+        <div id="billing-auth" class="hidden space-y-5">
+          <p class="text-sm leading-relaxed text-zinc-500">
+            {t.billingSettings.authRequired}
+          </p>
+          <a
+            href={signupUrl.toString()}
+            class="inline-flex rounded bg-zinc-200 px-4 py-2 text-sm font-medium text-[#0a0a0a] transition-colors hover:bg-white"
+          >
+            {t.billingSettings.signIn}
+          </a>
+        </div>
+
+        <div id="billing-error" class="hidden space-y-5">
+          <p class="text-sm leading-relaxed text-zinc-500">
+            {t.billingSettings.error}
+          </p>
+          <button
+            id="retry-button"
+            type="button"
+            class="rounded bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+          >
+            {t.billingSettings.retry}
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <Footer locale={locale} />
+  </div>
+</Layout>
+
+<script
+  define:vars={{
+    apiUrl,
+    labels: t.billingSettings,
+    returnPath: localizedPath(locale, "/billing"),
+    signupUrl: signupUrl.toString(),
+    locale,
+  }}
+>
+  const loading = document.getElementById("billing-loading");
+  const content = document.getElementById("billing-content");
+  const auth = document.getElementById("billing-auth");
+  const error = document.getElementById("billing-error");
+  const plan = document.getElementById("billing-plan");
+  const badge = document.getElementById("billing-badge");
+  const periodGroup = document.getElementById("billing-period-group");
+  const periodLabel = document.getElementById("billing-period-label");
+  const period = document.getElementById("billing-period");
+  const message = document.getElementById("billing-message");
+  const manageButton = document.getElementById("manage-button");
+  const upgradeLink = document.getElementById("upgrade-link");
+  const retryButton = document.getElementById("retry-button");
+
+  function show(panel) {
+    loading?.classList.toggle("hidden", panel !== "loading");
+    content?.classList.toggle("hidden", panel !== "content");
+    auth?.classList.toggle("hidden", panel !== "auth");
+    error?.classList.toggle("hidden", panel !== "error");
+  }
+
+  function formatPeriod(value) {
+    if (!value) {
+      return labels.noRenewalDate;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return labels.noRenewalDate;
+    }
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+    }).format(date);
+  }
+
+  function renderStatus(status) {
+    const isActive = Boolean(status.active);
+    const isStarter = status.planId === "starter";
+    const isCanceled = status.status === "canceled";
+    const isCanceling = isActive && (status.cancelAtPeriodEnd || isCanceled);
+    const interval = status.billingInterval === "annual"
+      ? labels.annual
+      : status.billingInterval === "monthly"
+        ? labels.monthly
+        : labels.freeInterval;
+
+    if (plan) {
+      plan.textContent = isStarter ? labels.starterPlan : labels.freePlan;
+    }
+    if (badge) {
+      badge.textContent = isCanceled
+        ? labels.canceled
+        : isCanceling
+          ? labels.canceling
+          : isActive
+            ? interval
+            : labels.freeInterval;
+      badge.className = isCanceled || isCanceling
+        ? "rounded border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[11px] font-medium text-amber-200"
+        : isActive
+          ? "rounded border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[11px] font-medium text-emerald-200"
+          : "rounded border border-zinc-700 bg-zinc-950/60 px-2 py-1 text-[11px] font-medium text-zinc-400";
+    }
+    if (period) {
+      period.textContent = isActive || isCanceled
+        ? formatPeriod(status.periodEnd)
+        : labels.noRenewalDate;
+    }
+    if (periodLabel) {
+      periodLabel.textContent = isCanceled || isCanceling
+        ? labels.endsOn
+        : labels.renewal;
+    }
+    periodGroup?.classList.remove("hidden");
+    if (message) {
+      message.textContent = isCanceled && !isActive
+        ? labels.canceledMessage
+        : isCanceling
+        ? labels.cancelingMessage
+        : isActive
+          ? labels.activeMessage
+          : labels.freeMessage;
+    }
+
+    manageButton?.classList.toggle("hidden", !isActive);
+    upgradeLink?.classList.toggle("hidden", isActive);
+    show("content");
+  }
+
+  async function fetchStatus() {
+    const response = await fetch(`${apiUrl}/v1/billing/status`, {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+    if (response.status === 401) {
+      show("auth");
+      return;
+    }
+    if (!response.ok) {
+      throw new Error("billing status failed");
+    }
+    renderStatus(await response.json());
+  }
+
+  async function openPortal() {
+    if (!(manageButton instanceof HTMLButtonElement)) {
+      return;
+    }
+    manageButton.disabled = true;
+
+    try {
+      const response = await fetch(`${apiUrl}/v1/billing/portal`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ returnPath }),
+      });
+      if (response.status === 401) {
+        window.location.href = signupUrl;
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("billing portal failed");
+      }
+
+      const portal = await response.json();
+      window.location.href = portal.url;
+    } catch {
+      manageButton.disabled = false;
+      show("error");
+    }
+  }
+
+  async function load() {
+    show("loading");
+    try {
+      await fetchStatus();
+    } catch {
+      show("error");
+    }
+  }
+
+  manageButton?.addEventListener("click", openPortal);
+  retryButton?.addEventListener("click", load);
+  load();
+</script>

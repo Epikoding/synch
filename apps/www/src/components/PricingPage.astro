@@ -2,7 +2,7 @@
 import Footer from "./Footer.astro";
 import Header from "./Header.astro";
 import Layout from "../layouts/Layout.astro";
-import { ui, type Locale } from "../i18n";
+import { localizedPath, ui, type Locale } from "../i18n";
 
 interface Props {
   locale: Locale;
@@ -16,6 +16,7 @@ const vaultsUrl = new URL("/vaults", authBaseUrl).toString();
 const signupUrl = new URL("/signup", authBaseUrl);
 signupUrl.searchParams.set("return_to", vaultsUrl);
 signupUrl.searchParams.set("lang", locale);
+const billingUrl = localizedPath(locale, "/billing");
 const freeFeatures = [
   t.pricing.features.oneVault,
   t.pricing.features.freeStorage,
@@ -147,7 +148,7 @@ const starterFeatures = [
   </div>
 </Layout>
 
-<script define:vars={{ apiUrl, signupUrl: signupUrl.toString(), monthLabel: t.pricing.month, yearLabel: t.pricing.year }}>
+<script define:vars={{ apiUrl, signupUrl: signupUrl.toString(), billingUrl, monthLabel: t.pricing.month, yearLabel: t.pricing.year }}>
   const starterCheckoutButton = document.getElementById("starter-checkout-button");
   const starterDiscountBadge = document.getElementById("starter-discount-badge");
   const starterPrice = document.getElementById("starter-price");
@@ -222,6 +223,10 @@ const starterFeatures = [
 
         if (response.status === 401) {
           window.location.href = signupUrl;
+          return;
+        }
+        if (response.status === 409) {
+          window.location.href = billingUrl;
           return;
         }
 
