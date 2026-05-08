@@ -73,14 +73,14 @@
 				"consumers": [
 					{
 						"queue": "synch-vault-purge",
-						"max_batch_size": 5,
-						"max_batch_timeout": 30,
+						"max_batch_size": 1,
+						"max_batch_timeout": 0,
 						"max_retries": 3
 					},
 					{
 						"queue": "synch-policy-refresh",
-						"max_batch_size": 10,
-						"max_batch_timeout": 30,
+						"max_batch_size": 1,
+						"max_batch_timeout": 0,
 						"max_retries": 5
 					}
 				]
@@ -127,14 +127,14 @@
 				"consumers": [
 					{
 						"queue": "synch-vault-purge",
-						"max_batch_size": 5,
-						"max_batch_timeout": 30,
+						"max_batch_size": 1,
+						"max_batch_timeout": 0,
 						"max_retries": 3
 					},
 					{
 						"queue": "synch-policy-refresh",
-						"max_batch_size": 10,
-						"max_batch_timeout": 30,
+						"max_batch_size": 1,
+						"max_batch_timeout": 0,
 						"max_retries": 5
 					}
 				]
