@@ -35,7 +35,7 @@ describe("subscription policy refresh integration", () => {
 
 		await createQueueConsumer({
 			...env,
-			POLAR_STARTER_PRODUCT_ID: starterProductId,
+			POLAR_STARTER_MONTHLY_PRODUCT_ID: starterProductId,
 		}).handleBatch({
 			messages: [message],
 		} as never);

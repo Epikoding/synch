@@ -5,12 +5,15 @@ import type { Auth } from "../auth";
 import { apiError } from "../errors";
 import { createEnsureAuthenticatedSession } from "../middlewares/authenticated-session";
 import {
+	SUBSCRIPTION_BILLING_INTERVALS,
 	SUBSCRIPTION_PLAN_IDS,
+	type SubscriptionBillingInterval,
 	type SubscriptionPlanId,
 } from "../subscription/policy";
 import type { BillingService } from "./service";
 
 const checkoutRequestSchema = z.object({
+	billingInterval: z.enum(SUBSCRIPTION_BILLING_INTERVALS).optional(),
 	planId: z.enum(SUBSCRIPTION_PLAN_IDS).optional(),
 }).strict();
 
@@ -22,11 +25,12 @@ export function registerBillingRoutes(
 
 	app.post("/v1/billing/checkout", ensureAuthenticatedSession, async (c) => {
 		const user = c.var.user;
-		const { planId } = await readCheckoutRequestPlanId(c.req.raw);
+		const { billingInterval, planId } = await readCheckoutRequestPlanId(c.req.raw);
 		const checkout = await deps.billingService.createCheckout({
 			userId: user.id,
 			email: user.email,
 			planId,
+			billingInterval,
 		});
 
 		return c.json(checkout);
@@ -41,10 +45,11 @@ export function registerBillingRoutes(
 }
 
 async function readCheckoutRequestPlanId(request: Request): Promise<{
+	billingInterval: SubscriptionBillingInterval;
 	planId: SubscriptionPlanId;
 }> {
 	if (!request.headers.get("content-type")) {
-		return { planId: "starter" };
+		return { planId: "starter", billingInterval: "monthly" };
 	}
 
 	let json: unknown;
@@ -59,5 +64,8 @@ async function readCheckoutRequestPlanId(request: Request): Promise<{
 		throw apiError(400, "bad_request", "invalid checkout request");
 	}
 
-	return { planId: parsed.data.planId ?? "starter" };
+	return {
+		planId: parsed.data.planId ?? "starter",
+		billingInterval: parsed.data.billingInterval ?? "monthly",
+	};
 }

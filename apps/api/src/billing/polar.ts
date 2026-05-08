@@ -6,7 +6,10 @@ import type {
 	BillingRepository,
 	PolarSubscriptionUpsertInput,
 } from "./repository";
-import type { PaidSubscriptionPlanId } from "../subscription/policy";
+import type {
+	PaidSubscriptionPlanId,
+	SubscriptionBillingInterval,
+} from "../subscription/policy";
 
 export type PolarClientConfig = {
 	accessToken?: string;
@@ -51,6 +54,7 @@ export async function createPolarCheckout(
 	config: PolarClientConfig & { wwwBaseUrl: string },
 	input: {
 		planId: PaidSubscriptionPlanId;
+		billingInterval: SubscriptionBillingInterval;
 		productId: string;
 		organizationId: string;
 		userId: string;
@@ -73,6 +77,7 @@ export async function createPolarCheckout(
 			organizationId: input.organizationId,
 			userId: input.userId,
 			planId: input.planId,
+			billingInterval: input.billingInterval,
 		},
 	});
 

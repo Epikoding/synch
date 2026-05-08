@@ -1,5 +1,6 @@
 import { createApp } from "../app";
 import { createAuth } from "../auth";
+import { readPolarProductIdsByPlanId } from "../billing/product-ids";
 import { BillingRepository } from "../billing/repository";
 import { createPolarAuthPlugin } from "../billing/polar";
 import { BillingService } from "../billing/service";
@@ -22,7 +23,8 @@ type RuntimeEnv = Omit<Env, "AUTH_EMAIL_FROM" | "DEV_MODE" | "EMAIL"> & {
 	WWW_BASE_URL?: string;
 	POLAR_ACCESS_TOKEN?: string;
 	POLAR_WEBHOOK_SECRET?: string;
-	POLAR_STARTER_PRODUCT_ID?: string;
+	POLAR_STARTER_MONTHLY_PRODUCT_ID?: string;
+	POLAR_STARTER_ANNUAL_PRODUCT_ID?: string;
 	POLAR_SANDBOX?: string;
 };
 
@@ -36,9 +38,7 @@ export function createRuntimeApp(env: RuntimeEnv, request: Request) {
 		: resolveOriginBinding("WWW_BASE_URL", env.WWW_BASE_URL, "http://localhost:4321");
 	const db = createDb(env.DB);
 	const billingRepository = new BillingRepository(db);
-	const productIdsByPlanId = {
-		starter: env.POLAR_STARTER_PRODUCT_ID,
-	};
+	const productIdsByPlanId = readPolarProductIdsByPlanId(env);
 	const polarConfig = {
 		accessToken: env.POLAR_ACCESS_TOKEN,
 		webhookSecret: env.POLAR_WEBHOOK_SECRET,

@@ -1,3 +1,4 @@
+import { readPolarProductIdsByPlanId } from "../billing/product-ids";
 import { createDb } from "../db/client";
 import { SubscriptionPolicyRefreshConsumer } from "../subscription/policy-refresh-consumer";
 import type { SubscriptionPolicyRefreshMessage } from "../subscription/policy-refresh-queue";
@@ -15,9 +16,7 @@ export function createQueueConsumer(env: Env): QueueConsumer {
 	const db = createDb(env.DB);
 	const vaultRepository = new VaultRepository(db);
 	const subscriptionPolicyService = new SubscriptionPolicyService(env.SELF_HOSTED, db, {
-		productIdsByPlanId: {
-			starter: env.POLAR_STARTER_PRODUCT_ID,
-		},
+		productIdsByPlanId: readPolarProductIdsByPlanId(env),
 	});
 	const vaultService = new VaultService(vaultRepository, subscriptionPolicyService);
 	const coordinatorProxyRepository = new CoordinatorProxyRepository(env.SYNC_COORDINATOR);

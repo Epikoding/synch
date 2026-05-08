@@ -6,12 +6,14 @@ import {
 import type { BillingRepository } from "./repository";
 import type {
 	PaidSubscriptionPlanId,
+	SubscriptionBillingInterval,
 	SubscriptionPlanId,
+	SubscriptionProductIdsByPlanId,
 } from "../subscription/policy";
-import { subscriptionAccessPlanId } from "../subscription/policy-service";
+import { subscriptionAccess } from "../subscription/policy-service";
 
 export type BillingServiceConfig = PolarClientConfig & {
-	productIdsByPlanId?: Partial<Record<PaidSubscriptionPlanId, string>>;
+	productIdsByPlanId?: SubscriptionProductIdsByPlanId;
 	publicBaseUrl: string;
 	wwwBaseUrl: string;
 };
@@ -29,7 +31,9 @@ export class BillingService {
 		userId: string;
 		email: string;
 		planId: SubscriptionPlanId;
+		billingInterval?: SubscriptionBillingInterval;
 	}): Promise<{ checkoutId: string; url: string }> {
+		const billingInterval = input.billingInterval ?? "monthly";
 		const organizationId = await this.repository.readDefaultOrganizationIdForUser(
 			input.userId,
 		);
@@ -42,9 +46,12 @@ export class BillingService {
 		}
 
 		const planId = input.planId as PaidSubscriptionPlanId;
-		const productId = this.config.productIdsByPlanId?.[planId];
+		const productId =
+			this.config.productIdsByPlanId?.[planId]?.[billingInterval];
 		if (!productId) {
-			throw new Error(`Polar product ID is not configured for ${planId}`);
+			throw new Error(
+				`Polar product ID is not configured for ${planId} ${billingInterval}`,
+			);
 		}
 
 		const billingStatus = await this.readOrganizationBillingStatus(organizationId);
@@ -58,6 +65,7 @@ export class BillingService {
 
 		return await createPolarCheckout(this.config, {
 			planId,
+			billingInterval,
 			productId,
 			organizationId,
 			userId: input.userId,
@@ -67,6 +75,7 @@ export class BillingService {
 
 	async readBillingStatus(userId: string): Promise<{
 		planId: SubscriptionPlanId;
+		billingInterval: SubscriptionBillingInterval | null;
 		active: boolean;
 		status: string;
 	}> {
@@ -80,26 +89,28 @@ export class BillingService {
 
 	private async readOrganizationBillingStatus(organizationId: string): Promise<{
 		planId: SubscriptionPlanId;
+		billingInterval: SubscriptionBillingInterval | null;
 		active: boolean;
 		status: string;
 	}> {
 		const subscriptions =
 			await this.repository.readOrganizationSubscriptionStatuses(organizationId);
-		const activeSubscription = subscriptions.find(
-			(subscription) =>
-				subscriptionAccessPlanId(subscription, {
+		const activeSubscription = subscriptions
+			.map((subscription) => ({
+				subscription,
+				access: subscriptionAccess(subscription, {
 					productIdsByPlanId: this.config.productIdsByPlanId,
-				}) !== null,
-		);
-		const activePlanId = subscriptionAccessPlanId(activeSubscription, {
-			productIdsByPlanId: this.config.productIdsByPlanId,
-		});
-		const active = activePlanId !== null;
-		const planId: SubscriptionPlanId = activePlanId ?? "free";
+				}),
+			}))
+			.find(({ access }) => access !== null);
+		const active = activeSubscription !== undefined;
+		const planId: SubscriptionPlanId = activeSubscription?.access?.planId ?? "free";
 		return {
 			planId,
+			billingInterval: activeSubscription?.access?.billingInterval ?? null,
 			active,
-			status: activeSubscription?.status ?? subscriptions[0]?.status ?? "none",
+			status:
+				activeSubscription?.subscription.status ?? subscriptions[0]?.status ?? "none",
 		};
 	}
 }

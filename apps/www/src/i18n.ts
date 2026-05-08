@@ -94,6 +94,10 @@ export const ui = {
 			starterPlan: "Sync Starter",
 			forever: "/ forever",
 			month: "/ month",
+			year: "/ year",
+			monthly: "Monthly",
+			annual: "Annual",
+			annualDiscount: "$2 off",
 			comingSoon: "Coming Soon",
 			features: {
 				oneVault: "1 synced vault",
@@ -177,6 +181,10 @@ export const ui = {
 			starterPlan: "Sync Starter",
 			forever: "/ 평생 무료",
 			month: "/ 월",
+			year: "/ 년",
+			monthly: "월간",
+			annual: "연간",
+			annualDiscount: "$2 할인",
 			comingSoon: "준비 중",
 			features: {
 				oneVault: "vault 1개 동기화",

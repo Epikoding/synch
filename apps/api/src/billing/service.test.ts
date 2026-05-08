@@ -10,7 +10,7 @@ vi.mock("./polar", () => ({
 
 import type { BillingRepository } from "./repository";
 import { BillingService } from "./service";
-import type { PaidSubscriptionPlanId } from "../subscription/policy";
+import type { SubscriptionProductIdsByPlanId } from "../subscription/policy";
 
 describe("BillingService", () => {
 	beforeEach(() => {
@@ -42,17 +42,52 @@ describe("BillingService", () => {
 		expect(polarMocks.createPolarCheckout).toHaveBeenCalledWith(
 			expect.objectContaining({
 				productIdsByPlanId: {
-					starter: "starter-product",
+					starter: {
+						monthly: "starter-monthly-product",
+						annual: "starter-annual-product",
+					},
 				},
 				wwwBaseUrl: "https://synch.example",
 			}),
 			{
 				planId: "starter",
-				productId: "starter-product",
+				billingInterval: "monthly",
+				productId: "starter-monthly-product",
 				organizationId: "org-1",
 				userId: "user-1",
 				email: "user@example.com",
 			},
+		);
+	});
+
+	it("creates annual starter checkout for the user's default organization", async () => {
+		polarMocks.createPolarCheckout.mockResolvedValueOnce({
+			checkoutId: "checkout-annual",
+			url: "https://polar.example/checkout-annual",
+		});
+		const service = createBillingService(fakeBillingRepository({
+			defaultOrganizationId: "org-1",
+			subscriptions: [],
+		}));
+
+		await expect(
+			service.createCheckout({
+				userId: "user-1",
+				email: "user@example.com",
+				planId: "starter",
+				billingInterval: "annual",
+			}),
+		).resolves.toEqual({
+			checkoutId: "checkout-annual",
+			url: "https://polar.example/checkout-annual",
+		});
+		expect(polarMocks.createPolarCheckout).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				planId: "starter",
+				billingInterval: "annual",
+				productId: "starter-annual-product",
+			}),
 		);
 	});
 
@@ -77,7 +112,7 @@ describe("BillingService", () => {
 			defaultOrganizationId: "org-1",
 			subscriptions: [
 				{
-					productId: "starter-product",
+					productId: "starter-monthly-product",
 					status: "active",
 					periodEnd: new Date(Date.now() + 60_000),
 					updatedAt: new Date(),
@@ -109,8 +144,12 @@ describe("BillingService", () => {
 				],
 			}),
 			{
-				starter: "starter-product",
-				pro: "pro-product",
+				starter: {
+					monthly: "starter-monthly-product",
+				},
+				pro: {
+					monthly: "pro-product",
+				},
 			} as never,
 		);
 
@@ -139,7 +178,7 @@ describe("BillingService", () => {
 				email: "user@example.com",
 				planId: "starter",
 			}),
-		).rejects.toThrow("Polar product ID is not configured for starter");
+		).rejects.toThrow("Polar product ID is not configured for starter monthly");
 		expect(polarMocks.createPolarCheckout).not.toHaveBeenCalled();
 	});
 
@@ -171,7 +210,7 @@ describe("BillingService", () => {
 			defaultOrganizationId: "org-1",
 			subscriptions: [
 				{
-					productId: "starter-product",
+					productId: "starter-monthly-product",
 					status: "active",
 					periodEnd: new Date(Date.now() + 60_000),
 					updatedAt: new Date(),
@@ -181,6 +220,28 @@ describe("BillingService", () => {
 
 		await expect(service.readBillingStatus("user-1")).resolves.toEqual({
 			planId: "starter",
+			billingInterval: "monthly",
+			active: true,
+			status: "active",
+		});
+	});
+
+	it("reports starter annual billing status for a matching annual product subscription", async () => {
+		const service = createBillingService(fakeBillingRepository({
+			defaultOrganizationId: "org-1",
+			subscriptions: [
+				{
+					productId: "starter-annual-product",
+					status: "active",
+					periodEnd: new Date(Date.now() + 60_000),
+					updatedAt: new Date(),
+				},
+			],
+		}));
+
+		await expect(service.readBillingStatus("user-1")).resolves.toEqual({
+			planId: "starter",
+			billingInterval: "annual",
 			active: true,
 			status: "active",
 		});
@@ -201,6 +262,7 @@ describe("BillingService", () => {
 
 		await expect(service.readBillingStatus("user-1")).resolves.toEqual({
 			planId: "free",
+			billingInterval: null,
 			active: false,
 			status: "active",
 		});
@@ -209,8 +271,11 @@ describe("BillingService", () => {
 
 function createBillingService(
 	repository: BillingRepository,
-	productIdsByPlanId: Partial<Record<PaidSubscriptionPlanId, string>> = {
-		starter: "starter-product",
+	productIdsByPlanId: SubscriptionProductIdsByPlanId = {
+		starter: {
+			monthly: "starter-monthly-product",
+			annual: "starter-annual-product",
+		},
 	},
 ): BillingService {
 	return new BillingService(repository, {

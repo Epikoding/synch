@@ -38,6 +38,7 @@ describe("createPolarCheckout", () => {
 				},
 				{
 					planId: "starter",
+					billingInterval: "monthly",
 					productId: "starter-product",
 					organizationId: "org-1",
 					userId: "user-1",
@@ -63,6 +64,7 @@ describe("createPolarCheckout", () => {
 				organizationId: "org-1",
 				userId: "user-1",
 				planId: "starter",
+				billingInterval: "monthly",
 			},
 		});
 	});
@@ -75,6 +77,7 @@ describe("createPolarCheckout", () => {
 				},
 				{
 					planId: "starter",
+					billingInterval: "monthly",
 					productId: "starter-product",
 					organizationId: "org-1",
 					userId: "user-1",
@@ -96,6 +99,7 @@ describe("createPolarCheckout", () => {
 				},
 				{
 					planId: "starter",
+					billingInterval: "monthly",
 					productId: "starter-product",
 					organizationId: "org-1",
 					userId: "user-1",

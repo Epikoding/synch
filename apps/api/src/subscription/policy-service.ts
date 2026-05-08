@@ -6,8 +6,10 @@ import {
 	applySubscriptionPlanLimitOverrides,
 	getSubscriptionPlanPolicy,
 	type PaidSubscriptionPlanId,
+	type SubscriptionBillingInterval,
 	type SubscriptionPlanId,
 	type SubscriptionPlanPolicy,
+	type SubscriptionProductIdsByPlanId,
 } from "./policy";
 
 export type SubscriptionPolicyReader = {
@@ -18,7 +20,7 @@ const ACTIVE_ACCESS_STATUSES = new Set(["active", "trialing"]);
 const PERIOD_ACCESS_STATUSES = new Set(["canceled", "past_due", "unpaid"]);
 
 export type SubscriptionPolicyServiceConfig = {
-	productIdsByPlanId?: Partial<Record<PaidSubscriptionPlanId, string>>;
+	productIdsByPlanId?: SubscriptionProductIdsByPlanId;
 };
 
 export class SubscriptionPolicyService implements SubscriptionPolicyReader {
@@ -49,11 +51,11 @@ export class SubscriptionPolicyService implements SubscriptionPolicyReader {
 
 		const activePlanId = subscriptions
 			.map((subscription) =>
-				subscriptionAccessPlanId(subscription, {
+				subscriptionAccess(subscription, {
 					productIdsByPlanId: this.config.productIdsByPlanId,
 				}),
 			)
-			.find((planId) => planId !== null);
+			.find((access) => access !== null)?.planId;
 		const basePolicy = getSubscriptionPlanPolicy(activePlanId ?? "free");
 
 		const organizations = await this.db
@@ -108,6 +110,35 @@ export function subscriptionAccessPlanId(
 		| undefined,
 	config: SubscriptionPolicyServiceConfig = {},
 ): SubscriptionPlanId | null {
+	return subscriptionAccess(subscription, config)?.planId ?? null;
+}
+
+export function subscriptionBillingInterval(
+	subscription:
+		| {
+				productId?: string;
+				status: string;
+				periodEnd: Date | null;
+		  }
+		| undefined,
+	config: SubscriptionPolicyServiceConfig = {},
+): SubscriptionBillingInterval | null {
+	return subscriptionAccess(subscription, config)?.billingInterval ?? null;
+}
+
+export function subscriptionAccess(
+	subscription:
+		| {
+				productId?: string;
+				status: string;
+				periodEnd: Date | null;
+		  }
+		| undefined,
+	config: SubscriptionPolicyServiceConfig = {},
+): {
+	planId: PaidSubscriptionPlanId;
+	billingInterval: SubscriptionBillingInterval;
+} | null {
 	if (!subscription) {
 		return null;
 	}
@@ -116,9 +147,16 @@ export function subscriptionAccessPlanId(
 	}
 
 	const productIdsByPlanId = config.productIdsByPlanId ?? {};
-	for (const [planId, productId] of Object.entries(productIdsByPlanId)) {
-		if (productId && subscription.productId === productId) {
-			return planId as PaidSubscriptionPlanId;
+	for (const [planId, productIdsByInterval] of Object.entries(productIdsByPlanId)) {
+		for (const [billingInterval, productId] of Object.entries(
+			productIdsByInterval ?? {},
+		)) {
+			if (productId && subscription.productId === productId) {
+				return {
+					planId: planId as PaidSubscriptionPlanId,
+					billingInterval: billingInterval as SubscriptionBillingInterval,
+				};
+			}
 		}
 	}
 

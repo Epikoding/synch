@@ -9,6 +9,7 @@ import {
 	SubscriptionPolicyService,
 	subscriptionGrantsAccess,
 	subscriptionAccessPlanId,
+	subscriptionBillingInterval,
 } from "./policy-service";
 
 describe("SubscriptionPolicyService", () => {
@@ -35,6 +36,8 @@ describe("SubscriptionPolicyService", () => {
 		const policy = getSubscriptionPlanPolicy("starter");
 
 		expect(policy.pricing.monthlyUsd).toBe(1);
+		expect(policy.pricing.annualMonthlyUsd).toBeCloseTo(10 / 12);
+		expect(policy.pricing.annualUsd).toBe(10);
 		expect(policy.limits.storageLimitBytes).toBe(1_000_000_000);
 		expect(policy.limits.maxFileSizeBytes).toBe(5_000_000);
 		expect(policy.limits.versionHistoryRetentionDays).toBe(1);
@@ -47,16 +50,19 @@ describe("SubscriptionPolicyService", () => {
 				organization: null,
 				subscriptions: [
 					{
-						productId: "starter-product",
+						productId: "starter-annual-product",
 						status: "active",
 						periodEnd: new Date(Date.now() + 60_000),
 					},
 				],
 			}),
 			{
-				productIdsByPlanId: {
-					starter: "starter-product",
-				},
+					productIdsByPlanId: {
+						starter: {
+							monthly: "starter-monthly-product",
+							annual: "starter-annual-product",
+						},
+					},
 			},
 		).readOrganizationPolicy("org-1");
 
@@ -77,9 +83,12 @@ describe("SubscriptionPolicyService", () => {
 				],
 			}),
 			{
-				productIdsByPlanId: {
-					starter: "starter-product",
-				},
+					productIdsByPlanId: {
+						starter: {
+							monthly: "starter-monthly-product",
+							annual: "starter-annual-product",
+						},
+					},
 			},
 		).readOrganizationPolicy("org-1");
 
@@ -147,21 +156,41 @@ describe("SubscriptionPolicyService", () => {
 		);
 	});
 
-	it("maps subscriptions to plan ids through product ids", () => {
+	it("maps subscriptions to plan ids and billing intervals through product ids", () => {
 		expect(
 			subscriptionAccessPlanId(
 				{
-					productId: "starter-product",
+					productId: "starter-annual-product",
 					status: "active",
 					periodEnd: new Date(Date.now() + 60_000),
 				},
 				{
 					productIdsByPlanId: {
-						starter: "starter-product",
+						starter: {
+							monthly: "starter-monthly-product",
+							annual: "starter-annual-product",
+						},
 					},
 				},
 			),
 		).toBe("starter");
+		expect(
+			subscriptionBillingInterval(
+				{
+					productId: "starter-annual-product",
+					status: "active",
+					periodEnd: new Date(Date.now() + 60_000),
+				},
+				{
+					productIdsByPlanId: {
+						starter: {
+							monthly: "starter-monthly-product",
+							annual: "starter-annual-product",
+						},
+					},
+				},
+			),
+		).toBe("annual");
 		expect(
 			subscriptionAccessPlanId(
 				{
@@ -171,7 +200,10 @@ describe("SubscriptionPolicyService", () => {
 				},
 				{
 					productIdsByPlanId: {
-						starter: "starter-product",
+						starter: {
+							monthly: "starter-monthly-product",
+							annual: "starter-annual-product",
+						},
 					},
 				},
 			),

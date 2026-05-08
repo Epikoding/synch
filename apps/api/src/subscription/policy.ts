@@ -2,9 +2,18 @@ export const BYTES_PER_MB = 1_000_000;
 export const BYTES_PER_GB = 1_000_000_000;
 
 export const SUBSCRIPTION_PLAN_IDS = ["free", "starter", "self_hosted"] as const;
+export const SUBSCRIPTION_BILLING_INTERVALS = ["monthly", "annual"] as const;
 
 export type SubscriptionPlanId = (typeof SUBSCRIPTION_PLAN_IDS)[number];
 export type PaidSubscriptionPlanId = Exclude<SubscriptionPlanId, "free" | "self_hosted">;
+export type SubscriptionBillingInterval =
+	(typeof SUBSCRIPTION_BILLING_INTERVALS)[number];
+export type SubscriptionProductIdsByPlanId = Partial<
+	Record<
+		PaidSubscriptionPlanId,
+		Partial<Record<SubscriptionBillingInterval, string>>
+	>
+>;
 
 export type SubscriptionPlanPolicy = {
 	id: SubscriptionPlanId;
@@ -57,8 +66,8 @@ export const SUBSCRIPTION_PLAN_POLICIES = {
 		badge: "$1/month",
 		pricing: {
 			monthlyUsd: 1,
-			annualMonthlyUsd: 1,
-			annualUsd: 12,
+			annualMonthlyUsd: 10 / 12,
+			annualUsd: 10,
 		},
 		limits: {
 			syncedVaults: 1,
